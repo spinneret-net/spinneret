@@ -1,11 +1,11 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
         <TargetFramework>net10.0</TargetFramework>
         <Nullable>enable</Nullable>
         <ImplicitUsings>enable</ImplicitUsings>
         <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
-        <NoWarn>CS8524</NoWarn>
+        <NoWarn>$(NoWarn);CS8524</NoWarn>
     </PropertyGroup>
 
     <ItemGroup>
@@ -15,5 +15,10 @@
     <ItemGroup>
         <ProjectReference Include="..\Spinneret.Mediator\Spinneret.Mediator.csproj" />
     </ItemGroup>
+
+    <PropertyGroup>
+        <Description>Recurring jobs declared in code and installed idempotently at startup, dispatched as mediator requests.</Description>
+        <PackageTags>$(PackageTags) scheduler recurring-jobs cron background-jobs</PackageTags>
+    </PropertyGroup>
 
 </Project>

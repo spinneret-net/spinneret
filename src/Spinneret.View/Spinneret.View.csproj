@@ -5,7 +5,7 @@
         <Nullable>enable</Nullable>
         <ImplicitUsings>enable</ImplicitUsings>
         <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
-        <NoWarn>CS8524</NoWarn>
+        <NoWarn>$(NoWarn);CS8524</NoWarn>
     </PropertyGroup>
 
     <ItemGroup>
@@ -16,5 +16,10 @@
     <ItemGroup>
       <ProjectReference Include="..\Spinneret.ViewModel\Spinneret.ViewModel.csproj" />
     </ItemGroup>
+
+    <PropertyGroup>
+        <Description>Blazor view layer: ViewBase components that resolve their view model from DI, with lifecycle state and app-wide refresh coordination.</Description>
+        <PackageTags>$(PackageTags) blazor mvvm components views</PackageTags>
+    </PropertyGroup>
 
 </Project>

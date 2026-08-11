@@ -5,12 +5,17 @@
         <Nullable>enable</Nullable>
         <ImplicitUsings>enable</ImplicitUsings>
         <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
-        <NoWarn>CS8524</NoWarn>
+        <NoWarn>$(NoWarn);CS8524</NoWarn>
     </PropertyGroup>
 
     <ItemGroup>
         <ProjectReference Include="..\Spinneret.Functional\Spinneret.Functional.csproj" />
         <ProjectReference Include="..\Spinneret.Parsing\Spinneret.Parsing.csproj" />
     </ItemGroup>
+
+    <PropertyGroup>
+        <Description>MVVM for Blazor: bindable view models, two-way bindings with conversion and validation state, row collections, and nested view models.</Description>
+        <PackageTags>$(PackageTags) blazor mvvm viewmodel data-binding validation</PackageTags>
+    </PropertyGroup>
 
 </Project>

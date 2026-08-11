@@ -1,11 +1,11 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
         <TargetFramework>net10.0</TargetFramework>
         <Nullable>enable</Nullable>
         <ImplicitUsings>enable</ImplicitUsings>
         <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
-        <NoWarn>CS8524</NoWarn>
+        <NoWarn>$(NoWarn);CS8524</NoWarn>
     </PropertyGroup>
 
     <ItemGroup>
@@ -21,5 +21,10 @@
         <ProjectReference Include="..\Spinneret.Scheduler\Spinneret.Scheduler.csproj" />
         <ProjectReference Include="..\Spinneret.Queue.Gcp\Spinneret.Queue.Gcp.csproj" />
     </ItemGroup>
+
+    <PropertyGroup>
+        <Description>Firestore-backed implementation of Spinneret.Scheduler with transactional dispatch.</Description>
+        <PackageTags>$(PackageTags) scheduler gcp firestore google-cloud</PackageTags>
+    </PropertyGroup>
 
 </Project>
