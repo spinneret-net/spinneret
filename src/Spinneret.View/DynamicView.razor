@@ -1,0 +1,18 @@
+﻿@using Spinneret.ViewModel
+
+@inject IViewResolver ViewResolver;
+
+<DynamicComponent Type="@ViewType" Parameters="@ViewParameters" />
+
+@code
+{
+    [Parameter, EditorRequired]
+    public IViewModel ViewModel { get; set; } = null!;
+
+    private Type ViewType => ViewResolver.ResolveViewType(ViewModel.GetType());
+
+    private Dictionary<string, object> ViewParameters => new ()
+        {
+            { nameof(IView<IViewModel>.ViewModel), ViewModel },
+        };
+}

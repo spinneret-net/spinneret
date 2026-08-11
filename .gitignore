@@ -1,0 +1,35 @@
+# Build output
+bin/
+obj/
+artifacts/
+
+# Packages produced by local `dotnet pack`
+*.nupkg
+*.snupkg
+
+# Test and coverage results
+TestResults/
+coverage*.json
+coverage*.xml
+coverage*.info
+*.trx
+
+# IDE — Visual Studio
+.vs/
+*.user
+*.suo
+
+# IDE — Rider / ReSharper
+.idea/
+*.DotSettings.user
+
+# IDE — VS Code (keep shared settings if you ever add them deliberately)
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# OS noise
+Thumbs.db
+.DS_Store
