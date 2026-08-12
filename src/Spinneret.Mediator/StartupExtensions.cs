@@ -14,7 +14,7 @@ public static class StartupExtensions
         foreach (var assembly in mediatorAssemblies)
         {
             var handlers = assembly.GetTypes()
-                .Where(t => t is { IsAbstract: false, IsInterface: false })
+                .Where(t => t is { IsAbstract: false, IsInterface: false, IsGenericTypeDefinition: false })
                 .SelectMany(t => t.GetInterfaces()
                     .Where(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IRequestHandler<,>))
                     .Select(i => (Impl: t, Iface: i)));

@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Runtime.ExceptionServices;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Spinneret.Mediator;
@@ -53,6 +54,16 @@ internal sealed class SpinneretMediator(IServiceProvider serviceProvider, ITagIn
         var handlerType = typeof(IRequestHandler<,>).MakeGenericType(request.GetType(), typeof(TResponse));
         var handler = serviceProvider.GetRequiredService(handlerType);
         var method = handlerType.GetMethod(nameof(IRequestHandler<,>.Handle))!;
-        return (Task<TResponse>)method.Invoke(handler, [request, cancellationToken])!;
+        try
+        {
+            return (Task<TResponse>)method.Invoke(handler, [request, cancellationToken])!;
+        }
+        catch (TargetInvocationException e) when (e.InnerException is not null)
+        {
+            // Unwrap so synchronously thrown handler exceptions surface like async ones,
+            // with the original stack trace preserved.
+            ExceptionDispatchInfo.Capture(e.InnerException).Throw();
+            throw; // Unreachable.
+        }
     }
 }

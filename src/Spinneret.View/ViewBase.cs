@@ -96,6 +96,14 @@ public abstract class ViewBase<T> : ComponentBase, IView<T>, IAsyncDisposable wh
         
         await SafeExecute(() => InitializeViewModel(SpecifiedViewModel), "Initialize updated view model");
 
+        // A failed initialization must leave the view in InitializationFailed, mirroring the
+        // refresh path: InitializeViewModel sets the state before rethrowing and SafeExecute
+        // reports the exception, so the view renders nothing and never subscribes.
+        if (State == ViewState.InitializationFailed)
+        {
+            return;
+        }
+
         State = ViewState.Initialized;
 
         // Only views that resolve their own view model from DI can refresh by re-resolving it.

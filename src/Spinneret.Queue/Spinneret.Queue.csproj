@@ -19,7 +19,7 @@
     </ItemGroup>
 
     <ItemGroup>
-        <InternalsVisibleTo Include="Spinneret.Tests" />
+        <InternalsVisibleTo Include="Spinneret.Queue.Tests" />
     </ItemGroup>
 
     <PropertyGroup>

@@ -1,11 +1,23 @@
 <Solution>
-  <Project Path="src\Spinneret.Functional\Spinneret.Functional.csproj" Type="Classic C#" />
-  <Project Path="src\Spinneret.Mediator\Spinneret.Mediator.csproj" Type="Classic C#" />
-  <Project Path="src\Spinneret.Parsing\Spinneret.Parsing.csproj" Type="Classic C#" />
-  <Project Path="src\Spinneret.Queue.Gcp\Spinneret.Queue.Gcp.csproj" Type="Classic C#" />
-  <Project Path="src\Spinneret.Queue\Spinneret.Queue.csproj" Type="Classic C#" />
-  <Project Path="src\Spinneret.Scheduler.Gcp\Spinneret.Scheduler.Gcp.csproj" Type="Classic C#" />
-  <Project Path="src\Spinneret.Scheduler\Spinneret.Scheduler.csproj" Type="Classic C#" />
-  <Project Path="src\Spinneret.ViewModel\Spinneret.ViewModel.csproj" Type="Classic C#" />
-  <Project Path="src\Spinneret.View\Spinneret.View.csproj" Type="Classic C#" />
+  <Folder Name="/src/">
+    <Project Path="src\Spinneret.Functional\Spinneret.Functional.csproj" Type="Classic C#" />
+    <Project Path="src\Spinneret.Mediator\Spinneret.Mediator.csproj" Type="Classic C#" />
+    <Project Path="src\Spinneret.Parsing\Spinneret.Parsing.csproj" Type="Classic C#" />
+    <Project Path="src\Spinneret.Queue\Spinneret.Queue.csproj" Type="Classic C#" />
+    <Project Path="src\Spinneret.Queue.Gcp\Spinneret.Queue.Gcp.csproj" Type="Classic C#" />
+    <Project Path="src\Spinneret.Scheduler\Spinneret.Scheduler.csproj" Type="Classic C#" />
+    <Project Path="src\Spinneret.Scheduler.Gcp\Spinneret.Scheduler.Gcp.csproj" Type="Classic C#" />
+    <Project Path="src\Spinneret.View\Spinneret.View.csproj" Type="Classic C#" />
+    <Project Path="src\Spinneret.ViewModel\Spinneret.ViewModel.csproj" Type="Classic C#" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests\Spinneret.Functional.Tests\Spinneret.Functional.Tests.csproj" Type="Classic C#" />
+    <Project Path="tests\Spinneret.Mediator.Tests\Spinneret.Mediator.Tests.csproj" Type="Classic C#" />
+    <Project Path="tests\Spinneret.Parsing.Tests\Spinneret.Parsing.Tests.csproj" Type="Classic C#" />
+    <Project Path="tests\Spinneret.Queue.Tests\Spinneret.Queue.Tests.csproj" Type="Classic C#" />
+    <Project Path="tests\Spinneret.Queue.Gcp.Tests\Spinneret.Queue.Gcp.Tests.csproj" Type="Classic C#" />
+    <Project Path="tests\Spinneret.Scheduler.Gcp.Tests\Spinneret.Scheduler.Gcp.Tests.csproj" Type="Classic C#" />
+    <Project Path="tests\Spinneret.View.Tests\Spinneret.View.Tests.csproj" Type="Classic C#" />
+    <Project Path="tests\Spinneret.ViewModel.Tests\Spinneret.ViewModel.Tests.csproj" Type="Classic C#" />
+  </Folder>
 </Solution>

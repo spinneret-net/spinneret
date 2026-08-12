@@ -62,11 +62,18 @@ public class PropertyParser<TModel, TError>(
     }
 
     public TParsed Nest<TNestedModel, TParsed>(
-        Expression<Func<TModel, TNestedModel>> expression, 
+        Expression<Func<TModel, TNestedModel>> expression,
         Func<PropertyParser<TNestedModel, TError>, TParsed> nestedParser)
     {
         var memberName = GetMemberName(expression);
         var memberValue = GetMemberValue(expression);
+
+        if (memberValue == null)
+        {
+            AddError(memberName, errorForMissingProperty);
+            return default!;
+        }
+
         var nestedPropertyParser = CreateNested(memberValue, memberName);
         return nestedParser(nestedPropertyParser);
     }
@@ -157,6 +164,7 @@ public class PropertyParser<TModel, TError>(
         }
 
         var res = new List<TParsed>();
+        var hasErrors = false;
         for (var i = 0; i < memberValues.Count; ++i)
         {
             var memberValue = memberValues[i];
@@ -164,11 +172,12 @@ public class PropertyParser<TModel, TError>(
             if (memberValue == null)
             {
                 AddError(GetIndexedMemberName(memberName, i), errorForMissingProperty);
-                return [];
+                hasErrors = true;
+                continue;
             }
 
             var memberIndex = i;
-            var parseSucceeded = parser(memberValues[i]).Reduce(
+            var parseSucceeded = parser(memberValue).Reduce(
                 parsed => {
                     res.Add(parsed);
                     return true;
@@ -181,11 +190,11 @@ public class PropertyParser<TModel, TError>(
 
             if (!parseSucceeded)
             {
-                return [];
+                hasErrors = true;
             }
         }
 
-        return res;
+        return hasErrors ? [] : res;
     }
 
     public IEnumerable<TParsed> NestMany<TNestedModel, TParsed>(
@@ -230,7 +239,7 @@ public class PropertyParser<TModel, TError>(
 
         var res = memberValue is null || memberValue is string value && string.IsNullOrWhiteSpace(value)
             ? Result<TParsed?, TError>.Ok(null)
-            : parser(memberValue).Map(x => (TParsed?) x);
+            : parser(memberValue).Map(TParsed? (x) => x);
 
         return ReduceResult(memberName, res);
     }
@@ -245,7 +254,7 @@ public class PropertyParser<TModel, TError>(
 
         var res = (memberValue is null)
             ? Result<TParsed?, TError>.Ok(null)
-            : parser(memberValue.Value).Map(x => (TParsed?)x);
+            : parser(memberValue.Value).Map(TParsed? (x) => x);
 
         return ReduceResult(memberName, res);
     }
@@ -309,7 +318,7 @@ public class PropertyParser<TModel, TError>(
         var memberName = GetMemberName(expression);
         var memberValue = GetMemberValue(expression);
 
-        var res = memberValue is null
+        var res = memberValue is null || memberValue is string value && string.IsNullOrWhiteSpace(value)
             ? Result<TParsed?, TError>.Ok(null)
             : parser(memberValue).Map(x => (TParsed?)x);
 

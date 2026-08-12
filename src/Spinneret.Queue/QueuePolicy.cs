@@ -89,10 +89,17 @@ public sealed record QueuePolicy
 
     public ExhaustedAction OnExhausted { get; init; } = ExhaustedAction.DeadLetter;
 
-    /// <summary>The delay before redelivery after failed execution number <paramref name="attempt"/> (1-based).</summary>
+    /// <summary>
+    /// The delay before redelivery after failed execution number <paramref name="attempt"/> (1-based),
+    /// capped at <see cref="MaxBackoff"/>. Returns the cap directly when doubling would overshoot it,
+    /// so no policy/attempt combination can overflow the underlying tick arithmetic.
+    /// </summary>
     public TimeSpan BackoffFor(int attempt)
     {
         var factor = Math.Pow(2, Math.Clamp(attempt - 1, 0, 30));
+        if (MinBackoff.Ticks > MaxBackoff.Ticks / factor)
+            return MaxBackoff;
+
         var backoff = MinBackoff * factor;
         return backoff > MaxBackoff ? MaxBackoff : backoff;
     }

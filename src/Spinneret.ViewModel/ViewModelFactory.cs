@@ -12,7 +12,7 @@ public class ViewModelFactory(IServiceProvider services) : IViewModelFactory
         var instance = services.GetService(typeof(T));
 
         if (instance is null)
-            throw new InvalidOperationException($"No service registered for modal type {typeof(T).Name}");
+            throw new InvalidOperationException($"No service registered for model type {typeof(T).Name}");
 
         return (T)instance;
     }

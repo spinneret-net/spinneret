@@ -22,6 +22,10 @@
         <ProjectReference Include="..\Spinneret.Queue.Gcp\Spinneret.Queue.Gcp.csproj" />
     </ItemGroup>
 
+    <ItemGroup>
+        <InternalsVisibleTo Include="Spinneret.Scheduler.Gcp.Tests" />
+    </ItemGroup>
+
     <PropertyGroup>
         <Description>Firestore-backed implementation of Spinneret.Scheduler with transactional dispatch.</Description>
         <PackageTags>$(PackageTags) scheduler gcp firestore google-cloud</PackageTags>

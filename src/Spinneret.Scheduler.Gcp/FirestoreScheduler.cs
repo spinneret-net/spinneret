@@ -15,8 +15,10 @@ internal sealed class FirestoreScheduler(
     {
         if (string.IsNullOrWhiteSpace(key))
             throw new ArgumentException("A recurring job requires a stable key.", nameof(key));
-        if (interval <= Duration.Zero)
-            throw new ArgumentOutOfRangeException(nameof(interval), "A recurring interval must be positive.");
+        if (interval < Duration.FromSeconds(1))
+            throw new ArgumentOutOfRangeException(nameof(interval),
+                "A recurring interval must be at least one second: the interval is persisted in whole "
+                + "seconds, so a sub-second value would degrade the job to a one-shot.");
 
         var docRef = db.Collection(options.Value.Collection).Document(key);
         var definition = factory.RecurringDefinition(request, interval);

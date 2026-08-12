@@ -6,7 +6,7 @@ namespace Spinneret.ViewModel;
 
 public abstract class ViewModelBase : BindableBase, IViewModel, IValidationStateProvider
 {
-    private bool _initialized = true;
+    private bool _initializationPending = true;
     private CancellationToken? _cancellationToken;
     private readonly SemaphoreSlim _updateLock = new(1, 1);
 
@@ -74,7 +74,7 @@ public abstract class ViewModelBase : BindableBase, IViewModel, IValidationState
     {
         _cancellationToken = cancellationToken;
         
-        if (_initialized)
+        if (_initializationPending)
         {
             await _updateLock.WaitAsync(cancellationToken);
             try
@@ -85,13 +85,17 @@ public abstract class ViewModelBase : BindableBase, IViewModel, IValidationState
             {
                 _updateLock.Release();
             }
-            _initialized = false;
+            _initializationPending = false;
         }
     }
-    
+
     public async Task UpdateAsync(ICollection<string> changedProperties)
     {
-        await _updateLock.WaitAsync(_cancellationToken!.Value);
+        if (_cancellationToken is null)
+            throw new InvalidOperationException(
+                $"{nameof(InitializeAsync)} must be called before {nameof(UpdateAsync)}.");
+
+        await _updateLock.WaitAsync(_cancellationToken.Value);
         try
         {
             await OnUpdateAsync(changedProperties);

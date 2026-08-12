@@ -3,8 +3,15 @@ namespace Spinneret.Mediator;
 [AttributeUsage(AttributeTargets.Class)]
 public sealed class CacheAttribute(int seconds, params object[] tags) : Attribute
 {
-    public TimeSpan Duration { get; } = TimeSpan.FromSeconds(seconds);
+    public TimeSpan Duration { get; } = ValidateDuration(seconds);
     public IReadOnlyList<Enum> Tags { get; } = ValidateTags(tags);
+
+    private static TimeSpan ValidateDuration(int seconds)
+    {
+        if (seconds <= 0)
+            throw new ArgumentOutOfRangeException(nameof(seconds), seconds, "CacheAttribute duration must be greater than zero seconds.");
+        return TimeSpan.FromSeconds(seconds);
+    }
 
     private static Enum[] ValidateTags(object[] tags)
     {

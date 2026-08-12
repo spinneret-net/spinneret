@@ -24,21 +24,28 @@ public sealed class QueueTypeRegistry
                 if (type is { IsAbstract: true } or { IsInterface: true })
                     continue;
 
-                foreach (var iface in type.GetInterfaces())
-                {
-                    if (!iface.IsGenericType || iface.GetGenericTypeDefinition() != typeof(IRequest<>))
-                        continue;
+                var requestInterfaces = type.GetInterfaces()
+                    .Where(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IRequest<>))
+                    .ToArray();
 
-                    var responseType = iface.GetGenericArguments()[0];
-                    var key = type.FullName ?? throw new InvalidOperationException(
-                        $"Cannot register request type without a FullName: {type}");
+                if (requestInterfaces.Length == 0)
+                    continue;
 
-                    if (entries.TryGetValue(key, out var existing) && existing.RequestType != type)
-                        throw new InvalidOperationException(
-                            $"Duplicate IRequest type name '{key}' in registered assemblies: {existing.RequestType.AssemblyQualifiedName} vs {type.AssemblyQualifiedName}.");
+                var key = type.FullName ?? throw new InvalidOperationException(
+                    $"Cannot register request type without a FullName: {type}");
 
-                    entries[key] = new RegisteredRequest(type, responseType, BuildPolicy(type));
-                }
+                if (requestInterfaces.Length > 1)
+                    throw new InvalidOperationException(
+                        $"Request type '{key}' implements IRequest<> with multiple response types " +
+                        $"({string.Join(", ", requestInterfaces.Select(i => i.GetGenericArguments()[0].Name))}); " +
+                        $"a queued command must implement exactly one IRequest<> so its response type is unambiguous.");
+
+                if (entries.TryGetValue(key, out var existing) && existing.RequestType != type)
+                    throw new InvalidOperationException(
+                        $"Duplicate IRequest type name '{key}' in registered assemblies: {existing.RequestType.AssemblyQualifiedName} vs {type.AssemblyQualifiedName}.");
+
+                var responseType = requestInterfaces[0].GetGenericArguments()[0];
+                entries[key] = new RegisteredRequest(type, responseType, BuildPolicy(type));
             }
         }
 
