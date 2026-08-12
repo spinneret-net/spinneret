@@ -90,14 +90,14 @@ public class ScheduledJobDocumentFactoryTests
     }
 
     [Test]
-    public async Task OneShot_omits_interval_marking_the_job_as_one_shot()
+    public async Task OneShot_omits_schedule_marking_the_job_as_one_shot()
     {
-        // The dispatcher treats the absence of intervalSeconds as the one-shot marker.
+        // The dispatcher treats the absence of schedule as the one-shot marker.
         var factory = CreateFactory();
 
         var doc = factory.OneShot(new TestRequest("x"), Instant.FromUtc(2030, 1, 2, 3, 4, 5));
 
-        await Assert.That(doc.ContainsKey(ScheduledJob.Fields.IntervalSeconds)).IsFalse();
+        await Assert.That(doc.ContainsKey(ScheduledJob.Fields.Schedule)).IsFalse();
         await Assert.That(doc.ContainsKey(ScheduledJob.Fields.LastRunAt)).IsFalse();
     }
 
@@ -114,35 +114,26 @@ public class ScheduledJobDocumentFactoryTests
     // --------------------------------------------------------------------- RecurringDefinition ---
 
     [Test]
-    public async Task RecurringDefinition_maps_interval_to_whole_seconds()
+    public async Task RecurringDefinition_writes_the_canonical_schedule_string()
     {
         var factory = CreateFactory();
+        var schedule = Schedule.Every(Duration.FromMinutes(15));
 
-        var doc = factory.RecurringDefinition(new TestRequest("x"), Duration.FromMinutes(15));
+        var doc = factory.RecurringDefinition(new TestRequest("x"), schedule);
 
-        await Assert.That((long)doc[ScheduledJob.Fields.IntervalSeconds]).IsEqualTo(900L);
+        await Assert.That((string)doc[ScheduledJob.Fields.Schedule]).IsEqualTo(schedule.ToString());
     }
 
     [Test]
-    public async Task RecurringDefinition_truncates_fractional_seconds()
+    public async Task RecurringDefinition_daily_schedule_writes_the_canonical_schedule_string()
     {
         var factory = CreateFactory();
+        var zone = DateTimeZoneProviders.Tzdb["Europe/Stockholm"];
 
-        var doc = factory.RecurringDefinition(new TestRequest("x"), Duration.FromMilliseconds(1500));
+        var doc = factory.RecurringDefinition(new TestRequest("x"), Schedule.Daily(zone, new LocalTime(1, 0)));
 
-        await Assert.That((long)doc[ScheduledJob.Fields.IntervalSeconds]).IsEqualTo(1L);
-    }
-
-    [Test]
-    public async Task RecurringDefinition_subsecond_interval_throws_argument_out_of_range()
-    {
-        // Defence in depth alongside the scheduler's own validation: a sub-second interval would
-        // persist as intervalSeconds = 0, which the dispatcher treats as a one-shot job, so the
-        // factory refuses to build a definition that silently degrades.
-        var factory = CreateFactory();
-
-        await Assert.That(() => factory.RecurringDefinition(new TestRequest("x"), Duration.FromMilliseconds(500)))
-            .Throws<ArgumentOutOfRangeException>();
+        await Assert.That((string)doc[ScheduledJob.Fields.Schedule])
+            .IsEqualTo("daily:Europe/Stockholm:01:00:00");
     }
 
     [Test]
@@ -152,7 +143,7 @@ public class ScheduledJobDocumentFactoryTests
         var factory = CreateFactory(serializer);
         var request = new OtherTestRequest(7);
 
-        var doc = factory.RecurringDefinition(request, Duration.FromHours(1));
+        var doc = factory.RecurringDefinition(request, Schedule.Every(Duration.FromHours(1)));
 
         await Assert.That((string)doc[ScheduledJob.Fields.RequestTypeName])
             .IsEqualTo(typeof(OtherTestRequest).FullName!);
@@ -167,12 +158,12 @@ public class ScheduledJobDocumentFactoryTests
         // definition must never carry them, or re-registering would disturb a live schedule.
         var factory = CreateFactory();
 
-        var doc = factory.RecurringDefinition(new TestRequest("x"), Duration.FromMinutes(1));
+        var doc = factory.RecurringDefinition(new TestRequest("x"), Schedule.Every(Duration.FromMinutes(1)));
 
         await Assert.That(doc.Keys).IsEquivalentTo([
             ScheduledJob.Fields.RequestTypeName,
             ScheduledJob.Fields.PayloadJson,
-            ScheduledJob.Fields.IntervalSeconds
+            ScheduledJob.Fields.Schedule
         ]);
     }
 }

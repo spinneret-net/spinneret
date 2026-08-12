@@ -17,17 +17,17 @@
 
 A **spinneret** is the organ a spider uses to spin its web. It doesn't extrude one thread — it produces different silks for different jobs: dragline for the frame, radials that carry every signal, sticky spiral to catch what flies in, egg-sac silk to keep things safe until they hatch.
 
-**Spinneret** is that organ for .NET: nine small, sharply focused packages that spin the threads a serious application hangs from — results, requests, validation, queues, schedules, and a Blazor MVVM layer. Use one thread, or weave them all.
+**Spinneret** is that organ for .NET: small, sharply focused packages that spin the threads a serious application hangs from — results, requests, validation, queues, schedules, and a Blazor MVVM layer. Infrastructure-specific implementations stay at the edges. Use one thread, or weave them all.
 
 ## Why Spinneret
 
-Utility libraries tend to be junk drawers. Spinneret is the opposite: every package is small enough to read in one sitting, and they all share one philosophy.
+Utility libraries tend to be junk drawers. Spinneret is the opposite: every package is small enough to read in one sitting, and the whole library is built around a few consistent principles.
 
 - **Errors are values.** `Result<TOk, TError>` flows through parsing, mediation, and queue delivery. Exceptions are reserved for the exceptional.
 - **Parse, don't validate.** A boundary produces a typed model or a complete, localizable list of property errors — never a half-trusted DTO.
 - **Your app owns its behavior.** Retry policy is code on the command type, not YAML in a cloud console. A typo fails the host at boot, not a delivery at 2 a.m.
 - **A wait is not a failure.** Deferred work is re-enqueued without burning retry attempts. Dead letters are for the truly dead.
-- **The cloud is a seam.** Core packages are pure abstractions; the GCP adapters are separate packages. Changing providers means swapping a package, not rewriting your app.
+- **Infrastructure is a seam.** Core packages are provider-agnostic; GCP and SQL Server adapters live in separate packages. Changing infrastructure means swapping a package, not rewriting your app.
 
 ## The silk
 
@@ -38,8 +38,10 @@ Utility libraries tend to be junk drawers. Spinneret is the opposite: every pack
 | `Spinneret.Parsing` | **The sticky spiral** | Parse-don't-validate boundaries: one pass, every invalid property caught and localized. Nothing gets through that shouldn't. |
 | `Spinneret.Queue` | **The egg sac** | A durable command queue where the application owns the retry policy — attempts, backoff, channels, dead-lettering — per command type. Safe until it hatches. |
 | `Spinneret.Queue.Gcp` | | Google Cloud Tasks transport with an OIDC-authenticated dispatch endpoint. |
+| `Spinneret.Queue.Mssql` | | SQL Server-backed durable queue transport. |
 | `Spinneret.Scheduler` | **The nightly respin** | Recurring jobs declared in code and installed idempotently at startup. Orb-weavers rebuild their web every night; so do your jobs. |
 | `Spinneret.Scheduler.Gcp` | | Firestore-backed scheduling with transactional dispatch. |
+| `Spinneret.Scheduler.Mssql` | | SQL Server-backed scheduling with transactional dispatch. |
 | `Spinneret.ViewModel` | **The attachment discs** | MVVM for Blazor: bindable view models, two-way bindings with conversion and validation state, row collections, nested view models — the silk cement that fastens view to model. |
 | `Spinneret.View` | **The hub** | `ViewBase<T>` components that resolve their view model from DI, with lifecycle state and app-wide refresh coordination. Where the spider sits and feels everything. |
 
@@ -53,7 +55,7 @@ dotnet add package Spinneret.Mediator
 services.AddMediator(typeof(Program).Assembly);
 ```
 
-Every package registers the same way: one `Add*` call, one reflection sweep at startup, no magic at runtime.
+Packages that need wiring expose an `Add*` call; discovery happens once at startup, never at runtime.
 
 ### The dragline — `Spinneret.Functional`
 
@@ -129,7 +131,7 @@ throw new QueueHandlerPermanentException("Employee no longer exists.");
 throw new QueueHandlerRetryAfterException(TimeSpan.FromMinutes(10));
 ```
 
-`Spinneret.Queue.Gcp` delivers over Google Cloud Tasks with OIDC-authenticated dispatch. The core package has no cloud dependency at all.
+`Spinneret.Queue.Gcp` and `Spinneret.Queue.Mssql` provide the transport while the core queue owns delivery semantics. The GCP adapter uses Google Cloud Tasks with OIDC-authenticated dispatch; the MSSQL adapter uses SQL Server. The application-facing queue API stays the same either way.
 
 ### The nightly respin — `Spinneret.Scheduler`
 
@@ -143,6 +145,8 @@ public class RemindProjectMonthClose : IRecurringJob
     public IRequest<Unit> CreateRequest() => new SendMonthCloseReminders();
 }
 ```
+
+The scheduler itself is infrastructure-agnostic. `Spinneret.Scheduler.Gcp` provides Firestore-backed scheduling with transactional dispatch, while `Spinneret.Scheduler.Mssql` provides the SQL Server-backed equivalent. The job declaration and application-facing scheduling model stay the same.
 
 ### The hub — `Spinneret.View` + `Spinneret.ViewModel`
 
@@ -161,7 +165,7 @@ View models are plain `INotifyPropertyChanged` classes with typed two-way bindin
 
 ## Anatomy
 
-Each thread stands alone; together they make a web. Solid layers are pure .NET — the `.Gcp` packages are the only ones that know a cloud exists.
+Each thread stands alone; together they make a web. The core packages remain provider-agnostic — provider-specific packages such as `.Gcp` and `.Mssql` keep infrastructure concerns at the edges.
 
 ```mermaid
 graph BT
@@ -169,9 +173,11 @@ graph BT
   Parsing["Spinneret.Parsing"] --> Functional
   Mediator["Spinneret.Mediator"]
   Queue["Spinneret.Queue"] --> Mediator & Functional
-  Scheduler["Spinneret.Scheduler"] --> Mediator
   QueueGcp["Spinneret.Queue.Gcp"] --> Queue
+  QueueMssql["Spinneret.Queue.Mssql"] --> Queue
+  Scheduler["Spinneret.Scheduler"] --> Mediator
   SchedulerGcp["Spinneret.Scheduler.Gcp"] --> Scheduler & QueueGcp
+  SchedulerMssql["Spinneret.Scheduler.Mssql"] --> Scheduler & QueueMssql
   ViewModel["Spinneret.ViewModel"] --> Functional & Parsing
   View["Spinneret.View"] --> ViewModel
 ```
@@ -180,7 +186,7 @@ graph BT
 
 Because the pun was sitting right there: spiders spin webs, and this spins up **.NET** web apps.
 
-But the metaphor holds past the first laugh. A spinneret produces *different* silks from *one* organ — structural thread, signal thread, capture thread, protective thread — and a spider combines them into something far stronger than any single strand. That's the design here: small specialized packages, one shared philosophy, woven together.
+But the metaphor holds past the first laugh. A spinneret produces *different* silks from *one* organ — structural thread, signal thread, capture thread, protective thread — and a spider combines them into something far stronger than any single strand. That's the design here: small specialized packages, a consistent set of principles, woven together.
 
 **Is it web-scale?** It is literally a web.
 

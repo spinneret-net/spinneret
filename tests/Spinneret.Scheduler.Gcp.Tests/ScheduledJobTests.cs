@@ -15,7 +15,7 @@ public class ScheduledJobTests
         await Assert.That(ScheduledJob.Fields.ExecuteAt).IsEqualTo("executeAt");
         await Assert.That(ScheduledJob.Fields.NextExecuteAt).IsEqualTo("nextExecuteAt");
         await Assert.That(ScheduledJob.Fields.CreatedAt).IsEqualTo("createdAt");
-        await Assert.That(ScheduledJob.Fields.IntervalSeconds).IsEqualTo("intervalSeconds");
+        await Assert.That(ScheduledJob.Fields.Schedule).IsEqualTo("schedule");
         await Assert.That(ScheduledJob.Fields.LastRunAt).IsEqualTo("lastRunAt");
     }
 

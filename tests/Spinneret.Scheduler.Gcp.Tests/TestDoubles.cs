@@ -35,30 +35,30 @@ public sealed class FakePayloadSerializer : IQueuePayloadSerializer
 
 public sealed class RecordingRecurringJobScheduler : IRecurringJobScheduler
 {
-    public List<(string Key, IRequest<Unit> Request, Duration Interval, CancellationToken Ct)> Registrations { get; } = [];
+    public List<(string Key, IRequest<Unit> Request, Schedule Schedule, CancellationToken Ct)> Registrations { get; } = [];
     public HashSet<string> FailingKeys { get; } = [];
 
-    public Task RegisterAsync(string key, IRequest<Unit> request, Duration interval, CancellationToken ct = default)
+    public Task RegisterAsync(string key, IRequest<Unit> request, Schedule schedule, CancellationToken ct = default)
     {
         if (FailingKeys.Contains(key))
             throw new InvalidOperationException($"Registration failed for '{key}'.");
 
-        Registrations.Add((key, request, interval, ct));
+        Registrations.Add((key, request, schedule, ct));
         return Task.CompletedTask;
     }
 }
 
-public sealed class FakeRecurringJob(string key, Duration interval, IRequest<Unit> request) : IRecurringJob
+public sealed class FakeRecurringJob(string key, Schedule schedule, IRequest<Unit> request) : IRecurringJob
 {
     public string Key => key;
-    public Duration Interval => interval;
+    public Schedule Schedule => schedule;
     public IRequest<Unit> CreateRequest() => request;
 }
 
 public sealed class ThrowingCreateRequestJob(string key) : IRecurringJob
 {
     public string Key => key;
-    public Duration Interval => Duration.FromMinutes(1);
+    public Schedule Schedule => Schedule.Every(Duration.FromMinutes(1));
     public IRequest<Unit> CreateRequest() => throw new InvalidOperationException($"CreateRequest failed for '{key}'.");
 }
 

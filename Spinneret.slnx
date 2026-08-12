@@ -5,8 +5,10 @@
     <Project Path="src\Spinneret.Parsing\Spinneret.Parsing.csproj" Type="Classic C#" />
     <Project Path="src\Spinneret.Queue\Spinneret.Queue.csproj" Type="Classic C#" />
     <Project Path="src\Spinneret.Queue.Gcp\Spinneret.Queue.Gcp.csproj" Type="Classic C#" />
+    <Project Path="src\Spinneret.Queue.Mssql\Spinneret.Queue.Mssql.csproj" Type="Classic C#" />
     <Project Path="src\Spinneret.Scheduler\Spinneret.Scheduler.csproj" Type="Classic C#" />
     <Project Path="src\Spinneret.Scheduler.Gcp\Spinneret.Scheduler.Gcp.csproj" Type="Classic C#" />
+    <Project Path="src\Spinneret.Scheduler.Mssql\Spinneret.Scheduler.Mssql.csproj" Type="Classic C#" />
     <Project Path="src\Spinneret.View\Spinneret.View.csproj" Type="Classic C#" />
     <Project Path="src\Spinneret.ViewModel\Spinneret.ViewModel.csproj" Type="Classic C#" />
   </Folder>
@@ -16,7 +18,10 @@
     <Project Path="tests\Spinneret.Parsing.Tests\Spinneret.Parsing.Tests.csproj" Type="Classic C#" />
     <Project Path="tests\Spinneret.Queue.Tests\Spinneret.Queue.Tests.csproj" Type="Classic C#" />
     <Project Path="tests\Spinneret.Queue.Gcp.Tests\Spinneret.Queue.Gcp.Tests.csproj" Type="Classic C#" />
+    <Project Path="tests\Spinneret.Queue.Mssql.Tests\Spinneret.Queue.Mssql.Tests.csproj" Type="Classic C#" />
+    <Project Path="tests\Spinneret.Scheduler.Tests\Spinneret.Scheduler.Tests.csproj" Type="Classic C#" />
     <Project Path="tests\Spinneret.Scheduler.Gcp.Tests\Spinneret.Scheduler.Gcp.Tests.csproj" Type="Classic C#" />
+    <Project Path="tests\Spinneret.Scheduler.Mssql.Tests\Spinneret.Scheduler.Mssql.Tests.csproj" Type="Classic C#" />
     <Project Path="tests\Spinneret.View.Tests\Spinneret.View.Tests.csproj" Type="Classic C#" />
     <Project Path="tests\Spinneret.ViewModel.Tests\Spinneret.ViewModel.Tests.csproj" Type="Classic C#" />
   </Folder>

@@ -15,8 +15,9 @@ internal static class ScheduledJob
         public const string ExecuteAt = "executeAt";
         public const string NextExecuteAt = "nextExecuteAt";
         public const string CreatedAt = "createdAt";
-        // Present only on recurring jobs; its absence marks a one-shot job.
-        public const string IntervalSeconds = "intervalSeconds";
+        // Canonical Schedule string (Schedule.ToString/Parse); present only on recurring jobs —
+        // its absence marks a one-shot job.
+        public const string Schedule = "schedule";
         // Observability: when a recurring job was last enqueued.
         public const string LastRunAt = "lastRunAt";
     }

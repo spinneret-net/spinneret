@@ -11,17 +11,15 @@ internal sealed class FirestoreScheduler(
     ScheduledJobDocumentFactory factory)
     : IRecurringJobScheduler
 {
-    public Task RegisterAsync(string key, IRequest<Unit> request, Duration interval, CancellationToken ct = default)
+    public Task RegisterAsync(string key, IRequest<Unit> request, Schedule schedule, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(key))
             throw new ArgumentException("A recurring job requires a stable key.", nameof(key));
-        if (interval < Duration.FromSeconds(1))
-            throw new ArgumentOutOfRangeException(nameof(interval),
-                "A recurring interval must be at least one second: the interval is persisted in whole "
-                + "seconds, so a sub-second value would degrade the job to a one-shot.");
+        ArgumentNullException.ThrowIfNull(schedule);
 
         var docRef = db.Collection(options.Value.Collection).Document(key);
-        var definition = factory.RecurringDefinition(request, interval);
+        var definition = factory.RecurringDefinition(request, schedule);
+        var scheduleText = schedule.ToString();
 
         return db.RunTransactionAsync(async transaction =>
         {
@@ -29,8 +27,7 @@ internal sealed class FirestoreScheduler(
 
             if (!snapshot.Exists)
             {
-                // First registration: arm the first run one interval out.
-                var firstRun = NextRunFromNow(interval);
+                var firstRun = NextRunFromNow(schedule);
                 transaction.Set(docRef, new Dictionary<string, object>(definition)
                 {
                     [ScheduledJob.Fields.Status] = ScheduledJob.StatusValues.Pending,
@@ -42,11 +39,12 @@ internal sealed class FirestoreScheduler(
             }
 
             // Idempotent refresh: update the definition in place. Re-arm only if a previous
-            // incarnation went terminal (e.g. cancelled); an already-pending job keeps its
-            // cadence so frequent restarts never reset the schedule.
-            if (snapshot.GetValue<string>(ScheduledJob.Fields.Status) != ScheduledJob.StatusValues.Pending)
+            // incarnation went terminal (e.g. cancelled) or the schedule itself changed; a pending
+            // job with an unchanged schedule keeps its cadence so frequent restarts never reset it.
+            if (snapshot.GetValue<string>(ScheduledJob.Fields.Status) != ScheduledJob.StatusValues.Pending
+                || StoredSchedule(snapshot) != scheduleText)
             {
-                var nextRun = NextRunFromNow(interval);
+                var nextRun = NextRunFromNow(schedule);
                 definition[ScheduledJob.Fields.Status] = ScheduledJob.StatusValues.Pending;
                 definition[ScheduledJob.Fields.ExecuteAt] = nextRun;
                 definition[ScheduledJob.Fields.NextExecuteAt] = nextRun;
@@ -56,6 +54,15 @@ internal sealed class FirestoreScheduler(
         }, cancellationToken: ct);
     }
 
-    private static Timestamp NextRunFromNow(Duration interval) =>
-        Timestamp.FromDateTimeOffset(DateTimeOffset.UtcNow.Add(interval.ToTimeSpan()));
+    /// <summary>The stored canonical schedule, or null if the document is a one-shot job.</summary>
+    private static string? StoredSchedule(DocumentSnapshot snapshot) =>
+        snapshot.ContainsField(ScheduledJob.Fields.Schedule)
+            ? snapshot.GetValue<string>(ScheduledJob.Fields.Schedule)
+            : null;
+
+    private static Timestamp NextRunFromNow(Schedule schedule)
+    {
+        var next = schedule.NextRun(Instant.FromDateTimeOffset(DateTimeOffset.UtcNow));
+        return Timestamp.FromDateTimeOffset(next.ToDateTimeOffset());
+    }
 }

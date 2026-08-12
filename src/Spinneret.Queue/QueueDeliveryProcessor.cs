@@ -39,6 +39,7 @@ public interface IQueueDeliveryProcessor
 internal sealed class QueueDeliveryProcessor(
     QueueTypeRegistry registry,
     IQueueDispatcher dispatcher,
+    IQueueDispatchBoundary dispatchBoundary,
     IEnvelopeQueue envelopeQueue,
     IDeadLetterWriter deadLetterWriter,
     TimeProvider timeProvider,
@@ -74,7 +75,7 @@ internal sealed class QueueDeliveryProcessor(
 
         try
         {
-            await dispatcher.Dispatch(envelope, ct);
+            await dispatchBoundary.ExecuteAsync(envelope, () => dispatcher.Dispatch(envelope, ct), ct);
             return QueueDeliveryOutcome.Acked;
         }
         catch (QueueHandlerRetryAfterException ex)

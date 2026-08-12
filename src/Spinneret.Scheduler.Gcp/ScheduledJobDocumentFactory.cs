@@ -26,21 +26,16 @@ internal sealed class ScheduledJobDocumentFactory(QueueTypeRegistry typeRegistry
     }
 
     /// <summary>
-    /// The recurrence-defining fields (type, payload, interval) for a recurring job. The status and
+    /// The recurrence-defining fields (type, payload, schedule) for a recurring job. The status and
     /// run timestamps are owned by the caller's idempotent register-or-refresh, not by this builder.
-    /// The interval is persisted in whole seconds, so it must be at least one second — a sub-second
-    /// value would persist as intervalSeconds = 0, which the dispatcher treats as a one-shot job.
     /// </summary>
-    public Dictionary<string, object> RecurringDefinition(IRequest<Unit> request, Duration interval)
+    public Dictionary<string, object> RecurringDefinition(IRequest<Unit> request, Schedule schedule)
     {
-        if (interval < Duration.FromSeconds(1))
-            throw new ArgumentOutOfRangeException(nameof(interval),
-                "A recurring interval must be at least one second: the interval is persisted in whole "
-                + "seconds, so a sub-second value would degrade the job to a one-shot.");
+        ArgumentNullException.ThrowIfNull(schedule);
 
         return new Dictionary<string, object>(Payload(request))
         {
-            [ScheduledJob.Fields.IntervalSeconds] = (long)interval.TotalSeconds,
+            [ScheduledJob.Fields.Schedule] = schedule.ToString(),
         };
     }
 

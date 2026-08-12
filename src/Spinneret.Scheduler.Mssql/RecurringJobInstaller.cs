@@ -1,7 +1,7 @@
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
-namespace Spinneret.Scheduler.Gcp;
+namespace Spinneret.Scheduler.Mssql;
 
 /// <summary>
 /// Installs every registered <see cref="IRecurringJob"/> into the scheduler at startup. The

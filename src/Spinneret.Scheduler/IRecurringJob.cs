@@ -1,4 +1,3 @@
-using NodaTime;
 using Spinneret.Mediator;
 
 namespace Spinneret.Scheduler;
@@ -16,8 +15,8 @@ public interface IRecurringJob
     /// </summary>
     string Key { get; }
 
-    /// <summary>How often the job is enqueued.</summary>
-    Duration Interval { get; }
+    /// <summary>When the job is enqueued: a fixed interval or fixed local times of day.</summary>
+    Schedule Schedule { get; }
 
     /// <summary>Builds the request to enqueue on each run.</summary>
     IRequest<Unit> CreateRequest();

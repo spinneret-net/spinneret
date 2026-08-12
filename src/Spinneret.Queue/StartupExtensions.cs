@@ -28,6 +28,7 @@ public static class StartupExtensions
         services.AddSingleton(registry);
         services.TryAddScoped<IQueueDispatcher, QueueDispatcher>();
         services.TryAddScoped<IQueueDeliveryProcessor, QueueDeliveryProcessor>();
+        services.TryAddScoped<IQueueDispatchBoundary, DirectDispatchBoundary>();
         services.TryAddSingleton(TimeProvider.System);
         return services;
     }

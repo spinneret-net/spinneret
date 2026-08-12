@@ -17,17 +17,17 @@ public class RecurringJobInstallerTests
         var requestB = new OtherTestRequest(2);
         var installer = CreateInstaller(
             scheduler,
-            new FakeRecurringJob("job-a", Duration.FromMinutes(5), requestA),
-            new FakeRecurringJob("job-b", Duration.FromHours(1), requestB));
+            new FakeRecurringJob("job-a", Schedule.Every(Duration.FromMinutes(5)), requestA),
+            new FakeRecurringJob("job-b", Schedule.Every(Duration.FromHours(1)), requestB));
 
         await installer.StartAsync(CancellationToken.None);
 
         await Assert.That(scheduler.Registrations.Count).IsEqualTo(2);
         await Assert.That(scheduler.Registrations[0].Key).IsEqualTo("job-a");
-        await Assert.That(scheduler.Registrations[0].Interval).IsEqualTo(Duration.FromMinutes(5));
+        await Assert.That(scheduler.Registrations[0].Schedule).IsEqualTo(Schedule.Every(Duration.FromMinutes(5)));
         await Assert.That(scheduler.Registrations[0].Request).IsSameReferenceAs(requestA);
         await Assert.That(scheduler.Registrations[1].Key).IsEqualTo("job-b");
-        await Assert.That(scheduler.Registrations[1].Interval).IsEqualTo(Duration.FromHours(1));
+        await Assert.That(scheduler.Registrations[1].Schedule).IsEqualTo(Schedule.Every(Duration.FromHours(1)));
         await Assert.That(scheduler.Registrations[1].Request).IsSameReferenceAs(requestB);
     }
 
@@ -48,8 +48,8 @@ public class RecurringJobInstallerTests
         var scheduler = new RecordingRecurringJobScheduler { FailingKeys = { "job-a" } };
         var installer = CreateInstaller(
             scheduler,
-            new FakeRecurringJob("job-a", Duration.FromMinutes(5), new TestRequest("a")),
-            new FakeRecurringJob("job-b", Duration.FromMinutes(5), new TestRequest("b")));
+            new FakeRecurringJob("job-a", Schedule.Every(Duration.FromMinutes(5)), new TestRequest("a")),
+            new FakeRecurringJob("job-b", Schedule.Every(Duration.FromMinutes(5)), new TestRequest("b")));
 
         await installer.StartAsync(CancellationToken.None);
 
@@ -64,7 +64,7 @@ public class RecurringJobInstallerTests
         var installer = CreateInstaller(
             scheduler,
             new ThrowingCreateRequestJob("job-a"),
-            new FakeRecurringJob("job-b", Duration.FromMinutes(5), new TestRequest("b")));
+            new FakeRecurringJob("job-b", Schedule.Every(Duration.FromMinutes(5)), new TestRequest("b")));
 
         await installer.StartAsync(CancellationToken.None);
 
@@ -78,7 +78,7 @@ public class RecurringJobInstallerTests
         var scheduler = new RecordingRecurringJobScheduler();
         var installer = CreateInstaller(
             scheduler,
-            new FakeRecurringJob("job-a", Duration.FromMinutes(5), new TestRequest("a")));
+            new FakeRecurringJob("job-a", Schedule.Every(Duration.FromMinutes(5)), new TestRequest("a")));
         using var cts = new CancellationTokenSource();
 
         await installer.StartAsync(cts.Token);
