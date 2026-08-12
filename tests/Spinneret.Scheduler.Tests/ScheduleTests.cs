@@ -1,4 +1,5 @@
 using NodaTime;
+using NodaTime.TimeZones;
 
 namespace Spinneret.Scheduler.Tests;
 
@@ -186,11 +187,11 @@ public class ScheduleTests
     [Test]
     public async Task Daily_rejects_non_tzdb_zones()
     {
-        // Only the zone id is persisted and rehydrated via TZDB; a BCL zone would produce a
-        // schedule the dispatch sweep can never parse back.
-        var bclZone = DateTimeZoneProviders.Bcl["W. Europe Standard Time"];
-
-        await Assert.That(() => Schedule.Daily(bclZone, new LocalTime(7, 0)))
+        // Only the zone id is persisted and rehydrated via TZDB; a zone TZDB cannot resolve by id —
+        // a custom zone here, a Windows zone id on a BCL provider — would produce a schedule the
+        // dispatch sweep can never parse back. The zone is hand-rolled rather than taken from the
+        // BCL provider, whose ids are Windows-only, so the test asserts the same on every platform.
+        await Assert.That(() => Schedule.Daily(new UnknownZone(), new LocalTime(7, 0)))
             .Throws<ArgumentException>();
     }
 
@@ -213,5 +214,12 @@ public class ScheduleTests
     public async Task Parse_missing_text_throws_argument_exception(string? text)
     {
         await Assert.That(() => Schedule.Parse(text!)).Throws<ArgumentException>();
+    }
+
+    /// <summary>A valid zone carrying an id no TZDB lookup can resolve.</summary>
+    private sealed class UnknownZone() : DateTimeZone("Mars/Olympus", true, Offset.Zero, Offset.Zero)
+    {
+        public override ZoneInterval GetZoneInterval(Instant instant) =>
+            new(Id, null, null, Offset.Zero, Offset.Zero);
     }
 }
