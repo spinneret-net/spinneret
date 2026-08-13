@@ -11,7 +11,12 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <FrameworkReference Include="Microsoft.AspNetCore.App" />
+        <!-- A package reference, never a Microsoft.AspNetCore.App framework reference: framework
+             references flow transitively into the consuming app, and the shared framework has no
+             runtime pack for the browser-wasm RID, so one here would make this package impossible
+             to restore from a Blazor WebAssembly app. Anything needing the shared framework —
+             HttpContext and friends — belongs in Spinneret.View.Server instead. -->
+        <PackageReference Include="Microsoft.AspNetCore.Components.Web" Version="10.0.9" />
     </ItemGroup>
 
     <ItemGroup>

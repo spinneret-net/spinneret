@@ -1,0 +1,6 @@
+#nullable enable
+Spinneret.View.Server.ServerRenderContext
+Spinneret.View.Server.ServerRenderContext.IsClient.get -> bool
+Spinneret.View.Server.ServerRenderContext.IsPrerendering.get -> bool
+Spinneret.View.Server.ServerRenderContext.IsServer.get -> bool
+Spinneret.View.Server.ServerRenderContext.ServerRenderContext(Microsoft.AspNetCore.Http.IHttpContextAccessor! contextAccessor) -> void

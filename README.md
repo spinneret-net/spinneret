@@ -44,6 +44,7 @@ Utility libraries tend to be junk drawers. Spinneret is the opposite: every pack
 | `Spinneret.Scheduler.Mssql` | | SQL Server-backed scheduling with transactional dispatch. |
 | `Spinneret.ViewModel` | **The attachment discs** | MVVM for Blazor: bindable view models, two-way bindings with conversion and validation state, row collections, nested view models — the silk cement that fastens view to model. |
 | `Spinneret.View` | **The hub** | `ViewBase<T>` components that resolve their view model from DI, with lifecycle state and app-wide refresh coordination. Where the spider sits and feels everything. |
+| `Spinneret.View.Server` | | Blazor Server host support: the render context that reports whether the current render is a prerender. |
 
 ## Spinning up
 
@@ -187,8 +188,8 @@ The scheduler itself is infrastructure-agnostic. `Spinneret.Scheduler.Gcp` provi
 Blazor components that receive a view model from DI instead of building their own state, with an explicit lifecycle and app-wide refresh coordination. Wire it up once:
 
 ```csharp
-services.AddMvvm<ServerRenderContext>(o =>          // ClientRenderContext on WebAssembly
-    o.Assemblies.Add(typeof(Program).Assembly));    // scans views, auto-registers view models
+services.AddMvvm<ClientRenderContext>(o =>          // Scans views, auto-registers view models
+    o.Assemblies.Add(typeof(Program).Assembly));
 ```
 
 Then a view is a component that inherits its view model:
@@ -230,6 +231,7 @@ graph BT
   SchedulerMssql["Spinneret.Scheduler.Mssql"] --> Scheduler & QueueMssql
   ViewModel["Spinneret.ViewModel"] --> Functional & Parsing
   View["Spinneret.View"] --> ViewModel
+  ViewServer["Spinneret.View.Server"] --> View
 ```
 
 ## Why "Spinneret"?

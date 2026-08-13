@@ -1,6 +1,6 @@
 ﻿using Microsoft.AspNetCore.Http;
 
-namespace Spinneret.View
+namespace Spinneret.View.Server
 {
     /// <inheritdoc/>
     public sealed class ServerRenderContext(IHttpContextAccessor contextAccessor) : IRenderContext

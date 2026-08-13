@@ -17,6 +17,7 @@ A *spinneret* is the organ a spider uses to spin its web — different silks for
 | `Spinneret.Scheduler.Mssql` | SQL Server-backed scheduling with transactional dispatch |
 | `Spinneret.ViewModel` | MVVM for Blazor: typed two-way bindings with validation state |
 | `Spinneret.View` | Blazor views that resolve their view model from DI |
+| `Spinneret.View.Server` | Blazor Server host support for `Spinneret.View` |
 
 Errors are values. Boundaries parse, they don't validate. Your app owns its behavior — a typo fails the host at boot, not a delivery at 2 a.m. Infrastructure is a seam.
 

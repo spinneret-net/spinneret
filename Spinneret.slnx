@@ -10,6 +10,7 @@
     <Project Path="src\Spinneret.Scheduler.Gcp\Spinneret.Scheduler.Gcp.csproj" Type="Classic C#" />
     <Project Path="src\Spinneret.Scheduler.Mssql\Spinneret.Scheduler.Mssql.csproj" Type="Classic C#" />
     <Project Path="src\Spinneret.View\Spinneret.View.csproj" Type="Classic C#" />
+    <Project Path="src\Spinneret.View.Server\Spinneret.View.Server.csproj" Type="Classic C#" />
     <Project Path="src\Spinneret.ViewModel\Spinneret.ViewModel.csproj" Type="Classic C#" />
   </Folder>
   <Folder Name="/tests/">
@@ -23,6 +24,7 @@
     <Project Path="tests\Spinneret.Scheduler.Gcp.Tests\Spinneret.Scheduler.Gcp.Tests.csproj" Type="Classic C#" />
     <Project Path="tests\Spinneret.Scheduler.Mssql.Tests\Spinneret.Scheduler.Mssql.Tests.csproj" Type="Classic C#" />
     <Project Path="tests\Spinneret.View.Tests\Spinneret.View.Tests.csproj" Type="Classic C#" />
+    <Project Path="tests\Spinneret.View.Server.Tests\Spinneret.View.Server.Tests.csproj" Type="Classic C#" />
     <Project Path="tests\Spinneret.ViewModel.Tests\Spinneret.ViewModel.Tests.csproj" Type="Classic C#" />
   </Folder>
 </Solution>

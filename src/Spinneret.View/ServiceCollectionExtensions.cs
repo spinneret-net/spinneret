@@ -14,8 +14,10 @@ public static class MvvmServiceCollectionExtensions
     /// and the render context — scanning the entry assembly and auto-registering view models.
     /// </summary>
     /// <typeparam name="TRenderContext">
-    /// The host's render context: <c>ServerRenderContext</c> for Blazor Server,
-    /// <c>ClientRenderContext</c> for WebAssembly.
+    /// The host's render context: <see cref="ClientRenderContext"/> for WebAssembly, or
+    /// <c>ServerRenderContext</c> from Spinneret.View.Server for Blazor Server. That one reads
+    /// <c>HttpContext</c>, which ships only in the shared framework, so it lives in its own
+    /// package to keep this one restorable from WebAssembly.
     /// </typeparam>
     public static IServiceCollection AddMvvm<TRenderContext>(this IServiceCollection services)
         where TRenderContext : class, IRenderContext

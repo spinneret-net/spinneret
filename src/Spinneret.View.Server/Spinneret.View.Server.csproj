@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+        <NoWarn>$(NoWarn);CS8524</NoWarn>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <!-- The reason this package exists: IHttpContextAccessor ships only in the shared
+             framework, and a framework reference cannot be restored from a Blazor WebAssembly
+             app. Keeping it here leaves Spinneret.View consumable from both hosts. -->
+        <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\Spinneret.View\Spinneret.View.csproj" />
+    </ItemGroup>
+
+    <PropertyGroup>
+        <Description>Blazor Server host support for Spinneret.View: the render context that reports whether the current render is a prerender.</Description>
+        <PackageTags>$(PackageTags) blazor mvvm views blazor-server prerendering</PackageTags>
+    </PropertyGroup>
+
+</Project>

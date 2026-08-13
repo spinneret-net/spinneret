@@ -27,11 +27,6 @@ Spinneret.View.MvvmOptions.Assemblies.get -> System.Collections.Generic.IList<Sy
 Spinneret.View.MvvmOptions.AutoRegisterViewModels.get -> bool
 Spinneret.View.MvvmOptions.AutoRegisterViewModels.set -> void
 Spinneret.View.MvvmOptions.MvvmOptions() -> void
-Spinneret.View.ServerRenderContext
-Spinneret.View.ServerRenderContext.IsClient.get -> bool
-Spinneret.View.ServerRenderContext.IsPrerendering.get -> bool
-Spinneret.View.ServerRenderContext.IsServer.get -> bool
-Spinneret.View.ServerRenderContext.ServerRenderContext(Microsoft.AspNetCore.Http.IHttpContextAccessor! contextAccessor) -> void
 Spinneret.View.ViewBase<T>
 Spinneret.View.ViewBase<T>.DisposeAsync() -> System.Threading.Tasks.ValueTask
 Spinneret.View.ViewBase<T>.State.get -> Spinneret.View.ViewState

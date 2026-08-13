@@ -2,7 +2,7 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Features;
 
-namespace Spinneret.View.Tests;
+namespace Spinneret.View.Server.Tests;
 
 public class ServerRenderContextTests
 {
