@@ -1,6 +1,5 @@
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Options;
-using NodaTime;
 using Spinneret.Mediator;
 using Spinneret.Queue;
 using Spinneret.Queue.Mssql;
@@ -89,5 +88,5 @@ internal sealed class MssqlScheduler(
     }
 
     private DateTime NextRunFromNow(Schedule schedule) =>
-        schedule.NextRun(Instant.FromDateTimeOffset(timeProvider.GetUtcNow())).ToDateTimeUtc();
+        schedule.NextRun(timeProvider.GetUtcNow()).UtcDateTime;
 }

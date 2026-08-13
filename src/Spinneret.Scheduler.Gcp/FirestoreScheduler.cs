@@ -1,6 +1,5 @@
 using Google.Cloud.Firestore;
 using Microsoft.Extensions.Options;
-using NodaTime;
 using Spinneret.Mediator;
 
 namespace Spinneret.Scheduler.Gcp;
@@ -60,9 +59,6 @@ internal sealed class FirestoreScheduler(
             ? snapshot.GetValue<string>(ScheduledJob.Fields.Schedule)
             : null;
 
-    private static Timestamp NextRunFromNow(Schedule schedule)
-    {
-        var next = schedule.NextRun(Instant.FromDateTimeOffset(DateTimeOffset.UtcNow));
-        return Timestamp.FromDateTimeOffset(next.ToDateTimeOffset());
-    }
+    private static Timestamp NextRunFromNow(Schedule schedule) =>
+        Timestamp.FromDateTimeOffset(schedule.NextRun(DateTimeOffset.UtcNow));
 }

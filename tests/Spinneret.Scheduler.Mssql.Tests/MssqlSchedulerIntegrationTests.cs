@@ -1,6 +1,5 @@
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.DependencyInjection;
-using NodaTime;
 
 namespace Spinneret.Scheduler.Mssql.Tests;
 
@@ -11,16 +10,17 @@ namespace Spinneret.Scheduler.Mssql.Tests;
 [ClassDataSource<MssqlContainerFixture>(Shared = SharedType.PerTestSession)]
 public sealed class MssqlSchedulerIntegrationTests(MssqlContainerFixture fixture)
 {
-    private static readonly DateTimeZone Stockholm = DateTimeZoneProviders.Tzdb["Europe/Stockholm"];
+    private const string Stockholm = "Europe/Stockholm";
+    private static readonly TimeZoneInfo StockholmZone = TimeZoneInfo.FindSystemTimeZoneById(Stockholm);
 
-    private static readonly Schedule Hourly = Schedule.Cron(Stockholm, "0 * * * *");
-    private static readonly Schedule EverySecond = Schedule.Cron(Stockholm, "* * * * * *");
+    private static readonly Schedule Hourly = Schedule.Cron("0 * * * *", Stockholm);
+    private static readonly Schedule EverySecond = Schedule.Cron("* * * * * *", Stockholm);
 
     /// <summary>A slot no test run can be close to: a fixed daily time roughly half a day away.</summary>
     private static Schedule FarOff()
     {
-        var localHour = SystemClock.Instance.GetCurrentInstant().InZone(Stockholm).Hour;
-        return Schedule.Cron(Stockholm, $"13 {(localHour + 12) % 24} * * *");
+        var localHour = TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, StockholmZone).Hour;
+        return Schedule.Cron($"13 {(localHour + 12) % 24} * * *", Stockholm);
     }
     // ---------------------------------------------------------------------- registration ---
 
@@ -74,7 +74,7 @@ public sealed class MssqlSchedulerIntegrationTests(MssqlContainerFixture fixture
         // Re-armed onto the new schedule's next slot. The replacement never falls on the hour, so it
         // cannot coincide with what the hourly schedule had armed.
         var next = await host.JobNextExecuteAt("moving");
-        var expected = moved.NextRun(SystemClock.Instance.GetCurrentInstant()).ToDateTimeUtc();
+        var expected = moved.NextRun(DateTimeOffset.UtcNow).UtcDateTime;
         await Assert.That(next).IsNotEqualTo(armed);
         await Assert.That(Math.Abs((next - expected).TotalSeconds) < 5).IsTrue();
         await Assert.That(await host.ScalarAsync<string>(
@@ -101,7 +101,7 @@ public sealed class MssqlSchedulerIntegrationTests(MssqlContainerFixture fixture
             fixture.ConnectionString,
             sweeper: false,
             configure: services => services.AddRecurringJob(
-                "declared-job", Schedule.Cron(Stockholm, "0 */2 * * *"), () => new TickCommand("declared")));
+                "declared-job", Schedule.Cron("0 */2 * * *", Stockholm), () => new TickCommand("declared")));
 
         await Wait.Until(
             async () => await host.ScalarAsync<int>(
@@ -170,7 +170,7 @@ public sealed class MssqlSchedulerIntegrationTests(MssqlContainerFixture fixture
         await using (var transaction = (SqlTransaction)await connection.BeginTransactionAsync())
         {
             handle = await host.TransactionalScheduler.ScheduleJobAsync(
-                transaction, new TickCommand("once"), Instant.FromDateTimeOffset(DateTimeOffset.UtcNow));
+                transaction, new TickCommand("once"), DateTimeOffset.UtcNow);
             await transaction.CommitAsync();
         }
 
@@ -189,7 +189,7 @@ public sealed class MssqlSchedulerIntegrationTests(MssqlContainerFixture fixture
         await using (var transaction = (SqlTransaction)await connection.BeginTransactionAsync())
         {
             await host.TransactionalScheduler.ScheduleJobAsync(
-                transaction, new TickCommand("phantom"), Instant.FromDateTimeOffset(DateTimeOffset.UtcNow));
+                transaction, new TickCommand("phantom"), DateTimeOffset.UtcNow);
             await transaction.RollbackAsync();
         }
 
@@ -209,7 +209,7 @@ public sealed class MssqlSchedulerIntegrationTests(MssqlContainerFixture fixture
         {
             handle = await host.TransactionalScheduler.ScheduleJobAsync(
                 transaction, new TickCommand("cancelled"),
-                Instant.FromDateTimeOffset(DateTimeOffset.UtcNow.AddSeconds(2)));
+                DateTimeOffset.UtcNow.AddSeconds(2));
             await host.TransactionalScheduler.CancelJobAsync(transaction, handle);
             await transaction.CommitAsync();
         }
@@ -277,7 +277,7 @@ public sealed class MssqlSchedulerIntegrationTests(MssqlContainerFixture fixture
         await using (var transaction = (SqlTransaction)await connection.BeginTransactionAsync())
         {
             handle = await host.TransactionalScheduler.ScheduleJobAsync(
-                transaction, new TickCommand("bad"), Instant.FromDateTimeOffset(DateTimeOffset.UtcNow));
+                transaction, new TickCommand("bad"), DateTimeOffset.UtcNow);
             await transaction.CommitAsync();
         }
         await host.ExecuteAsync(

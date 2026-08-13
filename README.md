@@ -141,7 +141,7 @@ A recurring job is an interface, not infrastructure. Register it in DI and it in
 public class RemindProjectMonthClose : IRecurringJob
 {
     public string Key => "project-month-close-reminder";
-    public Schedule Schedule => Schedule.Cron(Stockholm, "0 3 * * *");
+    public Schedule Schedule => Schedule.Cron("0 3 * * *", "Europe/Stockholm");
     public IRequest<Unit> CreateRequest() => new SendMonthCloseReminders();
 }
 ```
@@ -151,11 +151,11 @@ Or inline, where a class would be noise:
 ```csharp
 services.AddRecurringJob(
     "project-month-close-reminder",
-    Schedule.Cron(Stockholm, "0 3 * * *"),
+    Schedule.Cron("0 3 * * *", "Europe/Stockholm"),
     () => new SendMonthCloseReminders());
 ```
 
-Schedules are cron expressions — five fields, or six to schedule to the second — evaluated in an explicit time zone, so a slot keeps its wall-clock time across DST. The zone travels with the schedule in its canonical string form (`cron:Europe/Stockholm:0 3 * * *`), which is how a schedule is persisted and how `Schedule.Parse` reads one back.
+Schedules are cron expressions — five fields, or six to schedule to the second — evaluated in an explicit IANA time zone, so a slot keeps its wall-clock time across DST. The zone travels with the schedule in its canonical string form (`cron:Europe/Stockholm:0 3 * * *`), which is how a schedule is persisted and how `Schedule.Parse` reads one back. Times are plain `DateTimeOffset`: the scheduler packages take no date/time dependency, so they never impose one on you.
 
 To vary the cadence per environment, read the expression from configuration where the job is declared — staging sweeps every five minutes, production runs at 03:00, and the declaration is still the one place the schedule is decided:
 

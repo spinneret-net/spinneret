@@ -1,14 +1,13 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using NodaTime;
 
 namespace Spinneret.Scheduler.Tests;
 
 public class StartupExtensionsTests
 {
-    private static readonly DateTimeZone Stockholm = DateTimeZoneProviders.Tzdb["Europe/Stockholm"];
+    private const string Stockholm = "Europe/Stockholm";
 
-    private static readonly Schedule EveryFiveMinutes = Schedule.Cron(Stockholm, "*/5 * * * *");
+    private static readonly Schedule EveryFiveMinutes = Schedule.Cron("*/5 * * * *", Stockholm);
 
     // ------------------------------------------------------------------- AddRecurringJob ---
 
@@ -50,7 +49,7 @@ public class StartupExtensionsTests
         var services = new ServiceCollection();
 
         services.AddRecurringJob("job-a", EveryFiveMinutes, () => new TestRequest("a"));
-        services.AddRecurringJob("job-b", Schedule.Cron(Stockholm, "0 * * * *"), () => new TestRequest("b"));
+        services.AddRecurringJob("job-b", Schedule.Cron("0 * * * *", Stockholm), () => new TestRequest("b"));
         var jobs = services.BuildServiceProvider().GetServices<IRecurringJob>().ToArray();
 
         await Assert.That(jobs.Select(j => j.Key)).IsEquivalentTo(["job-a", "job-b"]);
@@ -102,6 +101,6 @@ public class StartupExtensionsTests
             "month-close", Schedule.Parse(configuration["Jobs:MonthClose"]!), () => new TestRequest("x"));
         var job = services.BuildServiceProvider().GetRequiredService<IRecurringJob>();
 
-        await Assert.That(job.Schedule).IsEqualTo(Schedule.Cron(Stockholm, "0 3 * * *"));
+        await Assert.That(job.Schedule).IsEqualTo(Schedule.Cron("0 3 * * *", Stockholm));
     }
 }

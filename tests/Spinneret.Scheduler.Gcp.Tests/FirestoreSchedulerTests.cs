@@ -1,5 +1,4 @@
 using Microsoft.Extensions.Options;
-using NodaTime;
 using Spinneret.Queue;
 
 namespace Spinneret.Scheduler.Gcp.Tests;
@@ -13,7 +12,7 @@ namespace Spinneret.Scheduler.Gcp.Tests;
 /// </summary>
 public class FirestoreSchedulerTests
 {
-    private static readonly DateTimeZone Stockholm = DateTimeZoneProviders.Tzdb["Europe/Stockholm"];
+    private const string Stockholm = "Europe/Stockholm";
 
     private static FirestoreScheduler CreateScheduler() =>
         new(
@@ -30,7 +29,7 @@ public class FirestoreSchedulerTests
         var scheduler = CreateScheduler();
 
         await Assert.That(() =>
-                scheduler.RegisterAsync(key!, new TestRequest("x"), Schedule.Cron(Stockholm, "* * * * *")))
+                scheduler.RegisterAsync(key!, new TestRequest("x"), Schedule.Cron("* * * * *", Stockholm)))
             .Throws<ArgumentException>();
     }
 
@@ -51,7 +50,7 @@ public class FirestoreSchedulerTests
         var scheduler = CreateScheduler();
 
         await Assert.That(() =>
-                scheduler.RegisterAsync("job", new TestRequest("x"), Schedule.Cron(Stockholm, "* * * * * *")))
+                scheduler.RegisterAsync("job", new TestRequest("x"), Schedule.Cron("* * * * * *", Stockholm)))
             .Throws<NullReferenceException>();
     }
 }

@@ -2,7 +2,6 @@ using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using NodaTime;
 using Spinneret.Mediator;
 using Spinneret.Queue;
 using Spinneret.Queue.Mssql;
@@ -314,7 +313,7 @@ internal sealed class MssqlSchedulerSweeper(
     }
 
     private static DateTime NextRun(Schedule schedule, DateTimeOffset now) =>
-        schedule.NextRun(Instant.FromDateTimeOffset(now)).ToDateTimeUtc();
+        schedule.NextRun(now).UtcDateTime;
 
     private sealed record ScheduledJobRow(string JobKey, string RequestTypeName, string PayloadJson, string? ScheduleText);
 }

@@ -1,12 +1,11 @@
 using Google.Cloud.Firestore;
-using NodaTime;
 using Spinneret.Queue;
 
 namespace Spinneret.Scheduler.Gcp.Tests;
 
 public class ScheduledJobDocumentFactoryTests
 {
-    private static readonly DateTimeZone Stockholm = DateTimeZoneProviders.Tzdb["Europe/Stockholm"];
+    private const string Stockholm = "Europe/Stockholm";
 
     private static QueueTypeRegistry Registry => new([typeof(TestRequest).Assembly]);
 
@@ -20,7 +19,7 @@ public class ScheduledJobDocumentFactoryTests
     {
         var factory = CreateFactory();
 
-        var doc = factory.OneShot(new TestRequest("x"), Instant.FromUtc(2030, 1, 2, 3, 4, 5));
+        var doc = factory.OneShot(new TestRequest("x"), new DateTimeOffset(2030, 1, 2, 3, 4, 5, TimeSpan.Zero));
 
         await Assert.That((string)doc[ScheduledJob.Fields.RequestTypeName])
             .IsEqualTo(typeof(TestRequest).FullName!);
@@ -33,7 +32,7 @@ public class ScheduledJobDocumentFactoryTests
         var factory = CreateFactory(serializer);
         var request = new TestRequest("x");
 
-        var doc = factory.OneShot(request, Instant.FromUtc(2030, 1, 2, 3, 4, 5));
+        var doc = factory.OneShot(request, new DateTimeOffset(2030, 1, 2, 3, 4, 5, TimeSpan.Zero));
 
         await Assert.That((string)doc[ScheduledJob.Fields.PayloadJson]).IsEqualTo("""{"name":"x"}""");
         await Assert.That(serializer.SerializeCalls.Count).IsEqualTo(1);
@@ -46,7 +45,7 @@ public class ScheduledJobDocumentFactoryTests
     {
         var factory = CreateFactory();
 
-        var doc = factory.OneShot(new TestRequest("x"), Instant.FromUtc(2030, 1, 2, 3, 4, 5));
+        var doc = factory.OneShot(new TestRequest("x"), new DateTimeOffset(2030, 1, 2, 3, 4, 5, TimeSpan.Zero));
 
         await Assert.That((string)doc[ScheduledJob.Fields.Status])
             .IsEqualTo(ScheduledJob.StatusValues.Pending);
@@ -56,11 +55,11 @@ public class ScheduledJobDocumentFactoryTests
     public async Task OneShot_sets_execute_at_and_next_execute_at_to_the_given_instant()
     {
         var factory = CreateFactory();
-        var executeAt = Instant.FromUtc(2030, 6, 15, 12, 30, 45);
+        var executeAt = new DateTimeOffset(2030, 6, 15, 12, 30, 45, TimeSpan.Zero);
 
         var doc = factory.OneShot(new TestRequest("x"), executeAt);
 
-        var expected = Timestamp.FromDateTimeOffset(executeAt.ToDateTimeOffset());
+        var expected = Timestamp.FromDateTimeOffset(executeAt);
         await Assert.That((Timestamp)doc[ScheduledJob.Fields.ExecuteAt]).IsEqualTo(expected);
         await Assert.That((Timestamp)doc[ScheduledJob.Fields.NextExecuteAt]).IsEqualTo(expected);
     }
@@ -69,11 +68,11 @@ public class ScheduledJobDocumentFactoryTests
     public async Task OneShot_preserves_subsecond_precision_of_the_execute_instant()
     {
         var factory = CreateFactory();
-        var executeAt = Instant.FromUtc(2030, 6, 15, 12, 30, 45).PlusNanoseconds(123_456_700);
+        var executeAt = new DateTimeOffset(2030, 6, 15, 12, 30, 45, TimeSpan.Zero).AddTicks(1_234_567);
 
         var doc = factory.OneShot(new TestRequest("x"), executeAt);
 
-        var expected = Timestamp.FromDateTimeOffset(executeAt.ToDateTimeOffset());
+        var expected = Timestamp.FromDateTimeOffset(executeAt);
         await Assert.That((Timestamp)doc[ScheduledJob.Fields.ExecuteAt]).IsEqualTo(expected);
     }
 
@@ -83,7 +82,7 @@ public class ScheduledJobDocumentFactoryTests
         var factory = CreateFactory();
         var before = DateTimeOffset.UtcNow.AddSeconds(-1);
 
-        var doc = factory.OneShot(new TestRequest("x"), Instant.FromUtc(2030, 1, 2, 3, 4, 5));
+        var doc = factory.OneShot(new TestRequest("x"), new DateTimeOffset(2030, 1, 2, 3, 4, 5, TimeSpan.Zero));
 
         var after = DateTimeOffset.UtcNow.AddSeconds(1);
         var createdAt = ((Timestamp)doc[ScheduledJob.Fields.CreatedAt]).ToDateTimeOffset();
@@ -97,7 +96,7 @@ public class ScheduledJobDocumentFactoryTests
         // The dispatcher treats the absence of schedule as the one-shot marker.
         var factory = CreateFactory();
 
-        var doc = factory.OneShot(new TestRequest("x"), Instant.FromUtc(2030, 1, 2, 3, 4, 5));
+        var doc = factory.OneShot(new TestRequest("x"), new DateTimeOffset(2030, 1, 2, 3, 4, 5, TimeSpan.Zero));
 
         await Assert.That(doc.ContainsKey(ScheduledJob.Fields.Schedule)).IsFalse();
         await Assert.That(doc.ContainsKey(ScheduledJob.Fields.LastRunAt)).IsFalse();
@@ -109,7 +108,7 @@ public class ScheduledJobDocumentFactoryTests
         // Registry built over no assemblies: TestRequest is unknown to it.
         var factory = new ScheduledJobDocumentFactory(new QueueTypeRegistry([]), new FakePayloadSerializer());
 
-        await Assert.That(() => factory.OneShot(new TestRequest("x"), Instant.FromUtc(2030, 1, 1, 0, 0)))
+        await Assert.That(() => factory.OneShot(new TestRequest("x"), new DateTimeOffset(2030, 1, 1, 0, 0, 0, TimeSpan.Zero)))
             .Throws<InvalidOperationException>();
     }
 
@@ -119,7 +118,7 @@ public class ScheduledJobDocumentFactoryTests
     public async Task RecurringDefinition_writes_the_canonical_schedule_string()
     {
         var factory = CreateFactory();
-        var schedule = Schedule.Cron(Stockholm, "*/15 * * * *");
+        var schedule = Schedule.Cron("*/15 * * * *", Stockholm);
 
         var doc = factory.RecurringDefinition(new TestRequest("x"), schedule);
 
@@ -133,7 +132,7 @@ public class ScheduledJobDocumentFactoryTests
         // slot in UTC when the sweep rehydrates it.
         var factory = CreateFactory();
 
-        var doc = factory.RecurringDefinition(new TestRequest("x"), Schedule.Cron(Stockholm, "0 1 * * *"));
+        var doc = factory.RecurringDefinition(new TestRequest("x"), Schedule.Cron("0 1 * * *", Stockholm));
 
         await Assert.That((string)doc[ScheduledJob.Fields.Schedule])
             .IsEqualTo("cron:Europe/Stockholm:0 1 * * *");
@@ -146,7 +145,7 @@ public class ScheduledJobDocumentFactoryTests
         var factory = CreateFactory(serializer);
         var request = new OtherTestRequest(7);
 
-        var doc = factory.RecurringDefinition(request, Schedule.Cron(Stockholm, "0 * * * *"));
+        var doc = factory.RecurringDefinition(request, Schedule.Cron("0 * * * *", Stockholm));
 
         await Assert.That((string)doc[ScheduledJob.Fields.RequestTypeName])
             .IsEqualTo(typeof(OtherTestRequest).FullName!);
@@ -161,7 +160,7 @@ public class ScheduledJobDocumentFactoryTests
         // definition must never carry them, or re-registering would disturb a live schedule.
         var factory = CreateFactory();
 
-        var doc = factory.RecurringDefinition(new TestRequest("x"), Schedule.Cron(Stockholm, "* * * * *"));
+        var doc = factory.RecurringDefinition(new TestRequest("x"), Schedule.Cron("* * * * *", Stockholm));
 
         await Assert.That(doc.Keys).IsEquivalentTo([
             ScheduledJob.Fields.RequestTypeName,

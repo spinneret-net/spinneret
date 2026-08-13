@@ -1,14 +1,13 @@
 using Microsoft.Extensions.Logging.Abstractions;
-using NodaTime;
 
 namespace Spinneret.Scheduler.Tests;
 
 public class RecurringJobInstallerTests
 {
-    private static readonly DateTimeZone Stockholm = DateTimeZoneProviders.Tzdb["Europe/Stockholm"];
+    private const string Stockholm = "Europe/Stockholm";
 
-    private static readonly Schedule EveryFiveMinutes = Schedule.Cron(Stockholm, "*/5 * * * *");
-    private static readonly Schedule Hourly = Schedule.Cron(Stockholm, "0 * * * *");
+    private static readonly Schedule EveryFiveMinutes = Schedule.Cron("*/5 * * * *", Stockholm);
+    private static readonly Schedule Hourly = Schedule.Cron("0 * * * *", Stockholm);
 
     private static RecurringJobInstaller CreateInstaller(
         RecordingRecurringJobScheduler scheduler, params IRecurringJob[] jobs) =>

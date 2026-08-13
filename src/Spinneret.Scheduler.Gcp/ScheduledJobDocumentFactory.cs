@@ -1,5 +1,4 @@
 using Google.Cloud.Firestore;
-using NodaTime;
 using Spinneret.Mediator;
 using Spinneret.Queue;
 
@@ -13,9 +12,9 @@ namespace Spinneret.Scheduler.Gcp;
 internal sealed class ScheduledJobDocumentFactory(QueueTypeRegistry typeRegistry, IQueuePayloadSerializer serializer)
 {
     /// <summary>Fields for a one-shot job that runs once at <paramref name="executeAt"/>.</summary>
-    public Dictionary<string, object> OneShot(IRequest<Unit> request, Instant executeAt)
+    public Dictionary<string, object> OneShot(IRequest<Unit> request, DateTimeOffset executeAt)
     {
-        var ts = Timestamp.FromDateTimeOffset(executeAt.ToDateTimeOffset());
+        var ts = Timestamp.FromDateTimeOffset(executeAt);
         return new Dictionary<string, object>(Payload(request))
         {
             [ScheduledJob.Fields.Status] = ScheduledJob.StatusValues.Pending,

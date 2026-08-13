@@ -1,5 +1,4 @@
 using Cronos;
-using NodaTime;
 
 namespace Spinneret.Scheduler;
 
@@ -16,46 +15,56 @@ namespace Spinneret.Scheduler;
 public sealed record Schedule
 {
     private readonly CronExpression _expression;
+    private readonly TimeZoneInfo _zone;
 
-    // Occurrences are computed against the system zone database, not TZDB: the zone is TZDB-checked
-    // for its id — that is what round-trips through Parse — but the DST rules applied to each
-    // occurrence come from TimeZoneInfo. Both track IANA, so they can only disagree on a host whose
-    // zone data is older than NodaTime's.
-    private readonly TimeZoneInfo _zoneInfo;
-
-    private Schedule(DateTimeZone zone, TimeZoneInfo zoneInfo, CronExpression expression, string expressionText)
+    private Schedule(TimeZoneInfo zone, CronExpression expression, string expressionText)
     {
-        Zone = zone;
-        _zoneInfo = zoneInfo;
+        _zone = zone;
         _expression = expression;
+        TimeZoneId = zone.Id;
         Expression = expressionText;
     }
 
-    /// <summary>The zone the expression's fields are interpreted in.</summary>
-    public DateTimeZone Zone { get; }
+    /// <summary>The IANA id of the zone the expression's fields are interpreted in.</summary>
+    public string TimeZoneId { get; }
 
     /// <summary>The normalized cron expression: five fields, or six when the first is seconds.</summary>
     public string Expression { get; }
 
     /// <summary>
     /// A run at every occurrence of <paramref name="expression"/> — five cron fields, or six when
-    /// the first is seconds — in local time in <paramref name="zone"/>.
+    /// the first is seconds — in local time in the zone named by <paramref name="timeZoneId"/>.
     /// </summary>
+    /// <param name="expression">The cron expression, e.g. <c>0 3 * * *</c>.</param>
+    /// <param name="timeZoneId">An IANA time zone id, e.g. <c>Europe/Stockholm</c>.</param>
     /// <exception cref="ArgumentException">
-    /// The expression is not valid cron, describes a date that never occurs, or the zone is not a
-    /// TZDB zone this host can resolve.
+    /// The expression is not valid cron, describes a date that never occurs, or the id is not an
+    /// IANA zone this host can resolve.
     /// </exception>
-    public static Schedule Cron(DateTimeZone zone, string expression)
+    public static Schedule Cron(string expression, string timeZoneId)
     {
-        ArgumentNullException.ThrowIfNull(zone);
-        ArgumentException.ThrowIfNullOrWhiteSpace(expression);
+        ArgumentException.ThrowIfNullOrWhiteSpace(timeZoneId);
 
-        // Only the zone id is persisted, and Parse rehydrates it through TZDB — a BCL or custom zone
-        // would produce a schedule the dispatch sweep can never parse back.
-        if (DateTimeZoneProviders.Tzdb.GetZoneOrNull(zone.Id) is null)
+        return Cron(expression, ResolveZone(timeZoneId));
+    }
+
+    /// <summary>
+    /// A run at every occurrence of <paramref name="expression"/> in local time in
+    /// <paramref name="zone"/>, which must be an IANA zone — see <see cref="Cron(string, string)"/>.
+    /// </summary>
+    public static Schedule Cron(string expression, TimeZoneInfo zone)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(expression);
+        ArgumentNullException.ThrowIfNull(zone);
+
+        // Only the zone id is persisted, and Parse rehydrates it by id on whichever host runs the
+        // dispatch sweep. Windows ids resolve on Windows but nowhere else, so a schedule registered
+        // with one would be unreadable to a Linux sweep — reject it here, where the caller sees it.
+        if (!zone.HasIanaId)
             throw new ArgumentException(
-                $"Time zone '{zone.Id}' is not a TZDB zone. Schedules persist only the zone id and "
-                + "rehydrate it via DateTimeZoneProviders.Tzdb, so use a TZDB zone (e.g. 'Europe/Stockholm').",
+                $"Time zone '{zone.Id}' is not an IANA zone. Schedules persist only the zone id and "
+                + "rehydrate it by id on any host, so use an IANA id (e.g. 'Europe/Stockholm'). "
+                + "TimeZoneInfo.TryConvertWindowsIdToIanaId converts a Windows id.",
                 nameof(zone));
 
         var normalized = Normalize(expression);
@@ -79,17 +88,15 @@ public sealed record Schedule
             throw new ArgumentException($"Invalid cron expression '{expression}': {ex.Message}", nameof(expression), ex);
         }
 
-        var zoneInfo = ResolveZoneInfo(zone);
-
         // A syntactically valid expression can still describe a date that never arrives (31 February).
         // Reject it here, where the registering code sees it, rather than letting it reach a job
         // document that no sweep can ever advance. Impossible dates are impossible at every instant,
         // so probing from the current one is enough to tell them apart.
-        if (parsed.GetNextOccurrence(DateTimeOffset.UtcNow, zoneInfo) is null)
+        if (parsed.GetNextOccurrence(DateTimeOffset.UtcNow, zone) is null)
             throw new ArgumentException(
                 $"Cron expression '{normalized}' has no future occurrence in '{zone.Id}'.", nameof(expression));
 
-        return new Schedule(zone, zoneInfo, parsed, normalized);
+        return new Schedule(zone, parsed, normalized);
     }
 
     /// <summary>
@@ -97,16 +104,12 @@ public sealed record Schedule
     /// sweep's lease-by-advancing-the-run-time terminate: a NextRun that could return
     /// <paramref name="now"/> itself would re-select the job forever.
     /// </summary>
-    public Instant NextRun(Instant now)
-    {
-        var next = _expression.GetNextOccurrence(now.ToDateTimeOffset(), _zoneInfo)
-            ?? throw new InvalidOperationException($"No next run found for '{this}' after {now}.");
-
-        return Instant.FromDateTimeOffset(next);
-    }
+    public DateTimeOffset NextRun(DateTimeOffset now) =>
+        _expression.GetNextOccurrence(now, _zone)
+        ?? throw new InvalidOperationException($"No next run found for '{this}' after {now:O}.");
 
     /// <summary>Canonical persistable form; round-trips through <see cref="Parse"/>.</summary>
-    public override string ToString() => $"cron:{Zone.Id}:{Expression}";
+    public override string ToString() => $"cron:{TimeZoneId}:{Expression}";
 
     /// <summary>Rehydrates a schedule persisted or configured via <see cref="ToString"/>.</summary>
     /// <exception cref="FormatException">The text is not a canonical schedule.</exception>
@@ -127,12 +130,19 @@ public sealed record Schedule
         if (parts.Length != 3 || parts[0] != "cron")
             throw new FormatException($"Unrecognized schedule '{text}'. Expected 'cron:<zone>:<expression>'.");
 
-        var zone = DateTimeZoneProviders.Tzdb.GetZoneOrNull(parts[1])
-            ?? throw new FormatException($"Unknown time zone '{parts[1]}' in schedule '{text}'.");
+        TimeZoneInfo zone;
+        try
+        {
+            zone = ResolveZone(parts[1]);
+        }
+        catch (ArgumentException ex)
+        {
+            throw new FormatException($"Unknown time zone '{parts[1]}' in schedule '{text}'.", ex);
+        }
 
         try
         {
-            return Cron(zone, parts[2]);
+            return Cron(parts[2], zone);
         }
         catch (ArgumentException ex)
         {
@@ -143,9 +153,9 @@ public sealed record Schedule
     }
 
     public bool Equals(Schedule? other) =>
-        other is not null && Zone.Id == other.Zone.Id && Expression == other.Expression;
+        other is not null && TimeZoneId == other.TimeZoneId && Expression == other.Expression;
 
-    public override int GetHashCode() => HashCode.Combine(Zone.Id, Expression);
+    public override int GetHashCode() => HashCode.Combine(TimeZoneId, Expression);
 
     /// <summary>
     /// Single-spaced and upper-cased, so expressions that differ only in whitespace or in the case
@@ -156,17 +166,19 @@ public sealed record Schedule
         string.Join(' ', expression.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries))
             .ToUpperInvariant();
 
-    private static TimeZoneInfo ResolveZoneInfo(DateTimeZone zone)
+    private static TimeZoneInfo ResolveZone(string timeZoneId)
     {
         try
         {
-            return TimeZoneInfo.FindSystemTimeZoneById(zone.Id);
+            return TimeZoneInfo.FindSystemTimeZoneById(timeZoneId);
         }
         catch (Exception ex) when (ex is TimeZoneNotFoundException or InvalidTimeZoneException)
         {
             throw new ArgumentException(
-                $"Time zone '{zone.Id}' is a TZDB zone this host cannot resolve, so cron occurrences "
-                + "cannot be computed in it.", nameof(zone), ex);
+                $"Time zone '{timeZoneId}' cannot be resolved on this host, so cron occurrences cannot "
+                + "be computed in it. Use an IANA id (e.g. 'Europe/Stockholm'); note that resolving "
+                + "IANA ids on Windows requires ICU, which globalization-invariant mode disables.",
+                nameof(timeZoneId), ex);
         }
     }
 }

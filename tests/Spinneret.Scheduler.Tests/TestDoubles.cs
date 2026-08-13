@@ -1,4 +1,3 @@
-using NodaTime;
 using Spinneret.Mediator;
 
 namespace Spinneret.Scheduler.Tests;
@@ -43,6 +42,6 @@ public sealed class ThrowingScheduleJob(string key) : IRecurringJob
 public sealed class ThrowingCreateRequestJob(string key) : IRecurringJob
 {
     public string Key => key;
-    public Schedule Schedule => Schedule.Cron(DateTimeZoneProviders.Tzdb["Europe/Stockholm"], "* * * * *");
+    public Schedule Schedule => Schedule.Cron("* * * * *", "Europe/Stockholm");
     public IRequest<Unit> CreateRequest() => throw new InvalidOperationException($"CreateRequest failed for '{key}'.");
 }

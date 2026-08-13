@@ -1,5 +1,4 @@
 using System.Data.Common;
-using NodaTime;
 using Spinneret.Mediator;
 using Spinneret.Queue;
 using Spinneret.Queue.Mssql;
@@ -19,7 +18,7 @@ public interface IMssqlTransactionalScheduler
     /// <paramref name="transaction"/>. Returns the handle to pass to <see cref="CancelJobAsync"/>.
     /// </summary>
     Task<string> ScheduleJobAsync(
-        DbTransaction transaction, IRequest<Unit> request, Instant executeAt, CancellationToken ct = default);
+        DbTransaction transaction, IRequest<Unit> request, DateTimeOffset executeAt, CancellationToken ct = default);
 
     /// <summary>Cancels the job identified by <paramref name="handle"/> within the transaction.</summary>
     Task CancelJobAsync(DbTransaction transaction, string handle, CancellationToken ct = default);
@@ -33,7 +32,7 @@ internal sealed class MssqlTransactionalScheduler(
     : IMssqlTransactionalScheduler
 {
     public async Task<string> ScheduleJobAsync(
-        DbTransaction transaction, IRequest<Unit> request, Instant executeAt, CancellationToken ct = default)
+        DbTransaction transaction, IRequest<Unit> request, DateTimeOffset executeAt, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(transaction);
         var connection = transaction.Connection
@@ -41,7 +40,7 @@ internal sealed class MssqlTransactionalScheduler(
 
         var requestType = request.GetType();
         var handle = $"oneshot-{Guid.NewGuid():N}";
-        var executeAtUtc = executeAt.ToDateTimeUtc();
+        var executeAtUtc = executeAt.UtcDateTime;
 
         await using var command = connection.CreateCommand();
         command.Transaction = transaction;

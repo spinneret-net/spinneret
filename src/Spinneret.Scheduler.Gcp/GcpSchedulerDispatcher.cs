@@ -1,7 +1,6 @@
 using Google.Cloud.Firestore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using NodaTime;
 using Spinneret.Mediator;
 using Spinneret.Queue;
 
@@ -17,10 +16,10 @@ internal sealed class GcpSchedulerDispatcher(
     ILogger<GcpSchedulerDispatcher> logger)
 {
     private string Collection => options.Value.Collection;
-    private Duration OneShotLeaseWindow => Duration.FromTimeSpan(options.Value.OneShotLeaseWindow);
+    private TimeSpan OneShotLeaseWindow => options.Value.OneShotLeaseWindow;
 
     /// <summary>How far a job with an unreadable schedule is pushed out before the sweep sees it again.</summary>
-    private static readonly Duration QuarantineWindow = Duration.FromMinutes(5);
+    private static readonly TimeSpan QuarantineWindow = TimeSpan.FromMinutes(5);
 
     public async Task DispatchDueJobsAsync(CancellationToken ct)
     {
@@ -168,11 +167,10 @@ internal sealed class GcpSchedulerDispatcher(
     /// it is no longer pending).
     /// </summary>
     private async Task<bool> TryLeaseAsync(
-        DocumentReference docRef, Func<Instant, Instant> nextRunFrom, CancellationToken ct)
+        DocumentReference docRef, Func<DateTimeOffset, DateTimeOffset> nextRunFrom, CancellationToken ct)
     {
         var now = DateTimeOffset.UtcNow;
-        var nextRun = Timestamp.FromDateTimeOffset(
-            nextRunFrom(Instant.FromDateTimeOffset(now)).ToDateTimeOffset());
+        var nextRun = Timestamp.FromDateTimeOffset(nextRunFrom(now));
 
         try
         {
