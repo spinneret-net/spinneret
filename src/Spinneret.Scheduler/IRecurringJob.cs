@@ -15,7 +15,11 @@ public interface IRecurringJob
     /// </summary>
     string Key { get; }
 
-    /// <summary>When the job is enqueued: a fixed interval or fixed local times of day.</summary>
+    /// <summary>
+    /// When the job is enqueued, as a cron expression in an explicit zone. Read once, while the job
+    /// is being installed. Build it from injected configuration if the cadence differs per
+    /// environment — the declaration stays the single place the schedule is decided.
+    /// </summary>
     Schedule Schedule { get; }
 
     /// <summary>Builds the request to enqueue on each run.</summary>

@@ -141,10 +141,32 @@ A recurring job is an interface, not infrastructure. Register it in DI and it in
 public class RemindProjectMonthClose : IRecurringJob
 {
     public string Key => "project-month-close-reminder";
-    public Duration Interval => Duration.FromHours(24);
+    public Schedule Schedule => Schedule.Cron(Stockholm, "0 3 * * *");
     public IRequest<Unit> CreateRequest() => new SendMonthCloseReminders();
 }
 ```
+
+Or inline, where a class would be noise:
+
+```csharp
+services.AddRecurringJob(
+    "project-month-close-reminder",
+    Schedule.Cron(Stockholm, "0 3 * * *"),
+    () => new SendMonthCloseReminders());
+```
+
+Schedules are cron expressions — five fields, or six to schedule to the second — evaluated in an explicit time zone, so a slot keeps its wall-clock time across DST. The zone travels with the schedule in its canonical string form (`cron:Europe/Stockholm:0 3 * * *`), which is how a schedule is persisted and how `Schedule.Parse` reads one back.
+
+To vary the cadence per environment, read the expression from configuration where the job is declared — staging sweeps every five minutes, production runs at 03:00, and the declaration is still the one place the schedule is decided:
+
+```csharp
+services.AddRecurringJob(
+    "project-month-close-reminder",
+    Schedule.Parse(builder.Configuration["Jobs:MonthClose"]!),
+    () => new SendMonthCloseReminders());
+```
+
+A job class does the same by injecting whatever it already binds — `public Schedule Schedule => Schedule.Parse(options.Value.Schedule);`. Occurrences arrive only as promptly as the provider's dispatch sweep runs.
 
 The scheduler itself is infrastructure-agnostic. `Spinneret.Scheduler.Gcp` provides Firestore-backed scheduling with transactional dispatch, while `Spinneret.Scheduler.Mssql` provides the SQL Server-backed equivalent. The job declaration and application-facing scheduling model stay the same.
 

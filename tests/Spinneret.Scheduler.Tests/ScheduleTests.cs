@@ -7,204 +7,207 @@ public class ScheduleTests
 {
     private static readonly DateTimeZone Stockholm = DateTimeZoneProviders.Tzdb["Europe/Stockholm"];
 
-    // ------------------------------------------------------------------------------ Every ---
+    // ------------------------------------------------------------------------------ NextRun ---
 
     [Test]
-    public async Task Every_next_run_adds_the_interval()
+    public async Task Next_run_is_the_next_matching_local_slot()
     {
-        var schedule = Schedule.Every(Duration.FromMinutes(15));
-        var now = Instant.FromUtc(2026, 8, 12, 10, 0);
+        var schedule = Schedule.Cron(Stockholm, "0 3 * * *");
+        var now = Instant.FromUtc(2026, 8, 12, 10, 0); // 12:00 CEST, past today's 03:00
 
-        await Assert.That(schedule.NextRun(now)).IsEqualTo(now + Duration.FromMinutes(15));
+        // 03:00 CEST on the 13th = 01:00 UTC.
+        await Assert.That(schedule.NextRun(now)).IsEqualTo(Instant.FromUtc(2026, 8, 13, 1, 0));
     }
 
     [Test]
-    public async Task Every_one_second_is_the_minimum_interval()
+    public async Task Next_run_is_strictly_after_now()
     {
-        var schedule = Schedule.Every(Duration.FromSeconds(1));
-        var now = Instant.FromUtc(2026, 8, 12, 10, 0);
+        var schedule = Schedule.Cron(Stockholm, "0 3 * * *");
+        var slot = Instant.FromUtc(2026, 8, 12, 1, 0); // exactly 03:00 CEST
 
-        await Assert.That(schedule.NextRun(now)).IsEqualTo(now + Duration.FromSeconds(1));
+        // Exactly at the slot: a sweep leases by advancing to NextRun, so returning the same instant
+        // would re-select the job forever.
+        await Assert.That(schedule.NextRun(slot)).IsEqualTo(Instant.FromUtc(2026, 8, 13, 1, 0));
     }
 
     [Test]
-    [Arguments(0)]
-    [Arguments(500)]
-    [Arguments(999)]
-    [Arguments(-1000)]
-    public async Task Every_below_one_second_throws_argument_out_of_range(int milliseconds)
+    public async Task Six_fields_schedule_to_the_second()
     {
-        await Assert.That(() => Schedule.Every(Duration.FromMilliseconds(milliseconds)))
-            .Throws<ArgumentOutOfRangeException>();
+        var schedule = Schedule.Cron(Stockholm, "* * * * * *");
+        var now = Instant.FromUtc(2026, 8, 12, 10, 0, 0);
+
+        await Assert.That(schedule.NextRun(now)).IsEqualTo(Instant.FromUtc(2026, 8, 12, 10, 0, 1));
     }
 
     [Test]
-    public async Task Every_canonical_string_is_stable()
+    public async Task Spring_forward_gap_runs_when_the_clock_finishes_the_jump()
     {
-        // Pins the wire format: persisted schedules must stay parseable across versions.
-        await Assert.That(Schedule.Every(Duration.FromMinutes(15)).ToString())
-            .IsEqualTo("every:0:00:15:00");
-    }
-
-    [Test]
-    public async Task Every_round_trips_through_parse()
-    {
-        var schedule = Schedule.Every(Duration.FromHours(3) + Duration.FromSeconds(7));
-
-        await Assert.That(Schedule.Parse(schedule.ToString())).IsEqualTo(schedule);
-    }
-
-    // ------------------------------------------------------------------------------ Daily ---
-
-    [Test]
-    public async Task Daily_runs_later_the_same_day_when_a_time_is_still_ahead()
-    {
-        var schedule = Schedule.Daily(Stockholm, new LocalTime(1, 0));
-        // 2026-08-11 23:30 UTC = 2026-08-12 01:30 CEST... use a moment clearly before 01:00 local:
-        // 2026-08-12 10:00 UTC = 12:00 local, so next run is tomorrow 01:00 CEST = 23:00 UTC today+0.
-        var now = Instant.FromUtc(2026, 8, 11, 20, 0); // 22:00 local, before next day's 01:00
-
-        // Next 01:00 Stockholm (CEST, UTC+2) after 2026-08-11 22:00 local is 2026-08-12 01:00 local
-        // = 2026-08-11 23:00 UTC.
-        await Assert.That(schedule.NextRun(now)).IsEqualTo(Instant.FromUtc(2026, 8, 11, 23, 0));
-    }
-
-    [Test]
-    public async Task Daily_wraps_to_the_first_time_of_the_next_day()
-    {
-        var schedule = Schedule.Daily(Stockholm, new LocalTime(1, 0));
-        var now = Instant.FromUtc(2026, 8, 12, 10, 0); // 12:00 local, past 01:00
-
-        await Assert.That(schedule.NextRun(now)).IsEqualTo(Instant.FromUtc(2026, 8, 12, 23, 0));
-    }
-
-    [Test]
-    public async Task Daily_picks_the_nearest_of_multiple_times()
-    {
-        var schedule = Schedule.Daily(Stockholm, new LocalTime(7, 0), new LocalTime(20, 0));
-        var now = Instant.FromUtc(2026, 8, 12, 10, 0); // 12:00 local: 07:00 passed, 20:00 ahead
-
-        await Assert.That(schedule.NextRun(now)).IsEqualTo(Instant.FromUtc(2026, 8, 12, 18, 0));
-    }
-
-    [Test]
-    public async Task Daily_normalizes_unsorted_and_duplicate_times()
-    {
-        var schedule = Schedule.Daily(Stockholm, new LocalTime(20, 0), new LocalTime(7, 0), new LocalTime(7, 0));
-
-        await Assert.That(schedule.ToString()).IsEqualTo("daily:Europe/Stockholm:07:00:00,20:00:00");
-        await Assert.That(schedule)
-            .IsEqualTo(Schedule.Daily(Stockholm, new LocalTime(7, 0), new LocalTime(20, 0)));
-    }
-
-    [Test]
-    public async Task Daily_next_run_is_strictly_after_now()
-    {
-        var schedule = Schedule.Daily(Stockholm, new LocalTime(1, 0));
-        var slot = Instant.FromUtc(2026, 8, 11, 23, 0); // exactly 01:00 local
-
-        // Exactly at the slot: the sweep leases by advancing to NextRun, so returning the same
-        // instant would re-select the job forever.
-        await Assert.That(schedule.NextRun(slot)).IsEqualTo(Instant.FromUtc(2026, 8, 12, 23, 0));
-    }
-
-    [Test]
-    public async Task Daily_spring_forward_gap_shifts_the_run_past_the_gap()
-    {
-        // Stockholm springs forward 2026-03-29 02:00 CET -> 03:00 CEST: 02:30 does not exist that
-        // day. The lenient mapping runs it shifted past the gap (03:30 CEST = 01:30 UTC) instead of
-        // skipping the day or throwing.
-        var schedule = Schedule.Daily(Stockholm, new LocalTime(2, 30));
+        // Stockholm springs forward 2026-03-29 02:00 CET -> 03:00 CEST, so 02:30 never happens that
+        // day. The slot runs at the moment the gap closes (03:00 CEST = 01:00 UTC) rather than being
+        // skipped for the day.
+        var schedule = Schedule.Cron(Stockholm, "30 2 * * *");
         var now = Instant.FromUtc(2026, 3, 29, 0, 0); // 01:00 CET, before the transition
 
-        await Assert.That(schedule.NextRun(now)).IsEqualTo(Instant.FromUtc(2026, 3, 29, 1, 30));
+        await Assert.That(schedule.NextRun(now)).IsEqualTo(Instant.FromUtc(2026, 3, 29, 1, 0));
+        // And the day after, the slot is back to its ordinary local time (02:30 CEST = 00:30 UTC).
+        await Assert.That(schedule.NextRun(Instant.FromUtc(2026, 3, 29, 1, 0)))
+            .IsEqualTo(Instant.FromUtc(2026, 3, 30, 0, 30));
     }
 
     [Test]
-    public async Task Daily_fall_back_overlap_runs_once_at_the_first_occurrence()
+    public async Task Fall_back_overlap_runs_a_fixed_slot_once()
     {
-        // Stockholm falls back 2026-10-25 03:00 CEST -> 02:00 CET: 02:30 occurs twice. The lenient
-        // mapping takes the earlier occurrence (02:30 CEST = 00:30 UTC) — once, not twice.
-        var schedule = Schedule.Daily(Stockholm, new LocalTime(2, 30));
-        var now = Instant.FromUtc(2026, 10, 24, 23, 30); // 01:30 CEST on the 25th
+        // Stockholm falls back 2026-10-25 03:00 CEST -> 02:00 CET, so 02:30 happens twice. A slot
+        // named once a day runs on the first pass only (02:30 CEST = 00:30 UTC).
+        var schedule = Schedule.Cron(Stockholm, "30 2 * * *");
 
-        await Assert.That(schedule.NextRun(now)).IsEqualTo(Instant.FromUtc(2026, 10, 25, 0, 30));
+        await Assert.That(schedule.NextRun(Instant.FromUtc(2026, 10, 24, 23, 30)))
+            .IsEqualTo(Instant.FromUtc(2026, 10, 25, 0, 30));
 
-        // And from just after the first occurrence, the next run is the following day — the
-        // repeated hour must not yield a second run.
-        var justAfter = Instant.FromUtc(2026, 10, 25, 0, 31);
-        await Assert.That(schedule.NextRun(justAfter)).IsEqualTo(Instant.FromUtc(2026, 10, 26, 1, 30));
+        // From the first occurrence the next run is the following day: the repeated hour must not
+        // produce a second run of a once-a-day slot.
+        await Assert.That(schedule.NextRun(Instant.FromUtc(2026, 10, 25, 0, 30)))
+            .IsEqualTo(Instant.FromUtc(2026, 10, 26, 1, 30));
     }
 
     [Test]
-    public async Task Daily_requires_at_least_one_time()
+    public async Task Fall_back_overlap_runs_a_recurring_slot_in_both_passes()
     {
-        await Assert.That(() => Schedule.Daily(Stockholm)).Throws<ArgumentException>();
+        // The counterpart to the fixed slot: an expression that recurs within the hour keeps running
+        // through the repeated hour, so 02:00 CET (01:00 UTC) follows 02:30 CEST (00:30 UTC).
+        var schedule = Schedule.Cron(Stockholm, "*/30 * * * *");
+
+        await Assert.That(schedule.NextRun(Instant.FromUtc(2026, 10, 25, 0, 30)))
+            .IsEqualTo(Instant.FromUtc(2026, 10, 25, 1, 0));
+    }
+
+    // --------------------------------------------------------------------------- canonical ---
+
+    [Test]
+    public async Task Canonical_string_is_stable()
+    {
+        // Pins the wire format: persisted and configured schedules must stay parseable across versions.
+        await Assert.That(Schedule.Cron(Stockholm, "0 3 * * *").ToString())
+            .IsEqualTo("cron:Europe/Stockholm:0 3 * * *");
     }
 
     [Test]
-    public async Task Daily_requires_a_zone()
+    public async Task Expression_is_normalized_to_one_canonical_form()
     {
-        await Assert.That(() => Schedule.Daily(null!, new LocalTime(1, 0))).Throws<ArgumentNullException>();
+        // Providers compare the stored canonical string to decide whether a schedule changed, so
+        // spacing and name casing must not read as a different schedule on the next deploy.
+        var schedule = Schedule.Cron(Stockholm, "  0   3  *  *  mon\t");
+
+        await Assert.That(schedule.Expression).IsEqualTo("0 3 * * MON");
+        await Assert.That(schedule).IsEqualTo(Schedule.Cron(Stockholm, "0 3 * * MON"));
     }
 
     [Test]
-    public async Task Daily_round_trips_through_parse()
+    public async Task Round_trips_through_parse()
     {
-        var schedule = Schedule.Daily(Stockholm, new LocalTime(1, 0), new LocalTime(13, 30));
+        var schedule = Schedule.Cron(Stockholm, "15 4,16 * * 1-5");
 
         await Assert.That(Schedule.Parse(schedule.ToString())).IsEqualTo(schedule);
     }
 
-    // ------------------------------------------------------------------------------ Parse ---
+    [Test]
+    public async Task Zone_is_part_of_identity()
+    {
+        var oslo = DateTimeZoneProviders.Tzdb["Europe/Oslo"];
+
+        await Assert.That(Schedule.Cron(Stockholm, "0 3 * * *"))
+            .IsNotEqualTo(Schedule.Cron(oslo, "0 3 * * *"));
+    }
+
+    // ----------------------------------------------------------------------------- rejects ---
 
     [Test]
-    [Arguments("cron:* * * * *")]
-    [Arguments("every")]
-    [Arguments("daily")]
+    [Arguments("* * * *")]
+    [Arguments("* * * * * * *")]
+    public async Task Wrong_field_count_throws_argument_exception(string expression)
+    {
+        await Assert.That(() => Schedule.Cron(Stockholm, expression)).Throws<ArgumentException>();
+    }
+
+    [Test]
+    [Arguments("0 99 * * *")]
+    [Arguments("banana")]
+    [Arguments("0 3 * * NOTADAY")]
+    public async Task Invalid_expression_throws_argument_exception(string expression)
+    {
+        await Assert.That(() => Schedule.Cron(Stockholm, expression)).Throws<ArgumentException>();
+    }
+
+    [Test]
+    public async Task Expression_that_never_occurs_throws_argument_exception()
+    {
+        // Valid cron, but 30 February never arrives: a sweep could never advance the job past it.
+        await Assert.That(() => Schedule.Cron(Stockholm, "0 0 30 2 *")).Throws<ArgumentException>();
+    }
+
+    [Test]
+    [Arguments(null)]
+    [Arguments("")]
+    [Arguments("   ")]
+    public async Task Missing_expression_throws_argument_exception(string? expression)
+    {
+        await Assert.That(() => Schedule.Cron(Stockholm, expression!)).Throws<ArgumentException>();
+    }
+
+    [Test]
+    public async Task Missing_zone_throws_argument_null()
+    {
+        await Assert.That(() => Schedule.Cron(null!, "0 3 * * *")).Throws<ArgumentNullException>();
+    }
+
+    [Test]
+    public async Task Non_tzdb_zone_is_rejected()
+    {
+        // Only the zone id is persisted and rehydrated via TZDB; a zone TZDB cannot resolve by id —
+        // a custom zone here, a Windows zone id on a BCL provider — would produce a schedule the
+        // dispatch sweep can never parse back. The zone is hand-rolled rather than taken from the
+        // BCL provider, whose ids are Windows-only, so the test asserts the same on every platform.
+        await Assert.That(() => Schedule.Cron(new UnknownZone(), "0 3 * * *")).Throws<ArgumentException>();
+    }
+
+    // ------------------------------------------------------------------------------- Parse ---
+
+    [Test]
     [Arguments("nonsense")]
+    [Arguments("cron")]
+    [Arguments("cron:Europe/Stockholm")]
+    [Arguments("cron:0 3 * * *")]
     public async Task Parse_unrecognized_forms_throw_format_exception(string text)
     {
         await Assert.That(() => Schedule.Parse(text)).Throws<FormatException>();
     }
 
     [Test]
-    public async Task Parse_invalid_interval_duration_throws_format_exception()
+    [Arguments("every:0:00:15:00")]
+    [Arguments("daily:Europe/Stockholm:07:00:00")]
+    public async Task Parse_pre_cron_forms_throw_format_exception(string text)
     {
-        await Assert.That(() => Schedule.Parse("every:banana")).Throws<FormatException>();
-    }
-
-    [Test]
-    [Arguments("every:-0:00:05:00")]
-    [Arguments("every:0:00:00:00.5")]
-    public async Task Parse_parseable_but_out_of_range_interval_throws_format_exception(string text)
-    {
-        // Parse's contract is FormatException for any non-canonical text — a duration the pattern
-        // accepts but the schedule rejects (negative, sub-second) must not leak a different type.
-        await Assert.That(() => Schedule.Parse(text)).Throws<FormatException>();
-    }
-
-    [Test]
-    public async Task Daily_rejects_non_tzdb_zones()
-    {
-        // Only the zone id is persisted and rehydrated via TZDB; a zone TZDB cannot resolve by id —
-        // a custom zone here, a Windows zone id on a BCL provider — would produce a schedule the
-        // dispatch sweep can never parse back. The zone is hand-rolled rather than taken from the
-        // BCL provider, whose ids are Windows-only, so the test asserts the same on every platform.
-        await Assert.That(() => Schedule.Daily(new UnknownZone(), new LocalTime(7, 0)))
-            .Throws<ArgumentException>();
+        // Stored by an older version: the sweep quarantines what it cannot parse, so the message has
+        // to be the one an operator reads.
+        await Assert.That(() => Schedule.Parse(text)).Throws<FormatException>()
+            .WithMessageContaining("pre-cron");
     }
 
     [Test]
     public async Task Parse_unknown_time_zone_throws_format_exception()
     {
-        await Assert.That(() => Schedule.Parse("daily:Mars/Olympus:01:00:00")).Throws<FormatException>();
+        await Assert.That(() => Schedule.Parse("cron:Mars/Olympus:0 3 * * *")).Throws<FormatException>();
     }
 
     [Test]
-    public async Task Parse_invalid_time_of_day_throws_format_exception()
+    [Arguments("cron:Europe/Stockholm:0 99 * * *")]
+    [Arguments("cron:Europe/Stockholm:* * * *")]
+    [Arguments("cron:Europe/Stockholm:0 0 30 2 *")]
+    public async Task Parse_wraps_a_rejected_expression_as_format_exception(string text)
     {
-        await Assert.That(() => Schedule.Parse("daily:Europe/Stockholm:25:99:00")).Throws<FormatException>();
+        // Parse's contract is FormatException for any non-canonical text — an expression the schedule
+        // rejects must not leak the ArgumentException from the factory.
+        await Assert.That(() => Schedule.Parse(text)).Throws<FormatException>();
     }
 
     [Test]

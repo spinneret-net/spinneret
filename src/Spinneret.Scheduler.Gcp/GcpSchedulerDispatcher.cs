@@ -141,7 +141,7 @@ internal sealed class GcpSchedulerDispatcher(
         }
         catch (Exception ex)
         {
-            // Dead-letter this occurrence but leave the schedule armed — the next interval still runs.
+            // Dead-letter this occurrence but leave the schedule armed — the next slot still runs.
             logger.LogError(ex,
                 "Recurring job {JobId} ({Type}) failed to enqueue; schedule remains active",
                 doc.Id, requestTypeName);

@@ -25,7 +25,7 @@ public static class StartupExtensions
         services.TryAddSingleton<IRecurringJobScheduler, FirestoreScheduler>();
         services.TryAddSingleton<IFirestoreTransactionalScheduler, FirestoreTransactionalScheduler>();
         services.TryAddSingleton<GcpSchedulerDispatcher>();
-        services.AddHostedService<RecurringJobInstaller>();
+        services.AddRecurringJobInstaller();
         return services;
     }
 

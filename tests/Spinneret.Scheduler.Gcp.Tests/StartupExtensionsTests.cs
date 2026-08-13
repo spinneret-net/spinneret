@@ -69,7 +69,7 @@ public class StartupExtensionsTests
         var descriptor = services.Single(d => d.ServiceType == typeof(IHostedService));
 
         await Assert.That(descriptor.ImplementationType!.FullName)
-            .IsEqualTo("Spinneret.Scheduler.Gcp.RecurringJobInstaller");
+            .IsEqualTo("Spinneret.Scheduler.RecurringJobInstaller");
     }
 
     [Test]

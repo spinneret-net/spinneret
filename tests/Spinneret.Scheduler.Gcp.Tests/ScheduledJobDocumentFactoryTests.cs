@@ -6,6 +6,8 @@ namespace Spinneret.Scheduler.Gcp.Tests;
 
 public class ScheduledJobDocumentFactoryTests
 {
+    private static readonly DateTimeZone Stockholm = DateTimeZoneProviders.Tzdb["Europe/Stockholm"];
+
     private static QueueTypeRegistry Registry => new([typeof(TestRequest).Assembly]);
 
     private static ScheduledJobDocumentFactory CreateFactory(FakePayloadSerializer? serializer = null) =>
@@ -117,7 +119,7 @@ public class ScheduledJobDocumentFactoryTests
     public async Task RecurringDefinition_writes_the_canonical_schedule_string()
     {
         var factory = CreateFactory();
-        var schedule = Schedule.Every(Duration.FromMinutes(15));
+        var schedule = Schedule.Cron(Stockholm, "*/15 * * * *");
 
         var doc = factory.RecurringDefinition(new TestRequest("x"), schedule);
 
@@ -125,15 +127,16 @@ public class ScheduledJobDocumentFactoryTests
     }
 
     [Test]
-    public async Task RecurringDefinition_daily_schedule_writes_the_canonical_schedule_string()
+    public async Task RecurringDefinition_writes_the_zone_with_the_expression()
     {
+        // The stored string is the whole schedule: a zone lost here would silently re-interpret every
+        // slot in UTC when the sweep rehydrates it.
         var factory = CreateFactory();
-        var zone = DateTimeZoneProviders.Tzdb["Europe/Stockholm"];
 
-        var doc = factory.RecurringDefinition(new TestRequest("x"), Schedule.Daily(zone, new LocalTime(1, 0)));
+        var doc = factory.RecurringDefinition(new TestRequest("x"), Schedule.Cron(Stockholm, "0 1 * * *"));
 
         await Assert.That((string)doc[ScheduledJob.Fields.Schedule])
-            .IsEqualTo("daily:Europe/Stockholm:01:00:00");
+            .IsEqualTo("cron:Europe/Stockholm:0 1 * * *");
     }
 
     [Test]
@@ -143,7 +146,7 @@ public class ScheduledJobDocumentFactoryTests
         var factory = CreateFactory(serializer);
         var request = new OtherTestRequest(7);
 
-        var doc = factory.RecurringDefinition(request, Schedule.Every(Duration.FromHours(1)));
+        var doc = factory.RecurringDefinition(request, Schedule.Cron(Stockholm, "0 * * * *"));
 
         await Assert.That((string)doc[ScheduledJob.Fields.RequestTypeName])
             .IsEqualTo(typeof(OtherTestRequest).FullName!);
@@ -158,7 +161,7 @@ public class ScheduledJobDocumentFactoryTests
         // definition must never carry them, or re-registering would disturb a live schedule.
         var factory = CreateFactory();
 
-        var doc = factory.RecurringDefinition(new TestRequest("x"), Schedule.Every(Duration.FromMinutes(1)));
+        var doc = factory.RecurringDefinition(new TestRequest("x"), Schedule.Cron(Stockholm, "* * * * *"));
 
         await Assert.That(doc.Keys).IsEquivalentTo([
             ScheduledJob.Fields.RequestTypeName,

@@ -1,179 +1,172 @@
+using Cronos;
 using NodaTime;
-using NodaTime.Text;
 
 namespace Spinneret.Scheduler;
 
 /// <summary>
-/// When a recurring job runs: either every fixed interval, or at fixed local times of day in a
-/// time zone (DST-aware). The hierarchy is closed — providers persist a schedule as the canonical
-/// string form (<see cref="ToString"/> / <see cref="Parse"/>), so an open hierarchy would let an
-/// application register a schedule the dispatch sweep could not rehydrate.
+/// When a recurring job runs: a cron expression evaluated in a fixed time zone, so a schedule keeps
+/// its wall-clock slot across DST transitions. Providers persist a schedule as the canonical string
+/// form (<see cref="ToString"/> / <see cref="Parse"/>) and rehydrate every stored schedule through
+/// <see cref="Parse"/>, which is also how an application reads a schedule out of configuration.
 /// </summary>
-public abstract record Schedule
+/// <remarks>
+/// Occurrences are only as prompt as the provider's dispatch sweep: a slot finer than the sweep's
+/// period is reached on the following sweep rather than at the slot itself.
+/// </remarks>
+public sealed record Schedule
 {
-    private protected Schedule() { }
+    private readonly CronExpression _expression;
 
-    /// <summary>A run every <paramref name="interval"/>, measured from the previous run.</summary>
-    public static Schedule Every(Duration interval) => new IntervalSchedule(interval);
+    // Occurrences are computed against the system zone database, not TZDB: the zone is TZDB-checked
+    // for its id — that is what round-trips through Parse — but the DST rules applied to each
+    // occurrence come from TimeZoneInfo. Both track IANA, so they can only disagree on a host whose
+    // zone data is older than NodaTime's.
+    private readonly TimeZoneInfo _zoneInfo;
+
+    private Schedule(DateTimeZone zone, TimeZoneInfo zoneInfo, CronExpression expression, string expressionText)
+    {
+        Zone = zone;
+        _zoneInfo = zoneInfo;
+        _expression = expression;
+        Expression = expressionText;
+    }
+
+    /// <summary>The zone the expression's fields are interpreted in.</summary>
+    public DateTimeZone Zone { get; }
+
+    /// <summary>The normalized cron expression: five fields, or six when the first is seconds.</summary>
+    public string Expression { get; }
 
     /// <summary>
-    /// A run at each of <paramref name="times"/> (local times of day in <paramref name="zone"/>)
-    /// every day. Times are DST-aware: a time that falls in a spring-forward gap runs shifted
-    /// past the gap, and a time repeated by a fall-back overlap runs once, at its first occurrence.
+    /// A run at every occurrence of <paramref name="expression"/> — five cron fields, or six when
+    /// the first is seconds — in local time in <paramref name="zone"/>.
     /// </summary>
-    public static Schedule Daily(DateTimeZone zone, params LocalTime[] times) => new DailySchedule(zone, times);
+    /// <exception cref="ArgumentException">
+    /// The expression is not valid cron, describes a date that never occurs, or the zone is not a
+    /// TZDB zone this host can resolve.
+    /// </exception>
+    public static Schedule Cron(DateTimeZone zone, string expression)
+    {
+        ArgumentNullException.ThrowIfNull(zone);
+        ArgumentException.ThrowIfNullOrWhiteSpace(expression);
+
+        // Only the zone id is persisted, and Parse rehydrates it through TZDB — a BCL or custom zone
+        // would produce a schedule the dispatch sweep can never parse back.
+        if (DateTimeZoneProviders.Tzdb.GetZoneOrNull(zone.Id) is null)
+            throw new ArgumentException(
+                $"Time zone '{zone.Id}' is not a TZDB zone. Schedules persist only the zone id and "
+                + "rehydrate it via DateTimeZoneProviders.Tzdb, so use a TZDB zone (e.g. 'Europe/Stockholm').",
+                nameof(zone));
+
+        var normalized = Normalize(expression);
+        var fieldCount = normalized.Count(c => c == ' ') + 1;
+        var format = fieldCount switch
+        {
+            5 => CronFormat.Standard,
+            6 => CronFormat.IncludeSeconds,
+            _ => throw new ArgumentException(
+                $"Cron expression '{expression}' has {fieldCount} fields; expected five, or six when "
+                + "the first field is seconds.", nameof(expression)),
+        };
+
+        CronExpression parsed;
+        try
+        {
+            parsed = CronExpression.Parse(normalized, format);
+        }
+        catch (CronFormatException ex)
+        {
+            throw new ArgumentException($"Invalid cron expression '{expression}': {ex.Message}", nameof(expression), ex);
+        }
+
+        var zoneInfo = ResolveZoneInfo(zone);
+
+        // A syntactically valid expression can still describe a date that never arrives (31 February).
+        // Reject it here, where the registering code sees it, rather than letting it reach a job
+        // document that no sweep can ever advance. Impossible dates are impossible at every instant,
+        // so probing from the current one is enough to tell them apart.
+        if (parsed.GetNextOccurrence(DateTimeOffset.UtcNow, zoneInfo) is null)
+            throw new ArgumentException(
+                $"Cron expression '{normalized}' has no future occurrence in '{zone.Id}'.", nameof(expression));
+
+        return new Schedule(zone, zoneInfo, parsed, normalized);
+    }
 
     /// <summary>
-    /// The next run strictly after <paramref name="now"/>. Strictness is what makes the dispatch
+    /// The next run strictly after <paramref name="now"/>. Strictness is what makes a dispatch
     /// sweep's lease-by-advancing-the-run-time terminate: a NextRun that could return
     /// <paramref name="now"/> itself would re-select the job forever.
     /// </summary>
-    public abstract Instant NextRun(Instant now);
+    public Instant NextRun(Instant now)
+    {
+        var next = _expression.GetNextOccurrence(now.ToDateTimeOffset(), _zoneInfo)
+            ?? throw new InvalidOperationException($"No next run found for '{this}' after {now}.");
+
+        return Instant.FromDateTimeOffset(next);
+    }
 
     /// <summary>Canonical persistable form; round-trips through <see cref="Parse"/>.</summary>
-    public abstract override string ToString();
+    public override string ToString() => $"cron:{Zone.Id}:{Expression}";
 
-    /// <summary>Rehydrates a schedule persisted via <see cref="ToString"/>.</summary>
+    /// <summary>Rehydrates a schedule persisted or configured via <see cref="ToString"/>.</summary>
     /// <exception cref="FormatException">The text is not a canonical schedule.</exception>
     public static Schedule Parse(string text)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(text);
 
-        var parts = text.Split(':', 2);
-        return parts[0] switch
-        {
-            "every" when parts.Length == 2 => IntervalSchedule.ParseBody(parts[1]),
-            "daily" when parts.Length == 2 => DailySchedule.ParseBody(parts[1]),
-            _ => throw new FormatException(
-                $"Unrecognized schedule '{text}'. Expected 'every:<duration>' or 'daily:<zone>:<time>[,<time>...]'."),
-        };
-    }
-}
+        var parts = text.Split(':', 3);
 
-public sealed record IntervalSchedule : Schedule
-{
-    private static readonly DurationPattern Pattern = DurationPattern.Roundtrip;
+        // Pre-cron schedules named their form in the same position, so say what to do about them
+        // instead of reporting them as gibberish — a stored one surfaces through the sweep, far from
+        // whoever wrote it.
+        if (parts[0] is "every" or "daily")
+            throw new FormatException(
+                $"Schedule '{text}' is in the pre-cron form. Re-register the job to replace it with "
+                + "'cron:<zone>:<expression>'.");
 
-    public IntervalSchedule(Duration interval)
-    {
-        if (interval < Duration.FromSeconds(1))
-            throw new ArgumentOutOfRangeException(nameof(interval),
-                "A recurring interval must be at least one second: providers persist run times with "
-                + "second precision, so a sub-second interval could re-select a job in a tight loop.");
+        if (parts.Length != 3 || parts[0] != "cron")
+            throw new FormatException($"Unrecognized schedule '{text}'. Expected 'cron:<zone>:<expression>'.");
 
-        Interval = interval;
-    }
-
-    public Duration Interval { get; }
-
-    public override Instant NextRun(Instant now) => now + Interval;
-
-    public override string ToString() => $"every:{Pattern.Format(Interval)}";
-
-    internal static Schedule ParseBody(string body)
-    {
-        var result = Pattern.Parse(body);
-        if (!result.Success)
-            throw new FormatException($"Invalid interval duration '{body}'.", result.Exception);
+        var zone = DateTimeZoneProviders.Tzdb.GetZoneOrNull(parts[1])
+            ?? throw new FormatException($"Unknown time zone '{parts[1]}' in schedule '{text}'.");
 
         try
         {
-            return new IntervalSchedule(result.Value);
-        }
-        catch (ArgumentOutOfRangeException ex)
-        {
-            // Parse promises FormatException for any non-canonical text — a parseable but
-            // out-of-range duration (negative, sub-second) is still non-canonical.
-            throw new FormatException($"Invalid interval duration '{body}': {ex.Message}", ex);
-        }
-    }
-}
-
-public sealed record DailySchedule : Schedule
-{
-    private static readonly LocalTimePattern TimePattern = LocalTimePattern.CreateWithInvariantCulture("HH:mm:ss");
-
-    private readonly LocalTime[] _times;
-
-    public DailySchedule(DateTimeZone zone, LocalTime[] times)
-    {
-        ArgumentNullException.ThrowIfNull(zone);
-        ArgumentNullException.ThrowIfNull(times);
-        if (times.Length == 0)
-            throw new ArgumentException("A daily schedule requires at least one time of day.", nameof(times));
-        // Only the zone id is persisted, and Parse rehydrates it through TZDB — a BCL or custom
-        // zone would produce a schedule the dispatch sweep can never parse back.
-        if (DateTimeZoneProviders.Tzdb.GetZoneOrNull(zone.Id) is null)
-            throw new ArgumentException(
-                $"Time zone '{zone.Id}' is not a TZDB zone. Daily schedules persist only the zone id "
-                + "and rehydrate it via DateTimeZoneProviders.Tzdb, so use a TZDB zone (e.g. 'Europe/Stockholm').",
-                nameof(zone));
-
-        Zone = zone;
-        _times = times.Distinct().Order().ToArray();
-    }
-
-    public DateTimeZone Zone { get; }
-
-    public IReadOnlyList<LocalTime> Times => _times;
-
-    public override Instant NextRun(Instant now)
-    {
-        // Walk the local slots in order and return the first that maps strictly after now. Slots are
-        // mapped leniently, so a DST transition never throws: a slot in a spring-forward gap shifts
-        // past the gap, and a slot in a fall-back overlap takes its first occurrence. Both mappings
-        // can land at or before now (a shifted slot can collide with the next one; an overlap's first
-        // occurrence lies in the past during the repeated hour), which is why the filter is on the
-        // mapped instant rather than on the local time-of-day.
-        var today = now.InZone(Zone).Date;
-
-        for (var day = 0; day <= 2; day++)
-        {
-            var date = today.PlusDays(day);
-            foreach (var time in _times)
-            {
-                var instant = Zone.AtLeniently(date.At(time)).ToInstant();
-                if (instant > now)
-                    return instant;
-            }
-        }
-
-        // Unreachable: tomorrow's slots always map after now (no transition spans a whole day).
-        throw new InvalidOperationException($"No next run found for '{this}' after {now}.");
-    }
-
-    public bool Equals(DailySchedule? other) =>
-        other is not null && Zone.Id == other.Zone.Id && _times.SequenceEqual(other._times);
-
-    public override int GetHashCode() => HashCode.Combine(Zone.Id, _times.Length, _times[0]);
-
-    public override string ToString() =>
-        $"daily:{Zone.Id}:{string.Join(',', _times.Select(TimePattern.Format))}";
-
-    internal static Schedule ParseBody(string body)
-    {
-        var parts = body.Split(':', 2);
-        if (parts.Length != 2)
-            throw new FormatException($"Invalid daily schedule '{body}'. Expected '<zone>:<time>[,<time>...]'.");
-
-        var zone = DateTimeZoneProviders.Tzdb.GetZoneOrNull(parts[0])
-            ?? throw new FormatException($"Unknown time zone '{parts[0]}' in daily schedule.");
-
-        var times = parts[1].Split(',').Select(t =>
-        {
-            var result = TimePattern.Parse(t);
-            if (!result.Success)
-                throw new FormatException($"Invalid time of day '{t}' in daily schedule.", result.Exception);
-            return result.Value;
-        }).ToArray();
-
-        try
-        {
-            return new DailySchedule(zone, times);
+            return Cron(zone, parts[2]);
         }
         catch (ArgumentException ex)
         {
-            throw new FormatException($"Invalid daily schedule '{body}': {ex.Message}", ex);
+            // Parse promises FormatException for any non-canonical text — a well-formed wrapper
+            // around an expression the schedule rejects is still non-canonical.
+            throw new FormatException($"Invalid schedule '{text}': {ex.Message}", ex);
+        }
+    }
+
+    public bool Equals(Schedule? other) =>
+        other is not null && Zone.Id == other.Zone.Id && Expression == other.Expression;
+
+    public override int GetHashCode() => HashCode.Combine(Zone.Id, Expression);
+
+    /// <summary>
+    /// Single-spaced and upper-cased, so expressions that differ only in whitespace or in the case
+    /// of a name (<c>MON</c>, <c>JAN</c>) produce one canonical string — providers compare the
+    /// stored string to decide whether a schedule changed.
+    /// </summary>
+    private static string Normalize(string expression) =>
+        string.Join(' ', expression.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries))
+            .ToUpperInvariant();
+
+    private static TimeZoneInfo ResolveZoneInfo(DateTimeZone zone)
+    {
+        try
+        {
+            return TimeZoneInfo.FindSystemTimeZoneById(zone.Id);
+        }
+        catch (Exception ex) when (ex is TimeZoneNotFoundException or InvalidTimeZoneException)
+        {
+            throw new ArgumentException(
+                $"Time zone '{zone.Id}' is a TZDB zone this host cannot resolve, so cron occurrences "
+                + "cannot be computed in it.", nameof(zone), ex);
         }
     }
 }

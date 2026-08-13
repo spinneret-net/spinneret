@@ -11,6 +11,17 @@ namespace Spinneret.Scheduler.Mssql.Tests;
 [ClassDataSource<MssqlContainerFixture>(Shared = SharedType.PerTestSession)]
 public sealed class MssqlSchedulerIntegrationTests(MssqlContainerFixture fixture)
 {
+    private static readonly DateTimeZone Stockholm = DateTimeZoneProviders.Tzdb["Europe/Stockholm"];
+
+    private static readonly Schedule Hourly = Schedule.Cron(Stockholm, "0 * * * *");
+    private static readonly Schedule EverySecond = Schedule.Cron(Stockholm, "* * * * * *");
+
+    /// <summary>A slot no test run can be close to: a fixed daily time roughly half a day away.</summary>
+    private static Schedule FarOff()
+    {
+        var localHour = SystemClock.Instance.GetCurrentInstant().InZone(Stockholm).Hour;
+        return Schedule.Cron(Stockholm, $"13 {(localHour + 12) % 24} * * *");
+    }
     // ---------------------------------------------------------------------- registration ---
 
     [Test]
@@ -18,22 +29,23 @@ public sealed class MssqlSchedulerIntegrationTests(MssqlContainerFixture fixture
     {
         await using var host = await SchedulerTestHost.StartAsync(fixture.ConnectionString, sweeper: false);
 
-        await host.Scheduler.RegisterAsync("hourly", new TickCommand("h"), Schedule.Every(Duration.FromHours(1)));
+        await host.Scheduler.RegisterAsync("hourly", new TickCommand("h"), Hourly);
 
         await Assert.That(await host.JobStatus("hourly")).IsEqualTo("pending");
+        // An hourly slot lands somewhere in the next hour rather than a fixed distance out.
         var next = await host.JobNextExecuteAt("hourly");
-        await Assert.That(next > DateTime.UtcNow.AddMinutes(55)).IsTrue();
-        await Assert.That(next < DateTime.UtcNow.AddMinutes(65)).IsTrue();
+        await Assert.That(next > DateTime.UtcNow).IsTrue();
+        await Assert.That(next <= DateTime.UtcNow.AddMinutes(60)).IsTrue();
         await Assert.That(await host.ScalarAsync<string>(
                 $"SELECT Schedule FROM [{host.JobsTable}] WHERE JobKey = N'hourly'"))
-            .IsEqualTo("every:0:01:00:00");
+            .IsEqualTo("cron:Europe/Stockholm:0 * * * *");
     }
 
     [Test]
     public async Task RegisterAsync_with_unchanged_schedule_keeps_the_cadence()
     {
         await using var host = await SchedulerTestHost.StartAsync(fixture.ConnectionString, sweeper: false);
-        var schedule = Schedule.Every(Duration.FromHours(1));
+        var schedule = Hourly;
 
         await host.Scheduler.RegisterAsync("stable", new TickCommand("v1"), schedule);
         var armed = await host.JobNextExecuteAt("stable");
@@ -53,24 +65,31 @@ public sealed class MssqlSchedulerIntegrationTests(MssqlContainerFixture fixture
     {
         await using var host = await SchedulerTestHost.StartAsync(fixture.ConnectionString, sweeper: false);
 
-        await host.Scheduler.RegisterAsync("moving", new TickCommand("m"), Schedule.Every(Duration.FromHours(1)));
-        await host.Scheduler.RegisterAsync("moving", new TickCommand("m"), Schedule.Every(Duration.FromHours(6)));
+        await host.Scheduler.RegisterAsync("moving", new TickCommand("m"), Hourly);
+        var armed = await host.JobNextExecuteAt("moving");
 
+        var moved = FarOff();
+        await host.Scheduler.RegisterAsync("moving", new TickCommand("m"), moved);
+
+        // Re-armed onto the new schedule's next slot. The replacement never falls on the hour, so it
+        // cannot coincide with what the hourly schedule had armed.
         var next = await host.JobNextExecuteAt("moving");
-        await Assert.That(next > DateTime.UtcNow.AddHours(5)).IsTrue();
+        var expected = moved.NextRun(SystemClock.Instance.GetCurrentInstant()).ToDateTimeUtc();
+        await Assert.That(next).IsNotEqualTo(armed);
+        await Assert.That(Math.Abs((next - expected).TotalSeconds) < 5).IsTrue();
         await Assert.That(await host.ScalarAsync<string>(
                 $"SELECT Schedule FROM [{host.JobsTable}] WHERE JobKey = N'moving'"))
-            .IsEqualTo("every:0:06:00:00");
+            .IsEqualTo(moved.ToString());
     }
 
     [Test]
     public async Task RegisterAsync_rearms_a_terminal_job()
     {
         await using var host = await SchedulerTestHost.StartAsync(fixture.ConnectionString, sweeper: false);
-        await host.Scheduler.RegisterAsync("revived", new TickCommand("r"), Schedule.Every(Duration.FromHours(1)));
+        await host.Scheduler.RegisterAsync("revived", new TickCommand("r"), Hourly);
         await host.ExecuteAsync($"UPDATE [{host.JobsTable}] SET Status = N'cancelled' WHERE JobKey = N'revived'");
 
-        await host.Scheduler.RegisterAsync("revived", new TickCommand("r"), Schedule.Every(Duration.FromHours(1)));
+        await host.Scheduler.RegisterAsync("revived", new TickCommand("r"), Hourly);
 
         await Assert.That(await host.JobStatus("revived")).IsEqualTo("pending");
     }
@@ -82,7 +101,7 @@ public sealed class MssqlSchedulerIntegrationTests(MssqlContainerFixture fixture
             fixture.ConnectionString,
             sweeper: false,
             configure: services => services.AddRecurringJob(
-                "declared-job", Schedule.Every(Duration.FromHours(2)), () => new TickCommand("declared")));
+                "declared-job", Schedule.Cron(Stockholm, "0 */2 * * *"), () => new TickCommand("declared")));
 
         await Wait.Until(
             async () => await host.ScalarAsync<int>(
@@ -98,8 +117,8 @@ public sealed class MssqlSchedulerIntegrationTests(MssqlContainerFixture fixture
     {
         await using var host = await SchedulerTestHost.StartAsync(fixture.ConnectionString);
 
-        // Minimum interval is 1s; with a 100ms sweep the job should tick repeatedly.
-        await host.Scheduler.RegisterAsync("ticker", new TickCommand("t"), Schedule.Every(Duration.FromSeconds(1)));
+        // Six fields schedule to the second; with a 100ms sweep the job should tick repeatedly.
+        await host.Scheduler.RegisterAsync("ticker", new TickCommand("t"), EverySecond);
 
         await Wait.Until(() => host.Log.DeliveryCount("tick:t") >= 2, "the recurring job to run at least twice");
         await Assert.That(await host.JobStatus("ticker")).IsEqualTo("pending");
@@ -110,10 +129,8 @@ public sealed class MssqlSchedulerIntegrationTests(MssqlContainerFixture fixture
     public async Task Daily_schedule_far_in_the_future_is_not_dispatched()
     {
         await using var host = await SchedulerTestHost.StartAsync(fixture.ConnectionString);
-        var stockholm = DateTimeZoneProviders.Tzdb["Europe/Stockholm"];
 
-        await host.Scheduler.RegisterAsync(
-            "nightly", new TickCommand("n"), Schedule.Daily(stockholm, new LocalTime(1, 0)));
+        await host.Scheduler.RegisterAsync("nightly", new TickCommand("n"), FarOff());
 
         await Task.Delay(700);
         await Assert.That(host.Log.DeliveryCount("tick:n")).IsEqualTo(0);
@@ -130,9 +147,9 @@ public sealed class MssqlSchedulerIntegrationTests(MssqlContainerFixture fixture
             fixture.ConnectionString, reuseSuffix: host.Suffix,
             configure: services => services.AddSingleton(host.Log)); // shared delivery log
 
-        // One due slot of a very long interval: whichever sweep wins books the next run an hour
-        // out, so seeing two deliveries would prove a double dispatch.
-        await host.Scheduler.RegisterAsync("contested", new TickCommand("c"), Schedule.Every(Duration.FromHours(1)));
+        // One due slot of a schedule whose next run is half a day out: whichever sweep wins books
+        // that run, so seeing two deliveries would prove a double dispatch.
+        await host.Scheduler.RegisterAsync("contested", new TickCommand("c"), FarOff());
         await host.ExecuteAsync(
             $"UPDATE [{host.JobsTable}] SET NextExecuteAt = SYSUTCDATETIME() WHERE JobKey = N'contested'");
 
@@ -208,7 +225,7 @@ public sealed class MssqlSchedulerIntegrationTests(MssqlContainerFixture fixture
     public async Task Failed_recurring_dispatch_dead_letters_the_occurrence_but_keeps_the_schedule()
     {
         await using var host = await SchedulerTestHost.StartAsync(fixture.ConnectionString, sweeper: false);
-        await host.Scheduler.RegisterAsync("broken", new TickCommand("b"), Schedule.Every(Duration.FromSeconds(1)));
+        await host.Scheduler.RegisterAsync("broken", new TickCommand("b"), EverySecond);
         // Sabotage the persisted type name so the sweep cannot resolve the request.
         await host.ExecuteAsync(
             $"UPDATE [{host.JobsTable}] SET RequestTypeName = N'No.Such.Type', NextExecuteAt = SYSUTCDATETIME() " +
@@ -228,12 +245,12 @@ public sealed class MssqlSchedulerIntegrationTests(MssqlContainerFixture fixture
     public async Task Unreadable_schedule_is_quarantined_without_blocking_other_jobs()
     {
         await using var host = await SchedulerTestHost.StartAsync(fixture.ConnectionString, sweeper: false);
-        await host.Scheduler.RegisterAsync("poison", new TickCommand("p"), Schedule.Every(Duration.FromSeconds(1)));
-        await host.Scheduler.RegisterAsync("healthy", new TickCommand("h"), Schedule.Every(Duration.FromSeconds(1)));
+        await host.Scheduler.RegisterAsync("poison", new TickCommand("p"), EverySecond);
+        await host.Scheduler.RegisterAsync("healthy", new TickCommand("h"), EverySecond);
         // Corrupt the poison job's schedule and make it the oldest-due row, so a sweep that fails
         // on it would starve everything behind it.
         await host.ExecuteAsync(
-            $"UPDATE [{host.JobsTable}] SET Schedule = N'daily:Mars/Olympus:99:99:99', " +
+            $"UPDATE [{host.JobsTable}] SET Schedule = N'cron:Mars/Olympus:0 3 * * *', " +
             "NextExecuteAt = DATEADD(minute, -10, SYSUTCDATETIME()) WHERE JobKey = N'poison'");
         await host.ExecuteAsync(
             $"UPDATE [{host.JobsTable}] SET NextExecuteAt = SYSUTCDATETIME() WHERE JobKey = N'healthy'");

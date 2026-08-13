@@ -65,7 +65,10 @@ public sealed class StartupExtensionsTests
             .Where(d => d.ServiceType == typeof(Microsoft.Extensions.Hosting.IHostedService))
             .Select(d => d.ImplementationType)
             .ToArray();
-        await Assert.That(hostedTypes).Contains(typeof(RecurringJobInstaller));
+        // The installer is shared with the other transports, so it is named rather than typed: it is
+        // internal to Spinneret.Scheduler.
+        await Assert.That(hostedTypes.Select(t => t?.FullName))
+            .Contains("Spinneret.Scheduler.RecurringJobInstaller");
         await Assert.That(hostedTypes).Contains(typeof(MssqlSchedulerSchemaInitializer));
         await Assert.That(hostedTypes).DoesNotContain(typeof(MssqlSchedulerSweeper));
     }

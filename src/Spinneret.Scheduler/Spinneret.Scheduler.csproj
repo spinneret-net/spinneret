@@ -9,7 +9,10 @@
     </PropertyGroup>
 
     <ItemGroup>
+        <PackageReference Include="Cronos" Version="0.13.0" />
         <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.9" />
+        <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.9" />
+        <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.9" />
         <PackageReference Include="NodaTime" Version="3.3.2" />
     </ItemGroup>
 
@@ -17,8 +20,12 @@
         <ProjectReference Include="..\Spinneret.Mediator\Spinneret.Mediator.csproj" />
     </ItemGroup>
 
+    <ItemGroup>
+        <InternalsVisibleTo Include="Spinneret.Scheduler.Tests" />
+    </ItemGroup>
+
     <PropertyGroup>
-        <Description>Recurring jobs declared in code and installed idempotently at startup, dispatched as mediator requests.</Description>
+        <Description>Recurring jobs declared in code on cron schedules, installed idempotently at startup and dispatched as mediator requests.</Description>
         <PackageTags>$(PackageTags) scheduler recurring-jobs cron background-jobs</PackageTags>
     </PropertyGroup>
 

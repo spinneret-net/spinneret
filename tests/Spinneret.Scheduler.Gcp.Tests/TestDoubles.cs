@@ -58,7 +58,7 @@ public sealed class FakeRecurringJob(string key, Schedule schedule, IRequest<Uni
 public sealed class ThrowingCreateRequestJob(string key) : IRecurringJob
 {
     public string Key => key;
-    public Schedule Schedule => Schedule.Every(Duration.FromMinutes(1));
+    public Schedule Schedule => Schedule.Cron(DateTimeZoneProviders.Tzdb["Europe/Stockholm"], "* * * * *");
     public IRequest<Unit> CreateRequest() => throw new InvalidOperationException($"CreateRequest failed for '{key}'.");
 }
 

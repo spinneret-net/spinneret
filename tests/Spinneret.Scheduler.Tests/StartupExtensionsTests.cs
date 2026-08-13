@@ -1,24 +1,27 @@
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using NodaTime;
-using Spinneret.Mediator;
 
 namespace Spinneret.Scheduler.Tests;
 
-public sealed record TestRequest(string Name) : IRequest<Unit>;
-
 public class StartupExtensionsTests
 {
+    private static readonly DateTimeZone Stockholm = DateTimeZoneProviders.Tzdb["Europe/Stockholm"];
+
+    private static readonly Schedule EveryFiveMinutes = Schedule.Cron(Stockholm, "*/5 * * * *");
+
+    // ------------------------------------------------------------------- AddRecurringJob ---
+
     [Test]
     public async Task AddRecurringJob_registers_a_recurring_job_with_the_given_definition()
     {
         var services = new ServiceCollection();
-        var schedule = Schedule.Every(Duration.FromMinutes(5));
 
-        services.AddRecurringJob("update-projections", schedule, () => new TestRequest("x"));
+        services.AddRecurringJob("update-projections", EveryFiveMinutes, () => new TestRequest("x"));
         var job = services.BuildServiceProvider().GetRequiredService<IRecurringJob>();
 
         await Assert.That(job.Key).IsEqualTo("update-projections");
-        await Assert.That(job.Schedule).IsEqualTo(schedule);
+        await Assert.That(job.Schedule).IsEqualTo(EveryFiveMinutes);
         await Assert.That(job.CreateRequest()).IsEqualTo(new TestRequest("x"));
     }
 
@@ -28,7 +31,7 @@ public class StartupExtensionsTests
         var services = new ServiceCollection();
         var calls = 0;
 
-        services.AddRecurringJob("job", Schedule.Every(Duration.FromMinutes(5)), () =>
+        services.AddRecurringJob("job", EveryFiveMinutes, () =>
         {
             calls++;
             return new TestRequest("x");
@@ -46,8 +49,8 @@ public class StartupExtensionsTests
     {
         var services = new ServiceCollection();
 
-        services.AddRecurringJob("job-a", Schedule.Every(Duration.FromMinutes(5)), () => new TestRequest("a"));
-        services.AddRecurringJob("job-b", Schedule.Every(Duration.FromMinutes(9)), () => new TestRequest("b"));
+        services.AddRecurringJob("job-a", EveryFiveMinutes, () => new TestRequest("a"));
+        services.AddRecurringJob("job-b", Schedule.Cron(Stockholm, "0 * * * *"), () => new TestRequest("b"));
         var jobs = services.BuildServiceProvider().GetServices<IRecurringJob>().ToArray();
 
         await Assert.That(jobs.Select(j => j.Key)).IsEquivalentTo(["job-a", "job-b"]);
@@ -61,8 +64,7 @@ public class StartupExtensionsTests
     {
         var services = new ServiceCollection();
 
-        await Assert.That(() => services.AddRecurringJob(
-                key!, Schedule.Every(Duration.FromMinutes(5)), () => new TestRequest("x")))
+        await Assert.That(() => services.AddRecurringJob(key!, EveryFiveMinutes, () => new TestRequest("x")))
             .Throws<ArgumentException>();
     }
 
@@ -80,7 +82,26 @@ public class StartupExtensionsTests
     {
         var services = new ServiceCollection();
 
-        await Assert.That(() => services.AddRecurringJob("job", Schedule.Every(Duration.FromMinutes(5)), null!))
+        await Assert.That(() => services.AddRecurringJob("job", EveryFiveMinutes, null!))
             .Throws<ArgumentNullException>();
+    }
+
+    // ------------------------------------------------------- schedules from configuration ---
+
+    [Test]
+    public async Task AddRecurringJob_takes_a_schedule_read_from_configuration()
+    {
+        // The supported way to vary cadence per environment: the job's declaration is still the one
+        // place the schedule is decided, and the configuration read is visible right beside it.
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection([new KeyValuePair<string, string?>("Jobs:MonthClose", "cron:Europe/Stockholm:0 3 * * *")])
+            .Build();
+        var services = new ServiceCollection();
+
+        services.AddRecurringJob(
+            "month-close", Schedule.Parse(configuration["Jobs:MonthClose"]!), () => new TestRequest("x"));
+        var job = services.BuildServiceProvider().GetRequiredService<IRecurringJob>();
+
+        await Assert.That(job.Schedule).IsEqualTo(Schedule.Cron(Stockholm, "0 3 * * *"));
     }
 }

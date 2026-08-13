@@ -39,7 +39,9 @@ public static class StartupExtensions
         services.TryAddSingleton<IRecurringJobScheduler, MssqlScheduler>();
         services.TryAddSingleton<IMssqlTransactionalScheduler, MssqlTransactionalScheduler>();
         services.AddHostedService<MssqlSchedulerSchemaInitializer>();
-        services.AddHostedService<RecurringJobInstaller>();
+        // After the schema initializer: hosted services start in registration order, and the
+        // installer writes job rows into the table that initializer creates.
+        services.AddRecurringJobInstaller();
 
         return services;
     }
