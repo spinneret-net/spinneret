@@ -90,6 +90,15 @@ internal sealed class ScheduledJobSql(MssqlQueueOptions queueOptions, MssqlSched
         WHERE JobKey = @JobKey AND Status = @PendingStatus AND NextExecuteAt <= @Now;
         """;
 
+    /// <summary>
+    /// Removes a retired recurring job. The Schedule NOT NULL guard is what keeps a one-shot job
+    /// safe: one-shot handles live in the same JobKey namespace and are the rows with no schedule.
+    /// </summary>
+    public string DeleteRecurring { get; } = $"""
+        DELETE FROM {Identifier.Qualify(queueOptions.SchemaName, schedulerOptions.TableName)}
+        WHERE JobKey = @JobKey AND Schedule IS NOT NULL;
+        """;
+
     public string Cancel { get; } = $"""
         UPDATE {Identifier.Qualify(queueOptions.SchemaName, schedulerOptions.TableName)}
         SET Status = @CancelledStatus

@@ -85,6 +85,42 @@ public class StartupExtensionsTests
             .Throws<ArgumentNullException>();
     }
 
+    // --------------------------------------------------------------- RetireRecurringJob ---
+
+    [Test]
+    public async Task RetireRecurringJob_registers_the_retired_key()
+    {
+        var services = new ServiceCollection();
+
+        services.RetireRecurringJob("project-month-close-reminder");
+        var retired = services.BuildServiceProvider().GetRequiredService<IRetiredRecurringJob>();
+
+        await Assert.That(retired.Key).IsEqualTo("project-month-close-reminder");
+    }
+
+    [Test]
+    public async Task RetireRecurringJob_multiple_retirements_accumulate()
+    {
+        var services = new ServiceCollection();
+
+        services.RetireRecurringJob("gone-one");
+        services.RetireRecurringJob("gone-two");
+        var retired = services.BuildServiceProvider().GetServices<IRetiredRecurringJob>().ToArray();
+
+        await Assert.That(retired.Select(r => r.Key)).IsEquivalentTo(["gone-one", "gone-two"]);
+    }
+
+    [Test]
+    [Arguments(null)]
+    [Arguments("")]
+    [Arguments("   ")]
+    public async Task RetireRecurringJob_missing_key_throws_argument_exception(string? key)
+    {
+        var services = new ServiceCollection();
+
+        await Assert.That(() => services.RetireRecurringJob(key!)).Throws<ArgumentException>();
+    }
+
     // ------------------------------------------------------- schedules from configuration ---
 
     [Test]

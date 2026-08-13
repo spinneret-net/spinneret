@@ -13,6 +13,7 @@ public sealed record OtherTestRequest(int Number) : IRequest<Unit>;
 public sealed class RecordingRecurringJobScheduler : IRecurringJobScheduler
 {
     public List<(string Key, IRequest<Unit> Request, Schedule Schedule, CancellationToken Ct)> Registrations { get; } = [];
+    public List<(string Key, CancellationToken Ct)> Unregistrations { get; } = [];
     public HashSet<string> FailingKeys { get; } = [];
 
     public Task RegisterAsync(string key, IRequest<Unit> request, Schedule schedule, CancellationToken ct = default)
@@ -23,7 +24,18 @@ public sealed class RecordingRecurringJobScheduler : IRecurringJobScheduler
         Registrations.Add((key, request, schedule, ct));
         return Task.CompletedTask;
     }
+
+    public Task UnregisterAsync(string key, CancellationToken ct = default)
+    {
+        if (FailingKeys.Contains(key))
+            throw new InvalidOperationException($"Unregistration failed for '{key}'.");
+
+        Unregistrations.Add((key, ct));
+        return Task.CompletedTask;
+    }
 }
+
+public sealed record RetiredJob(string Key) : IRetiredRecurringJob;
 
 public sealed class FakeRecurringJob(string key, Schedule schedule, IRequest<Unit> request) : IRecurringJob
 {

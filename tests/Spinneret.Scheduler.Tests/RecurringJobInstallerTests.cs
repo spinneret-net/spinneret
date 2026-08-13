@@ -11,7 +11,11 @@ public class RecurringJobInstallerTests
 
     private static RecurringJobInstaller CreateInstaller(
         RecordingRecurringJobScheduler scheduler, params IRecurringJob[] jobs) =>
-        new(scheduler, jobs, NullLogger<RecurringJobInstaller>.Instance);
+        new(scheduler, jobs, [], NullLogger<RecurringJobInstaller>.Instance);
+
+    private static RecurringJobInstaller CreateInstaller(
+        RecordingRecurringJobScheduler scheduler, IRecurringJob[] jobs, IRetiredRecurringJob[] retired) =>
+        new(scheduler, jobs, retired, NullLogger<RecurringJobInstaller>.Instance);
 
     [Test]
     public async Task StartAsync_installs_every_registered_job_with_its_key_schedule_and_request()
@@ -105,6 +109,125 @@ public class RecurringJobInstallerTests
         await installer.StartAsync(cts.Token);
 
         await Assert.That(scheduler.Registrations[0].Ct).IsEqualTo(cts.Token);
+    }
+
+    // ---------------------------------------------------------------------------- retiring ---
+
+    [Test]
+    public async Task StartAsync_unregisters_every_retired_key()
+    {
+        var scheduler = new RecordingRecurringJobScheduler();
+        var installer = CreateInstaller(
+            scheduler,
+            [new FakeRecurringJob("job-a", EveryFiveMinutes, new TestRequest("a"))],
+            [new RetiredJob("gone-one"), new RetiredJob("gone-two")]);
+
+        await installer.StartAsync(CancellationToken.None);
+
+        await Assert.That(scheduler.Unregistrations.Select(u => u.Key))
+            .IsEquivalentTo(["gone-one", "gone-two"]);
+        // Retiring is cleanup, not a substitute for installing: the live job is still asserted.
+        await Assert.That(scheduler.Registrations.Select(r => r.Key)).IsEquivalentTo(["job-a"]);
+    }
+
+    [Test]
+    public async Task StartAsync_with_no_retirements_unregisters_nothing()
+    {
+        var scheduler = new RecordingRecurringJobScheduler();
+        var installer = CreateInstaller(
+            scheduler, new FakeRecurringJob("job-a", EveryFiveMinutes, new TestRequest("a")));
+
+        await installer.StartAsync(CancellationToken.None);
+
+        await Assert.That(scheduler.Unregistrations).IsEmpty();
+    }
+
+    [Test]
+    public async Task StartAsync_retire_failure_for_one_key_does_not_block_the_rest()
+    {
+        // Removal is as environmental as installation — a transient store failure must not cost the
+        // other retirements or the startup.
+        var scheduler = new RecordingRecurringJobScheduler { FailingKeys = { "gone-one" } };
+        var installer = CreateInstaller(
+            scheduler, [], [new RetiredJob("gone-one"), new RetiredJob("gone-two")]);
+
+        await installer.StartAsync(CancellationToken.None);
+
+        await Assert.That(scheduler.Unregistrations.Select(u => u.Key)).IsEquivalentTo(["gone-two"]);
+    }
+
+    [Test]
+    public async Task StartAsync_passes_the_host_cancellation_token_when_retiring()
+    {
+        var scheduler = new RecordingRecurringJobScheduler();
+        var installer = CreateInstaller(scheduler, [], [new RetiredJob("gone")]);
+        using var cts = new CancellationTokenSource();
+
+        await installer.StartAsync(cts.Token);
+
+        await Assert.That(scheduler.Unregistrations[0].Ct).IsEqualTo(cts.Token);
+    }
+
+    // -------------------------------------------------------------------------- validation ---
+
+    [Test]
+    public async Task StartAsync_duplicate_job_keys_throw()
+    {
+        // Two jobs under one key install only the last of them, so the other silently never runs.
+        var scheduler = new RecordingRecurringJobScheduler();
+        var installer = CreateInstaller(
+            scheduler,
+            new FakeRecurringJob("job-a", EveryFiveMinutes, new TestRequest("a")),
+            new FakeRecurringJob("job-a", Hourly, new TestRequest("b")));
+
+        await Assert.That(() => installer.StartAsync(CancellationToken.None))
+            .Throws<InvalidOperationException>()
+            .WithMessageContaining("job-a");
+    }
+
+    [Test]
+    public async Task StartAsync_duplicate_job_keys_differing_only_in_case_throw()
+    {
+        // A case-insensitive store (SQL Server's usual collation) collapses these into one row.
+        var scheduler = new RecordingRecurringJobScheduler();
+        var installer = CreateInstaller(
+            scheduler,
+            new FakeRecurringJob("job-a", EveryFiveMinutes, new TestRequest("a")),
+            new FakeRecurringJob("JOB-A", Hourly, new TestRequest("b")));
+
+        await Assert.That(() => installer.StartAsync(CancellationToken.None))
+            .Throws<InvalidOperationException>();
+    }
+
+    [Test]
+    public async Task StartAsync_a_key_both_declared_and_retired_throws()
+    {
+        var scheduler = new RecordingRecurringJobScheduler();
+        var installer = CreateInstaller(
+            scheduler,
+            [new FakeRecurringJob("job-a", EveryFiveMinutes, new TestRequest("a"))],
+            [new RetiredJob("job-a")]);
+
+        await Assert.That(() => installer.StartAsync(CancellationToken.None))
+            .Throws<InvalidOperationException>()
+            .WithMessageContaining("job-a");
+    }
+
+    [Test]
+    public async Task StartAsync_validation_runs_before_anything_is_installed()
+    {
+        // The throw has to precede the work: half-applying a contradictory set would leave the
+        // scheduler in a state no restart converges on.
+        var scheduler = new RecordingRecurringJobScheduler();
+        var installer = CreateInstaller(
+            scheduler,
+            new FakeRecurringJob("job-a", EveryFiveMinutes, new TestRequest("a")),
+            new FakeRecurringJob("job-b", Hourly, new TestRequest("b")),
+            new FakeRecurringJob("job-b", Hourly, new TestRequest("c")));
+
+        await Assert.That(() => installer.StartAsync(CancellationToken.None))
+            .Throws<InvalidOperationException>();
+        await Assert.That(scheduler.Registrations).IsEmpty();
     }
 
     [Test]

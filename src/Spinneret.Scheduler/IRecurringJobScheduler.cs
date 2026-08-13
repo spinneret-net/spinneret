@@ -17,4 +17,13 @@ public interface IRecurringJobScheduler
     /// an individual failed run is dead-lettered but never stops the schedule.
     /// </summary>
     Task RegisterAsync(string key, IRequest<Unit> request, Schedule schedule, CancellationToken ct = default);
+
+    /// <summary>
+    /// Removes the recurring job identified by <paramref name="key"/>, so it stops being dispatched.
+    /// Idempotent: a key with no job is a no-op, not an error, so a retirement can stay declared
+    /// across as many deploys as it takes. Only recurring jobs are removable — a key naming a
+    /// one-shot job is left untouched, since one-shot handles and job keys share a namespace and
+    /// cancelling a pending one-shot is the transactional API's job, not this one's.
+    /// </summary>
+    Task UnregisterAsync(string key, CancellationToken ct = default);
 }

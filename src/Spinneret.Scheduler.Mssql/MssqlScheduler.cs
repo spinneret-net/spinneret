@@ -72,6 +72,20 @@ internal sealed class MssqlScheduler(
         await transaction.CommitAsync(ct);
     }
 
+    public async Task UnregisterAsync(string key, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(key))
+            throw new ArgumentException("A recurring job requires a stable key.", nameof(key));
+
+        await using var connection = new SqlConnection(queueOptions.Value.ConnectionString);
+        await connection.OpenAsync(ct);
+
+        await using var command = connection.CreateCommand();
+        command.CommandText = sql.DeleteRecurring;
+        command.AddParameter("@JobKey", key);
+        await command.ExecuteNonQueryAsync(ct);
+    }
+
     private async Task<(string Status, string? Schedule)?> SelectForRegister(
         SqlConnection connection, SqlTransaction transaction, string key, CancellationToken ct)
     {

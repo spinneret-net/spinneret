@@ -53,4 +53,23 @@ public class FirestoreSchedulerTests
                 scheduler.RegisterAsync("job", new TestRequest("x"), Schedule.Cron("* * * * * *", Stockholm)))
             .Throws<NullReferenceException>();
     }
+
+    [Test]
+    [Arguments(null)]
+    [Arguments("")]
+    [Arguments("   ")]
+    public async Task UnregisterAsync_missing_key_throws_argument_exception(string? key)
+    {
+        var scheduler = CreateScheduler();
+
+        await Assert.That(() => scheduler.UnregisterAsync(key!)).Throws<ArgumentException>();
+    }
+
+    [Test]
+    public async Task UnregisterAsync_valid_key_passes_validation()
+    {
+        var scheduler = CreateScheduler();
+
+        await Assert.That(() => scheduler.UnregisterAsync("job")).Throws<NullReferenceException>();
+    }
 }

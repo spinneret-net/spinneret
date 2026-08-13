@@ -110,6 +110,81 @@ public sealed class MssqlSchedulerIntegrationTests(MssqlContainerFixture fixture
         await Assert.That(await host.JobStatus("declared-job")).IsEqualTo("pending");
     }
 
+    // ------------------------------------------------------------------------- retiring ---
+
+    [Test]
+    public async Task UnregisterAsync_removes_a_recurring_job()
+    {
+        await using var host = await SchedulerTestHost.StartAsync(fixture.ConnectionString, sweeper: false);
+        await host.Scheduler.RegisterAsync("doomed", new TickCommand("d"), Hourly);
+
+        await host.Scheduler.UnregisterAsync("doomed");
+
+        await Assert.That(await host.ScalarAsync<int>(
+                $"SELECT COUNT(*) FROM [{host.JobsTable}] WHERE JobKey = N'doomed'"))
+            .IsEqualTo(0);
+    }
+
+    [Test]
+    public async Task UnregisterAsync_for_an_unknown_key_is_a_no_op()
+    {
+        // A retirement stays declared across deploys, so it re-runs long after the job is gone.
+        await using var host = await SchedulerTestHost.StartAsync(fixture.ConnectionString, sweeper: false);
+
+        await host.Scheduler.UnregisterAsync("never-existed");
+        await host.Scheduler.UnregisterAsync("never-existed");
+    }
+
+    [Test]
+    public async Task UnregisterAsync_leaves_a_one_shot_job_untouched()
+    {
+        // One-shot handles share the JobKey namespace with recurring keys; only a recurring job
+        // carries a schedule, and only a recurring job may be removed this way.
+        await using var host = await SchedulerTestHost.StartAsync(fixture.ConnectionString, sweeper: false);
+
+        await using var connection = await host.OpenConnectionAsync();
+        await using var transaction = (SqlTransaction)await connection.BeginTransactionAsync();
+        var handle = await host.TransactionalScheduler.ScheduleJobAsync(
+            transaction, new TickCommand("keep"), DateTimeOffset.UtcNow.AddHours(1));
+        await transaction.CommitAsync();
+
+        await host.Scheduler.UnregisterAsync(handle);
+
+        await Assert.That(await host.ScalarAsync<int>(
+                $"SELECT COUNT(*) FROM [{host.JobsTable}] WHERE JobKey = N'{handle}'"))
+            .IsEqualTo(1);
+    }
+
+    [Test]
+    public async Task RecurringJobInstaller_retires_declared_keys_at_startup()
+    {
+        var suffix = Guid.NewGuid().ToString("N")[..12];
+        await using (var first = await SchedulerTestHost.StartAsync(
+            fixture.ConnectionString,
+            sweeper: false,
+            configure: services => services.AddRecurringJob(
+                "seasonal", Schedule.Cron("0 */2 * * *", Stockholm), () => new TickCommand("seasonal")),
+            reuseSuffix: suffix))
+        {
+            await Wait.Until(
+                async () => await first.ScalarAsync<int>(
+                    $"SELECT COUNT(*) FROM [{first.JobsTable}] WHERE JobKey = N'seasonal'") == 1,
+                "the declared job to be installed");
+        }
+
+        // The next release drops the job and retires its key against the same tables.
+        await using var second = await SchedulerTestHost.StartAsync(
+            fixture.ConnectionString,
+            sweeper: false,
+            configure: services => services.RetireRecurringJob("seasonal"),
+            reuseSuffix: suffix);
+
+        await Wait.Until(
+            async () => await second.ScalarAsync<int>(
+                $"SELECT COUNT(*) FROM [{second.JobsTable}] WHERE JobKey = N'seasonal'") == 0,
+            "the retired job to be removed");
+    }
+
     // ------------------------------------------------------------------------- dispatch ---
 
     [Test]

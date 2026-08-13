@@ -45,6 +45,14 @@ public sealed class RecordingRecurringJobScheduler : IRecurringJobScheduler
         Registrations.Add((key, request, schedule, ct));
         return Task.CompletedTask;
     }
+
+    public Task UnregisterAsync(string key, CancellationToken ct = default)
+    {
+        Unregistrations.Add(key);
+        return Task.CompletedTask;
+    }
+
+    public List<string> Unregistrations { get; } = [];
 }
 
 public sealed class FakeRecurringJob(string key, Schedule schedule, IRequest<Unit> request) : IRecurringJob

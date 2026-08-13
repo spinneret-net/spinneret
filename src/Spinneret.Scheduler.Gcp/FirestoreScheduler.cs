@@ -53,6 +53,24 @@ internal sealed class FirestoreScheduler(
         }, cancellationToken: ct);
     }
 
+    public Task UnregisterAsync(string key, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(key))
+            throw new ArgumentException("A recurring job requires a stable key.", nameof(key));
+
+        var docRef = db.Collection(options.Value.Collection).Document(key);
+
+        return db.RunTransactionAsync(async transaction =>
+        {
+            var snapshot = await transaction.GetSnapshotAsync(docRef, ct);
+
+            // Absent is a no-op, and so is a one-shot: one-shot handles are auto-ids in this same
+            // collection, and only a recurring job carries a schedule field.
+            if (snapshot.Exists && StoredSchedule(snapshot) is not null)
+                transaction.Delete(docRef);
+        }, cancellationToken: ct);
+    }
+
     /// <summary>The stored canonical schedule, or null if the document is a one-shot job.</summary>
     private static string? StoredSchedule(DocumentSnapshot snapshot) =>
         snapshot.ContainsField(ScheduledJob.Fields.Schedule)

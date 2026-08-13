@@ -39,6 +39,21 @@ public static class StartupExtensions
 
         return services.AddSingleton<IRecurringJob>(new DelegateRecurringJob(key, schedule, requestFactory));
     }
+
+    /// <summary>
+    /// Declares that a recurring job previously installed under <paramref name="key"/> is gone, so
+    /// the installer removes its stored definition at startup. Deleting the job from code is not
+    /// enough on its own — see <see cref="IRetiredRecurringJob"/> for why, and for how long to
+    /// leave the retirement in place.
+    /// </summary>
+    /// <param name="services"></param>
+    /// <param name="key">The key the retired job used to be installed under.</param>
+    public static IServiceCollection RetireRecurringJob(this IServiceCollection services, string key)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(key);
+
+        return services.AddSingleton<IRetiredRecurringJob>(new RetiredRecurringJob(key));
+    }
 }
 
 internal sealed class DelegateRecurringJob(string key, Schedule schedule, Func<IRequest<Unit>> requestFactory)
@@ -47,4 +62,9 @@ internal sealed class DelegateRecurringJob(string key, Schedule schedule, Func<I
     public string Key => key;
     public Schedule Schedule => schedule;
     public IRequest<Unit> CreateRequest() => requestFactory();
+}
+
+internal sealed class RetiredRecurringJob(string key) : IRetiredRecurringJob
+{
+    public string Key => key;
 }
