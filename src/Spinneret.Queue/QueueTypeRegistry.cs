@@ -45,7 +45,12 @@ public sealed class QueueTypeRegistry
                         $"Duplicate IRequest type name '{key}' in registered assemblies: {existing.RequestType.AssemblyQualifiedName} vs {type.AssemblyQualifiedName}.");
 
                 var responseType = requestInterfaces[0].GetGenericArguments()[0];
-                entries[key] = new RegisteredRequest(type, responseType, BuildPolicy(type));
+                entries[key] = new RegisteredRequest
+                {
+                    RequestType = type,
+                    ResponseType = responseType,
+                    Policy = BuildPolicy(type),
+                };
             }
         }
 
@@ -71,17 +76,17 @@ public sealed class QueueTypeRegistry
         if (!_byName.ContainsKey(name))
             throw new InvalidOperationException(
                 $"Request type '{name}' is not registered with the queue. " +
-                $"Ensure its containing assembly was passed to AddGcpQueue/AddQueueCore.");
+                $"Ensure its containing assembly was passed to the queue registration " +
+                $"(AddQueueCore, or the transport's AddGcpQueue/AddMssqlQueue).");
 
         return name;
     }
 
+    /// <exception cref="UnknownRequestTypeException">The type name is not registered.</exception>
     public RegisteredRequest Resolve(string typeName)
     {
         if (!_byName.TryGetValue(typeName, out var entry))
-            throw new InvalidOperationException(
-                $"Received queue task for unknown request type '{typeName}'. " +
-                $"The producer and consumer are out of sync, or the assembly containing the type was not registered.");
+            throw new UnknownRequestTypeException(typeName);
 
         return entry;
     }
@@ -105,5 +110,11 @@ public sealed class QueueTypeRegistry
         }
     }
 
-    public sealed record RegisteredRequest(Type RequestType, Type ResponseType, QueuePolicy Policy);
+    /// <summary>A registered queueable request type with its resolved policy.</summary>
+    public sealed record RegisteredRequest
+    {
+        public required Type RequestType { get; init; }
+        public required Type ResponseType { get; init; }
+        public required QueuePolicy Policy { get; init; }
+    }
 }

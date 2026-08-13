@@ -8,7 +8,7 @@ public class ViewResolverTests
     // AddMvvm, which scans the given assemblies for ViewBase<T> subclasses.
     private static IViewResolver CreateResolver() =>
         new ServiceCollection()
-            .AddMvvm<ClientRenderContext>(autoRegisterViewModels: false, typeof(ViewResolverTests).Assembly)
+            .AddMvvm<ClientRenderContext>(o => { o.AutoRegisterViewModels = false; o.Assemblies.Add(typeof(ViewResolverTests).Assembly); })
             .BuildServiceProvider()
             .GetRequiredService<IViewResolver>();
 

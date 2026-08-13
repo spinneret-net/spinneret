@@ -9,6 +9,15 @@ namespace Spinneret.Queue;
 public sealed record QueueEnvelope
 {
     /// <summary>
+    /// Envelope format version, for forward evolution of the wire shape. Envelopes serialized
+    /// before this field existed deserialize as 0 and are treated as version 1.
+    /// New envelope members must be optional (non-required, with defaults valid for in-flight
+    /// messages) — a required member would break both out-of-tree transports at compile time
+    /// and already-enqueued envelopes on deploy.
+    /// </summary>
+    public int SchemaVersion { get; init; } = 1;
+
+    /// <summary>
     /// The full CLR name of the request type. The dispatcher resolves this against the
     /// <see cref="QueueTypeRegistry"/> -not via <c>Type.GetType</c> -to prevent arbitrary
     /// type instantiation if the OIDC perimeter is ever bypassed.

@@ -44,25 +44,25 @@ public class PropertyParserCollectionTests
     }
 
     [Test]
-    public async Task Many_with_failing_item_returns_empty_inside_parse_function()
+    public async Task Many_with_failing_item_returns_the_successfully_parsed_items()
     {
         var sut = new TestObject
         {
             ManyProperty = ["A", "B", "C"]
         };
 
-        var itemCount = -1;
+        List<string> items = [];
 
         ModelParser.Parse(sut, parser =>
         {
-            itemCount = parser.Many(
+            items = parser.Many(
                 x => x.ManyProperty,
-                x => x == "C" ? TestParseResult<string>.Error("some_error") : TestParseResult.Ok(x)).Count();
+                x => x == "C" ? TestParseResult<string>.Error("some_error") : TestParseResult.Ok(x)).ToList();
 
             return 0;
         });
 
-        await Assert.That(itemCount).IsEqualTo(0);
+        await Assert.That(items).IsEquivalentTo(["A", "B"]);
     }
 
     [Test]
@@ -87,7 +87,7 @@ public class PropertyParserCollectionTests
     }
 
     [Test]
-    public async Task Many_with_null_and_failing_items_accumulates_all_indexed_errors_and_returns_empty()
+    public async Task Many_with_null_and_failing_items_accumulates_all_indexed_errors_and_returns_valid_items()
     {
         var sut = new TestObject
         {
@@ -107,7 +107,7 @@ public class PropertyParserCollectionTests
 
         var errors = Expect.Error(parseRes).ToList();
 
-        await Assert.That(itemCount).IsEqualTo(0);
+        await Assert.That(itemCount).IsEqualTo(1);
         await Assert.That(errors.Count).IsEqualTo(2);
         await Assert.That(errors[0].PropertyName).IsEqualTo("ManyProperty[1]");
         await Assert.That(errors[0].Error).IsEqualTo("Required Property");
@@ -140,7 +140,7 @@ public class PropertyParserCollectionTests
     }
 
     [Test]
-    public async Task Many_with_null_item_records_indexed_required_error_and_returns_empty()
+    public async Task Many_with_null_item_records_indexed_required_error_and_returns_valid_items()
     {
         var sut = new TestObject
         {
@@ -158,7 +158,7 @@ public class PropertyParserCollectionTests
 
         var error = Expect.SingleError(parseRes);
 
-        await Assert.That(itemCount).IsEqualTo(0);
+        await Assert.That(itemCount).IsEqualTo(2);
         await Assert.That(error.PropertyName).IsEqualTo("ManyProperty[1]");
         await Assert.That(error.Error).IsEqualTo("Required Property");
     }
@@ -263,7 +263,7 @@ public class PropertyParserCollectionTests
     }
 
     [Test]
-    public async Task NestMany_with_null_item_records_indexed_required_error_and_returns_empty()
+    public async Task NestMany_with_null_item_records_indexed_required_error_and_returns_valid_items()
     {
         var sut = new NestedTestObject
         {
@@ -287,7 +287,7 @@ public class PropertyParserCollectionTests
 
         var error = Expect.SingleError(parseRes);
 
-        await Assert.That(itemCount).IsEqualTo(0);
+        await Assert.That(itemCount).IsEqualTo(1);
         await Assert.That(error.PropertyName).IsEqualTo("ClassChildren[1]");
         await Assert.That(error.Error).IsEqualTo("Required Property");
     }

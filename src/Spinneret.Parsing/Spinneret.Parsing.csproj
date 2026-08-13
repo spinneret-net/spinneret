@@ -17,6 +17,11 @@
       <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.9" />
     </ItemGroup>
 
+    <ItemGroup>
+      <InternalsVisibleTo Include="Spinneret.ViewModel" />
+      <InternalsVisibleTo Include="Spinneret.Parsing.Tests" />
+    </ItemGroup>
+
     <PropertyGroup>
         <Description>Parse-don't-validate boundaries: one pass produces a typed model or a complete, localizable list of property errors.</Description>
         <PackageTags>$(PackageTags) parsing validation parse-dont-validate</PackageTags>

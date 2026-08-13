@@ -1,3 +1,4 @@
+using Spinneret.Functional;
 using Google.Cloud.Tasks.V2;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -15,8 +16,6 @@ public sealed class StartupExtensionsTests
 
         public Task<TResponse> Send<TResponse>(IRequest<TResponse> request, CancellationToken cancellationToken = default)
             => Task.FromResult(default(TResponse)!);
-
-        public void ClearCache() { }
     }
 
     private sealed class NoopDeadLetterWriter : IDeadLetterWriter

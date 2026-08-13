@@ -18,7 +18,9 @@ internal sealed class QueueDispatcher(
 
     public async Task Dispatch(QueueEnvelope envelope, CancellationToken ct)
     {
-        var (requestType, responseType, _) = registry.Resolve(envelope.RequestTypeName);
+        var registered = registry.Resolve(envelope.RequestTypeName);
+        var requestType = registered.RequestType;
+        var responseType = registered.ResponseType;
 
         object? request;
         try
@@ -54,7 +56,8 @@ internal sealed class QueueDispatcher(
 
 /// <summary>
 /// Serializer abstraction so the queue can use whatever <see cref="JsonSerializerOptions"/>
-/// the host configured (NodaTime, Input, ValueArray converters, etc.).
+/// the host configured. Implemented by transports or hosts; register a custom one before the
+/// transport's Add* call. Additions to this interface ship as default interface members.
 /// </summary>
 public interface IQueuePayloadSerializer
 {

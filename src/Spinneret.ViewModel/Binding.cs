@@ -6,60 +6,82 @@ using Spinneret.Functional;
 
 namespace Spinneret.ViewModel;
 
-public class Binding(
-    IValidationStateProvider target, 
-    string propertyPath,
-    Func<object?> getPropertyValue,
-    Action<object?> setPropertyValue,
-    Func<string, Result<object, string>> convertToTarget,
-    Func<object?, string> convertFromTarget)
+/// <summary>
+/// A typed two-way binding between a string-based input and a view-model property, with
+/// conversion errors recorded in the target's <see cref="IValidationState"/>. Create bindings
+/// with the <see cref="Create{TViewModel}(TViewModel, Expression{Func{TViewModel, string}})"/>
+/// factories; bindings for the same target, expression and converters are cached and reused.
+/// </summary>
+public sealed class Binding
 {
     private static readonly ConditionalWeakTable<IValidationStateProvider, Dictionary<string, Binding>> Cache = new();
-    
+
+    private readonly IValidationStateProvider _target;
+    private readonly Func<object?> _getPropertyValue;
+    private readonly Action<object?> _setPropertyValue;
+    private readonly Func<string, Result<object, string>> _convertToTarget;
+    private readonly Func<object?, string> _convertFromTarget;
+
     private string? _conversionError;
 
-    public string PropertyPath { get; } = propertyPath;
-    
+    private Binding(
+        IValidationStateProvider target,
+        string propertyPath,
+        Func<object?> getPropertyValue,
+        Action<object?> setPropertyValue,
+        Func<string, Result<object, string>> convertToTarget,
+        Func<object?, string> convertFromTarget)
+    {
+        _target = target;
+        PropertyPath = propertyPath;
+        _getPropertyValue = getPropertyValue;
+        _setPropertyValue = setPropertyValue;
+        _convertToTarget = convertToTarget;
+        _convertFromTarget = convertFromTarget;
+    }
+
+    public string PropertyPath { get; }
+
     public void RegisterBoundProperty()
     {
-        target.ValidationState.RegisterBoundProperty(PropertyPath);
+        _target.ValidationState.RegisterBoundProperty(PropertyPath);
     }
 
     public void SetValue(string value)
     {
-        var res = convertToTarget(value);
-        res.Iter(SetValue, SetError);
+        var res = _convertToTarget(value);
+        res.Switch(SetValue, SetError);
     }
 
     private void SetValue(object value)
     {
         if (_conversionError != null)
         {
-            target.ValidationState.RemoveError(PropertyPath);
+            _target.ValidationState.RemoveError(PropertyPath);
             _conversionError = null;
         }
 
-        setPropertyValue(value);
+        _setPropertyValue(value);
     }
 
     private void SetError(string error)
     {
         _conversionError = error;
-        target.ValidationState.AddError(PropertyPath, error);
+        _target.ValidationState.AddError(PropertyPath, error);
     }
 
     public string GetValue()
     {
-        var propertyValue = getPropertyValue();
+        var propertyValue = _getPropertyValue();
 
         return propertyValue == null
             ? string.Empty
-            : convertFromTarget(propertyValue);
+            : _convertFromTarget(propertyValue);
     }
 
     public string? GetError()
     {
-        return target.ValidationState.GetError(PropertyPath);
+        return _target.ValidationState.GetError(PropertyPath);
     }
 
     public bool HasConversionError => _conversionError != null;

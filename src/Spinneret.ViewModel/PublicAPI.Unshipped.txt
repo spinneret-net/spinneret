@@ -1,0 +1,146 @@
+#nullable enable
+Microsoft.Extensions.DependencyInjection.ViewModelServiceCollectionExtensions
+override Spinneret.ViewModel.DataItemsRequest<TItem>.Equals(object? obj) -> bool
+override Spinneret.ViewModel.DataItemsRequest<TItem>.GetHashCode() -> int
+override Spinneret.ViewModel.DataItemsRequest<TItem>.ToString() -> string!
+override Spinneret.ViewModel.DataItemsResult<TItem>.Equals(object? obj) -> bool
+override Spinneret.ViewModel.DataItemsResult<TItem>.GetHashCode() -> int
+override Spinneret.ViewModel.DataItemsResult<TItem>.ToString() -> string!
+override Spinneret.ViewModel.ValidationError.GetHashCode() -> int
+override Spinneret.ViewModel.ViewModelParseResult<TParsed>.Equals(object? obj) -> bool
+override Spinneret.ViewModel.ViewModelParseResult<TParsed>.GetHashCode() -> int
+override Spinneret.ViewModel.ViewModelParseResult<TParsed>.ToString() -> string!
+Spinneret.ViewModel.BindableBase
+Spinneret.ViewModel.BindableBase.BindableBase() -> void
+Spinneret.ViewModel.BindableBase.PropertyChanged -> System.ComponentModel.PropertyChangedEventHandler?
+Spinneret.ViewModel.BindableBase.RaisePropertyChanged(string? propertyName = null) -> void
+Spinneret.ViewModel.BindableBase.SetProperty<T>(ref T storage, T value, string! propertyName, System.Action? onChanged = null) -> bool
+Spinneret.ViewModel.BindableBase.SetProperty<T>(ref T storage, T value, System.Action? onChanged = null, string? propertyName = null) -> bool
+Spinneret.ViewModel.BindableBase.SetProperty<T>(ref T storage, T value, System.ComponentModel.PropertyChangedEventHandler! onPropertyChanged, string! propertyName, System.Action? onChanged = null) -> bool
+Spinneret.ViewModel.BindableBase.SetProperty<T>(ref T storage, T value, System.ComponentModel.PropertyChangedEventHandler! onPropertyChanged, System.Action? onChanged = null, string? propertyName = null) -> bool
+Spinneret.ViewModel.Binding
+Spinneret.ViewModel.Binding.GetError() -> string?
+Spinneret.ViewModel.Binding.GetValue() -> string!
+Spinneret.ViewModel.Binding.HasConversionError.get -> bool
+Spinneret.ViewModel.Binding.HasError.get -> bool
+Spinneret.ViewModel.Binding.PropertyPath.get -> string!
+Spinneret.ViewModel.Binding.RegisterBoundProperty() -> void
+Spinneret.ViewModel.Binding.SetValue(string! value) -> void
+Spinneret.ViewModel.DataItemsRequest<TItem>
+Spinneret.ViewModel.DataItemsRequest<TItem>.<Clone>$() -> Spinneret.ViewModel.DataItemsRequest<TItem>!
+Spinneret.ViewModel.DataItemsRequest<TItem>.Count.get -> int
+Spinneret.ViewModel.DataItemsRequest<TItem>.Count.init -> void
+Spinneret.ViewModel.DataItemsRequest<TItem>.DataItemsRequest() -> void
+Spinneret.ViewModel.DataItemsRequest<TItem>.Equals(Spinneret.ViewModel.DataItemsRequest<TItem>? other) -> bool
+Spinneret.ViewModel.DataItemsRequest<TItem>.Offset.get -> int
+Spinneret.ViewModel.DataItemsRequest<TItem>.Offset.init -> void
+Spinneret.ViewModel.DataItemsRequest<TItem>.Query.get -> string?
+Spinneret.ViewModel.DataItemsRequest<TItem>.Query.init -> void
+Spinneret.ViewModel.DataItemsRequest<TItem>.SortBy.get -> System.Linq.Expressions.Expression<System.Func<TItem, object?>!>?
+Spinneret.ViewModel.DataItemsRequest<TItem>.SortBy.init -> void
+Spinneret.ViewModel.DataItemsRequest<TItem>.SortDirection.get -> Spinneret.ViewModel.SortDirection
+Spinneret.ViewModel.DataItemsRequest<TItem>.SortDirection.init -> void
+Spinneret.ViewModel.DataItemsResult<TItem>
+Spinneret.ViewModel.DataItemsResult<TItem>.<Clone>$() -> Spinneret.ViewModel.DataItemsResult<TItem>!
+Spinneret.ViewModel.DataItemsResult<TItem>.DataItemsResult() -> void
+Spinneret.ViewModel.DataItemsResult<TItem>.Equals(Spinneret.ViewModel.DataItemsResult<TItem>? other) -> bool
+Spinneret.ViewModel.DataItemsResult<TItem>.Items.get -> System.Collections.Generic.IEnumerable<TItem>!
+Spinneret.ViewModel.DataItemsResult<TItem>.Items.init -> void
+Spinneret.ViewModel.DataItemsResult<TItem>.TotalItemCount.get -> int
+Spinneret.ViewModel.DataItemsResult<TItem>.TotalItemCount.init -> void
+Spinneret.ViewModel.IConverter<T1, T2>
+Spinneret.ViewModel.IConverter<T1, T2>.ConvertFrom(T2 value) -> T1
+Spinneret.ViewModel.IConverter<T1, T2>.ConvertTo(T1 value) -> Spinneret.Functional.Result<T2, string!>!
+Spinneret.ViewModel.IDataItemsProvider<TItem>
+Spinneret.ViewModel.IDataItemsProvider<TItem>.GetItems(Spinneret.ViewModel.DataItemsRequest<TItem>! request, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Spinneret.ViewModel.DataItemsResult<TItem>!>!
+Spinneret.ViewModel.InMemoryDataItemsProvider<TItem>
+Spinneret.ViewModel.InMemoryDataItemsProvider<TItem>.GetItems(Spinneret.ViewModel.DataItemsRequest<TItem>! request, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Spinneret.ViewModel.DataItemsResult<TItem>!>!
+Spinneret.ViewModel.InMemoryDataItemsProvider<TItem>.InMemoryDataItemsProvider(System.Collections.Generic.IReadOnlyCollection<TItem>! items, System.Func<TItem, string!, bool>? filter = null) -> void
+Spinneret.ViewModel.IValidationState
+Spinneret.ViewModel.IValidationState.AddError(string! key, string! error) -> void
+Spinneret.ViewModel.IValidationState.BoundErrors.get -> System.Collections.Generic.IEnumerable<Spinneret.ViewModel.ValidationError>!
+Spinneret.ViewModel.IValidationState.ClearErrors() -> void
+Spinneret.ViewModel.IValidationState.Errors.get -> System.Collections.Generic.IEnumerable<Spinneret.ViewModel.ValidationError>!
+Spinneret.ViewModel.IValidationState.GetError(string! key) -> string?
+Spinneret.ViewModel.IValidationState.HasErrors.get -> bool
+Spinneret.ViewModel.IValidationState.RegisterBoundProperty(string! key) -> void
+Spinneret.ViewModel.IValidationState.RemoveError(string! key) -> void
+Spinneret.ViewModel.IValidationState.UnboundErrors.get -> System.Collections.Generic.IEnumerable<Spinneret.ViewModel.ValidationError>!
+Spinneret.ViewModel.IValidationStateProvider
+Spinneret.ViewModel.IValidationStateProvider.ValidationState.get -> Spinneret.ViewModel.IValidationState!
+Spinneret.ViewModel.IViewModel
+Spinneret.ViewModel.IViewModel.InitializeAsync(System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task!
+Spinneret.ViewModel.IViewModel.UpdateAsync(System.Collections.Generic.ICollection<string!>! changedProperties) -> System.Threading.Tasks.Task!
+Spinneret.ViewModel.IViewModelExceptionService
+Spinneret.ViewModel.IViewModelExceptionService.Handle(Spinneret.ViewModel.IViewModel! vm, System.Exception! e) -> bool
+Spinneret.ViewModel.IViewModelFactory
+Spinneret.ViewModel.IViewModelFactory.Create<T>() -> T
+Spinneret.ViewModel.IViewModelParser<TParseError>
+Spinneret.ViewModel.IViewModelParser<TParseError>.Parse<TViewModel, TParsed>(TViewModel viewModel, System.Collections.Generic.ICollection<string!>? propertiesToValidate, System.Func<Spinneret.Parsing.PropertyParser<TViewModel, TParseError>!, TParsed>! parseFn) -> TParsed?
+Spinneret.ViewModel.IViewModelParser<TParseError>.ParseChecked<TViewModel, TParsed>(TViewModel viewModel, System.Collections.Generic.ICollection<string!>? propertiesToValidate, System.Func<Spinneret.Parsing.PropertyParser<TViewModel, TParseError>!, TParsed>! parseFn) -> Spinneret.ViewModel.ViewModelParseResult<TParsed>!
+Spinneret.ViewModel.RowCollection<TRow>
+Spinneret.ViewModel.RowCollection<TRow>.ReplaceAll(System.Collections.Generic.IEnumerable<TRow!>! rows) -> void
+Spinneret.ViewModel.SortDirection
+Spinneret.ViewModel.SortDirection.Ascending = 1 -> Spinneret.ViewModel.SortDirection
+Spinneret.ViewModel.SortDirection.Descending = 2 -> Spinneret.ViewModel.SortDirection
+Spinneret.ViewModel.SortDirection.None = 0 -> Spinneret.ViewModel.SortDirection
+Spinneret.ViewModel.ValidationError
+Spinneret.ViewModel.ValidationError.Deconstruct(out string! Key, out string! Error) -> void
+Spinneret.ViewModel.ValidationError.Equals(Spinneret.ViewModel.ValidationError other) -> bool
+Spinneret.ViewModel.ValidationError.Error.get -> string!
+Spinneret.ViewModel.ValidationError.Error.init -> void
+Spinneret.ViewModel.ValidationError.Key.get -> string!
+Spinneret.ViewModel.ValidationError.Key.init -> void
+Spinneret.ViewModel.ValidationError.ValidationError() -> void
+Spinneret.ViewModel.ValidationError.ValidationError(string! Key, string! Error) -> void
+Spinneret.ViewModel.ValidationState
+Spinneret.ViewModel.ValidationState.AddError(string! key, string! error) -> void
+Spinneret.ViewModel.ValidationState.BoundErrors.get -> System.Collections.Generic.IEnumerable<Spinneret.ViewModel.ValidationError>!
+Spinneret.ViewModel.ValidationState.ClearErrors() -> void
+Spinneret.ViewModel.ValidationState.Errors.get -> System.Collections.Generic.IEnumerable<Spinneret.ViewModel.ValidationError>!
+Spinneret.ViewModel.ValidationState.GetError(string! key) -> string?
+Spinneret.ViewModel.ValidationState.HasErrors.get -> bool
+Spinneret.ViewModel.ValidationState.RegisterBoundProperty(string! key) -> void
+Spinneret.ViewModel.ValidationState.RemoveError(string! key) -> void
+Spinneret.ViewModel.ValidationState.UnboundErrors.get -> System.Collections.Generic.IEnumerable<Spinneret.ViewModel.ValidationError>!
+Spinneret.ViewModel.ValidationState.ValidationState() -> void
+Spinneret.ViewModel.ViewModelBase
+Spinneret.ViewModel.ViewModelBase.CreateRowCollection<TRow>(string? propertyName = null) -> Spinneret.ViewModel.RowCollection<TRow!>!
+Spinneret.ViewModel.ViewModelBase.ExceptionService.get -> Spinneret.ViewModel.IViewModelExceptionService?
+Spinneret.ViewModel.ViewModelBase.IsBusy.get -> bool
+Spinneret.ViewModel.ViewModelBase.Nested<TViewModel>(TViewModel! viewModel, string? propertyName = null) -> TViewModel!
+Spinneret.ViewModel.ViewModelBase.Run(System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task!>! function) -> System.Threading.Tasks.Task!
+Spinneret.ViewModel.ViewModelBase.RunIfNotBusy(System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task!>! function) -> System.Threading.Tasks.Task<bool>!
+Spinneret.ViewModel.ViewModelBase.ValidationState.get -> Spinneret.ViewModel.IValidationState!
+Spinneret.ViewModel.ViewModelBase.ViewModelBase() -> void
+Spinneret.ViewModel.ViewModelFactory
+Spinneret.ViewModel.ViewModelFactory.Create<T>() -> T
+Spinneret.ViewModel.ViewModelFactory.ViewModelFactory(System.IServiceProvider! services) -> void
+Spinneret.ViewModel.ViewModelParser<TParseError>
+Spinneret.ViewModel.ViewModelParser<TParseError>.ParseChecked<TViewModel, TParsed>(TViewModel viewModel, System.Collections.Generic.ICollection<string!>? propertiesToValidate, System.Func<Spinneret.Parsing.PropertyParser<TViewModel, TParseError>!, TParsed>! parseFn) -> Spinneret.ViewModel.ViewModelParseResult<TParsed>!
+Spinneret.ViewModel.ViewModelParser<TParseError>.ViewModelParser(Microsoft.Extensions.Localization.IStringLocalizer! localizer, TParseError missingPropertyError) -> void
+Spinneret.ViewModel.ViewModelParseResult<TParsed>
+Spinneret.ViewModel.ViewModelParseResult<TParsed>.<Clone>$() -> Spinneret.ViewModel.ViewModelParseResult<TParsed>!
+Spinneret.ViewModel.ViewModelParseResult<TParsed>.Equals(Spinneret.ViewModel.ViewModelParseResult<TParsed>? other) -> bool
+Spinneret.ViewModel.ViewModelParseResult<TParsed>.IsValid.get -> bool
+Spinneret.ViewModel.ViewModelParseResult<TParsed>.IsValid.init -> void
+Spinneret.ViewModel.ViewModelParseResult<TParsed>.Value.get -> TParsed?
+Spinneret.ViewModel.ViewModelParseResult<TParsed>.Value.init -> void
+Spinneret.ViewModel.ViewModelParseResult<TParsed>.ViewModelParseResult() -> void
+static Microsoft.Extensions.DependencyInjection.ViewModelServiceCollectionExtensions.AddViewModelParser<TParseError>(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, TParseError missingPropertyError, System.Func<Microsoft.Extensions.Localization.IStringLocalizerFactory!, Microsoft.Extensions.Localization.IStringLocalizer!>! localizerFactoryFn) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static Spinneret.ViewModel.Binding.Create<TViewModel, TValue>(TViewModel target, System.Linq.Expressions.Expression<System.Func<TViewModel, TValue>!>! expr, Spinneret.ViewModel.IConverter<string!, TValue>! converter) -> Spinneret.ViewModel.Binding!
+static Spinneret.ViewModel.Binding.Create<TViewModel, TValue>(TViewModel target, System.Linq.Expressions.Expression<System.Func<TViewModel, TValue>!>! expr, System.Func<string!, Spinneret.Functional.Result<TValue, string!>!>! convertToTarget) -> Spinneret.ViewModel.Binding!
+static Spinneret.ViewModel.Binding.Create<TViewModel, TValue>(TViewModel target, System.Linq.Expressions.Expression<System.Func<TViewModel, TValue>!>! expr, System.Func<string!, Spinneret.Functional.Result<TValue, string!>!>! convertToTarget, System.Func<TValue, string!>! convertFromTarget) -> Spinneret.ViewModel.Binding!
+static Spinneret.ViewModel.Binding.Create<TViewModel>(TViewModel target, System.Linq.Expressions.Expression<System.Func<TViewModel, string?>!>! expr) -> Spinneret.ViewModel.Binding!
+static Spinneret.ViewModel.DataItemsRequest<TItem>.operator !=(Spinneret.ViewModel.DataItemsRequest<TItem>? left, Spinneret.ViewModel.DataItemsRequest<TItem>? right) -> bool
+static Spinneret.ViewModel.DataItemsRequest<TItem>.operator ==(Spinneret.ViewModel.DataItemsRequest<TItem>? left, Spinneret.ViewModel.DataItemsRequest<TItem>? right) -> bool
+static Spinneret.ViewModel.DataItemsResult<TItem>.operator !=(Spinneret.ViewModel.DataItemsResult<TItem>? left, Spinneret.ViewModel.DataItemsResult<TItem>? right) -> bool
+static Spinneret.ViewModel.DataItemsResult<TItem>.operator ==(Spinneret.ViewModel.DataItemsResult<TItem>? left, Spinneret.ViewModel.DataItemsResult<TItem>? right) -> bool
+static Spinneret.ViewModel.ValidationError.operator !=(Spinneret.ViewModel.ValidationError left, Spinneret.ViewModel.ValidationError right) -> bool
+static Spinneret.ViewModel.ValidationError.operator ==(Spinneret.ViewModel.ValidationError left, Spinneret.ViewModel.ValidationError right) -> bool
+static Spinneret.ViewModel.ViewModelParseResult<TParsed>.operator !=(Spinneret.ViewModel.ViewModelParseResult<TParsed>? left, Spinneret.ViewModel.ViewModelParseResult<TParsed>? right) -> bool
+static Spinneret.ViewModel.ViewModelParseResult<TParsed>.operator ==(Spinneret.ViewModel.ViewModelParseResult<TParsed>? left, Spinneret.ViewModel.ViewModelParseResult<TParsed>? right) -> bool
+virtual Spinneret.ViewModel.ViewModelBase.OnInitializeAsync() -> System.Threading.Tasks.Task!
+virtual Spinneret.ViewModel.ViewModelBase.OnUpdateAsync(System.Collections.Generic.ICollection<string!>! changedProperties) -> System.Threading.Tasks.Task!
+~override Spinneret.ViewModel.ValidationError.Equals(object obj) -> bool
+~override Spinneret.ViewModel.ValidationError.ToString() -> string

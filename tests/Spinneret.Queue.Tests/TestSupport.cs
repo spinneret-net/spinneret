@@ -106,8 +106,6 @@ internal sealed class FakeMediator : ISpinneretMediator
         LastRequest = request;
         return Task.FromResult(Response is null ? default(TResponse)! : (TResponse)Response);
     }
-
-    public void ClearCache() { }
 }
 
 internal sealed class FakeSerializer : IQueuePayloadSerializer
@@ -149,6 +147,14 @@ internal static class TestServices
         services.AddSingleton(typeof(ILogger<>), typeof(NullLogger<>));
         return services;
     }
+}
+
+internal static class ProcessorTestExtensions
+{
+    /// <summary>Shorthand that wraps envelope + task id into a <see cref="QueueDeliveryContext"/>.</summary>
+    public static Task<QueueDeliveryOutcome> ProcessAsync(
+        this IQueueDeliveryProcessor processor, QueueEnvelope envelope, string taskId, CancellationToken ct)
+        => processor.ProcessAsync(new QueueDeliveryContext { Envelope = envelope, TaskId = taskId }, ct);
 }
 
 /// <summary>

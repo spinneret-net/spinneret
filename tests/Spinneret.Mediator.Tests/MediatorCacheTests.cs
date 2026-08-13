@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Spinneret.Functional;
 
 namespace Spinneret.Mediator.Tests;
 
@@ -182,16 +183,18 @@ public class MediatorCacheTests
     }
 
     [Test]
-    public async Task ClearCache_forces_refetch_on_next_send()
+    public async Task Clearing_the_cache_forces_refetch_on_next_send()
     {
         var handler = new CountingHandler();
-        var mediator = TestServices.BuildMediator(handler);
+        var provider = TestServices.BuildProvider(handler);
+        var mediator = provider.GetRequiredService<ISpinneretMediator>();
+        var cache = provider.GetRequiredService<IMediatorCache>();
 
         await mediator.Send(new CachedQuery(5));
         await mediator.Send(new CachedQuery(5));
         await Assert.That(handler.CallCount).IsEqualTo(1);
 
-        mediator.ClearCache();
+        cache.Clear();
         var result = await mediator.Send(new CachedQuery(5));
 
         await Assert.That(result).IsEqualTo(5);
@@ -199,16 +202,18 @@ public class MediatorCacheTests
     }
 
     [Test]
-    public async Task ClearCache_during_in_flight_request_does_not_evict_replacement_task()
+    public async Task Clearing_the_cache_during_in_flight_request_does_not_evict_replacement_task()
     {
         var handler = new CountingHandler();
-        var mediator = TestServices.BuildMediator(handler);
+        var provider = TestServices.BuildProvider(handler);
+        var mediator = provider.GetRequiredService<ISpinneretMediator>();
+        var cache = provider.GetRequiredService<IMediatorCache>();
 
         var firstGate = new TaskCompletionSource<int>();
         handler.SetPending(firstGate);
 
         var firstCall = mediator.Send(new CachedQuery(6));
-        mediator.ClearCache();
+        cache.Clear();
         firstGate.SetException(new InvalidOperationException("boom"));
 
         await Assert.That(async () => await firstCall).Throws<InvalidOperationException>();

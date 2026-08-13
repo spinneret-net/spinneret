@@ -33,7 +33,7 @@ Utility libraries tend to be junk drawers. Spinneret is the opposite: every pack
 
 | Package | In the web | What it spins |
 |---|---|---|
-| `Spinneret.Functional` | **The dragline** | `Result` / `Either` with task and LINQ combinators — the load-bearing thread every other package hangs from. |
+| `Spinneret.Functional` | **The dragline** | `Result` / `Either` with `Match`/`Map`/`Bind` combinators and an awaitable `TaskResult` — the load-bearing thread every other package hangs from. |
 | `Spinneret.Mediator` | **The radials** | In-process request dispatch with declarative, tag-invalidated caching. A spider reads the world through vibrations in its radials; so does your app. |
 | `Spinneret.Parsing` | **The sticky spiral** | Parse-don't-validate boundaries: one pass, every invalid property caught and localized. Nothing gets through that shouldn't. |
 | `Spinneret.Queue` | **The egg sac** | A durable command queue where the application owns the retry policy — attempts, backoff, channels, dead-lettering — per command type. Safe until it hatches. |
@@ -57,6 +57,8 @@ services.AddMediator(typeof(Program).Assembly);
 
 Packages that need wiring expose an `Add*` call; discovery happens once at startup, never at runtime.
 
+Default services are registered with `TryAdd`, so your own implementation (say a custom `IQueuePayloadSerializer` or `IDeadLetterWriter`) always wins: registered before the package's `Add*` call, the default is never added at all; registered after, yours shadows the default, since the container resolves the last registration.
+
 ### The dragline — `Spinneret.Functional`
 
 Failures travel the same thread as successes, so nothing falls off the web:
@@ -69,7 +71,7 @@ public Result<Employee, PromotionError> Promote(Employee employee) =>
             : Result.Error<Employee, PromotionError>(PromotionError.NotAuthorized));
 
 // Exactly one place decides what an error looks like at the edge:
-return result.Reduce<IResult>(
+return result.Match<IResult>(
     employee => Results.Ok(employee),
     error => Results.UnprocessableEntity(error));
 ```
@@ -94,7 +96,7 @@ var employees = await mediator.Send(new GetEmployees());   // cached, request-co
 await mediator.Send(new AddEmployee("Charlotte"));         // …and now it isn't
 ```
 
-Concurrent identical requests share one in-flight task, so a cache miss costs one execution, not one per caller.
+Concurrent identical requests share one in-flight task, so a cache miss costs one execution, not one per caller. The request object is the cache key, so cached request types need value equality — records, as above. Cache declarations are validated when `AddMediator` runs, so a bad tag or duration fails the host at boot.
 
 ### The sticky spiral — `Spinneret.Parsing`
 
@@ -182,7 +184,14 @@ The scheduler itself is infrastructure-agnostic. `Spinneret.Scheduler.Gcp` provi
 
 ### The hub — `Spinneret.View` + `Spinneret.ViewModel`
 
-Blazor components that receive a view model from DI instead of building their own state, with an explicit lifecycle and app-wide refresh coordination:
+Blazor components that receive a view model from DI instead of building their own state, with an explicit lifecycle and app-wide refresh coordination. Wire it up once:
+
+```csharp
+services.AddMvvm<ServerRenderContext>(o =>          // ClientRenderContext on WebAssembly
+    o.Assemblies.Add(typeof(Program).Assembly));    // scans views, auto-registers view models
+```
+
+Then a view is a component that inherits its view model:
 
 ```razor
 @inherits ViewBase<EmployeesViewModel>
@@ -193,7 +202,16 @@ Blazor components that receive a view model from DI instead of building their ow
 }
 ```
 
-View models are plain `INotifyPropertyChanged` classes with typed two-way bindings, conversion errors that land in a validation state, nested view models, and observable row collections — MVVM as you know it, wired for Blazor's render model.
+View models are plain `INotifyPropertyChanged` classes with typed two-way bindings, conversion errors that land in a validation state, nested view models, and observable row collections — MVVM as you know it, wired for Blazor's render model. A binding converts on the way in and formats on the way out, and a value the converter rejects becomes a validation error on exactly that field:
+
+```csharp
+var rate = Binding.Create(ViewModel, x => x.Rate, EmploymentRate.Parse);
+```
+
+```razor
+<input value="@rate.GetValue()" @onchange="e => rate.SetValue((string)e.Value!)" />
+<span>@rate.GetError()</span>
+```
 
 ## Anatomy
 

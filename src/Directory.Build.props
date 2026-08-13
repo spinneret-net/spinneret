@@ -1,0 +1,21 @@
+<Project>
+
+  <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)..'))" />
+
+  <PropertyGroup>
+    <!-- Fails dotnet pack on binary/source breaks against PackageValidationBaselineVersion.
+         Set the baseline to the latest published version once the post-review prerelease ships:
+         <PackageValidationBaselineVersion>1.0.0-alpha.3</PackageValidationBaselineVersion> -->
+    <EnablePackageValidation>true</EnablePackageValidation>
+  </PropertyGroup>
+
+  <!-- Every change to a package's public API surface must be mirrored in its
+       PublicAPI.Shipped.txt / PublicAPI.Unshipped.txt, making API changes explicit,
+       reviewable diffs (RS0016/RS0017). -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers" Version="4.14.0" PrivateAssets="All" />
+    <AdditionalFiles Include="PublicAPI.Shipped.txt" />
+    <AdditionalFiles Include="PublicAPI.Unshipped.txt" />
+  </ItemGroup>
+
+</Project>

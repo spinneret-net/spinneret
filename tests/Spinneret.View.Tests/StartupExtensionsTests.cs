@@ -12,7 +12,7 @@ public class StartupExtensionsTests
     {
         var services = new ServiceCollection();
 
-        var result = services.AddMvvm<ClientRenderContext>(autoRegisterViewModels: false, TestAssembly);
+        var result = services.AddMvvm<ClientRenderContext>(o => { o.AutoRegisterViewModels = false; o.Assemblies.Add(TestAssembly); });
 
         await Assert.That(ReferenceEquals(result, services)).IsTrue();
     }
@@ -22,7 +22,7 @@ public class StartupExtensionsTests
     {
         var services = new ServiceCollection();
 
-        services.AddMvvm<ClientRenderContext>(autoRegisterViewModels: false, TestAssembly);
+        services.AddMvvm<ClientRenderContext>(o => { o.AutoRegisterViewModels = false; o.Assemblies.Add(TestAssembly); });
 
         var descriptor = services.Single(d => d.ServiceType == typeof(IViewModelFactory));
         await Assert.That(descriptor.Lifetime).IsEqualTo(ServiceLifetime.Scoped);
@@ -34,7 +34,7 @@ public class StartupExtensionsTests
     {
         var services = new ServiceCollection();
 
-        services.AddMvvm<ClientRenderContext>(autoRegisterViewModels: false, TestAssembly);
+        services.AddMvvm<ClientRenderContext>(o => { o.AutoRegisterViewModels = false; o.Assemblies.Add(TestAssembly); });
 
         var descriptor = services.Single(d => d.ServiceType == typeof(IViewRefreshCoordinator));
         await Assert.That(descriptor.Lifetime).IsEqualTo(ServiceLifetime.Scoped);
@@ -45,7 +45,7 @@ public class StartupExtensionsTests
     {
         var services = new ServiceCollection();
 
-        services.AddMvvm<ClientRenderContext>(autoRegisterViewModels: false, TestAssembly);
+        services.AddMvvm<ClientRenderContext>(o => { o.AutoRegisterViewModels = false; o.Assemblies.Add(TestAssembly); });
 
         var descriptor = services.Single(d => d.ServiceType == typeof(IViewResolver));
         await Assert.That(descriptor.Lifetime).IsEqualTo(ServiceLifetime.Singleton);
@@ -55,7 +55,7 @@ public class StartupExtensionsTests
     public async Task AddMvvm_registers_render_context_as_singleton_of_the_specified_type()
     {
         var provider = new ServiceCollection()
-            .AddMvvm<ClientRenderContext>(autoRegisterViewModels: false, TestAssembly)
+            .AddMvvm<ClientRenderContext>(o => { o.AutoRegisterViewModels = false; o.Assemblies.Add(TestAssembly); })
             .BuildServiceProvider();
 
         var first = provider.GetRequiredService<IRenderContext>();
@@ -69,7 +69,7 @@ public class StartupExtensionsTests
     public async Task AddMvvm_refresh_coordinator_is_shared_within_a_scope_but_not_across_scopes()
     {
         var provider = new ServiceCollection()
-            .AddMvvm<ClientRenderContext>(autoRegisterViewModels: false, TestAssembly)
+            .AddMvvm<ClientRenderContext>(o => { o.AutoRegisterViewModels = false; o.Assemblies.Add(TestAssembly); })
             .BuildServiceProvider();
 
         using var scopeA = provider.CreateScope();
@@ -86,7 +86,7 @@ public class StartupExtensionsTests
     public async Task AddMvvm_view_resolver_maps_views_discovered_in_the_scanned_assembly()
     {
         var provider = new ServiceCollection()
-            .AddMvvm<ClientRenderContext>(autoRegisterViewModels: false, TestAssembly)
+            .AddMvvm<ClientRenderContext>(o => { o.AutoRegisterViewModels = false; o.Assemblies.Add(TestAssembly); })
             .BuildServiceProvider();
 
         var resolver = provider.GetRequiredService<IViewResolver>();
@@ -98,7 +98,7 @@ public class StartupExtensionsTests
     public async Task AddMvvm_auto_register_true_registers_view_models_as_transient()
     {
         var provider = new ServiceCollection()
-            .AddMvvm<ClientRenderContext>(autoRegisterViewModels: true, TestAssembly)
+            .AddMvvm<ClientRenderContext>(o => { o.AutoRegisterViewModels = true; o.Assemblies.Add(TestAssembly); })
             .BuildServiceProvider();
 
         var first = provider.GetService<SingleViewModel>();
@@ -113,7 +113,7 @@ public class StartupExtensionsTests
     public async Task AddMvvm_auto_register_true_registers_view_models_without_views_too()
     {
         var provider = new ServiceCollection()
-            .AddMvvm<ClientRenderContext>(autoRegisterViewModels: true, TestAssembly)
+            .AddMvvm<ClientRenderContext>(o => { o.AutoRegisterViewModels = true; o.Assemblies.Add(TestAssembly); })
             .BuildServiceProvider();
 
         await Assert.That(provider.GetService<UnmappedViewModel>()).IsNotNull();
@@ -123,7 +123,7 @@ public class StartupExtensionsTests
     public async Task AddMvvm_auto_register_false_does_not_register_view_models()
     {
         var provider = new ServiceCollection()
-            .AddMvvm<ClientRenderContext>(autoRegisterViewModels: false, TestAssembly)
+            .AddMvvm<ClientRenderContext>(o => { o.AutoRegisterViewModels = false; o.Assemblies.Add(TestAssembly); })
             .BuildServiceProvider();
 
         await Assert.That(provider.GetService<SingleViewModel>()).IsNull();

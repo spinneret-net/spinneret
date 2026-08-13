@@ -1,0 +1,17 @@
+#nullable enable
+const Spinneret.Scheduler.Mssql.MssqlSchedulerOptions.SectionName = "Scheduler:Mssql" -> string!
+Microsoft.Extensions.DependencyInjection.MssqlSchedulerServiceCollectionExtensions
+Spinneret.Scheduler.Mssql.IMssqlTransactionalScheduler
+Spinneret.Scheduler.Mssql.IMssqlTransactionalScheduler.CancelJobAsync(System.Data.Common.DbTransaction! transaction, string! handle, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Spinneret.Scheduler.Mssql.IMssqlTransactionalScheduler.ScheduleJobAsync(System.Data.Common.DbTransaction! transaction, Spinneret.Mediator.IRequest<Spinneret.Functional.Unit>! request, System.DateTimeOffset executeAt, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<string!>!
+Spinneret.Scheduler.Mssql.MssqlSchedulerOptions
+Spinneret.Scheduler.Mssql.MssqlSchedulerOptions.MssqlSchedulerOptions() -> void
+Spinneret.Scheduler.Mssql.MssqlSchedulerOptions.SweepInterval.get -> System.TimeSpan
+Spinneret.Scheduler.Mssql.MssqlSchedulerOptions.SweepInterval.set -> void
+Spinneret.Scheduler.Mssql.MssqlSchedulerOptions.TableName.get -> string!
+Spinneret.Scheduler.Mssql.MssqlSchedulerOptions.TableName.set -> void
+Spinneret.Scheduler.Mssql.MssqlSchedulerSchema
+static Microsoft.Extensions.DependencyInjection.MssqlSchedulerServiceCollectionExtensions.AddMssqlScheduler(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, Microsoft.Extensions.Configuration.IConfiguration! configuration) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static Microsoft.Extensions.DependencyInjection.MssqlSchedulerServiceCollectionExtensions.AddMssqlScheduler(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Spinneret.Scheduler.Mssql.MssqlSchedulerOptions!>! configure) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static Microsoft.Extensions.DependencyInjection.MssqlSchedulerServiceCollectionExtensions.AddMssqlSchedulerSweeper(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static Spinneret.Scheduler.Mssql.MssqlSchedulerSchema.CreateScript(Spinneret.Queue.Mssql.MssqlQueueOptions! queueOptions, Spinneret.Scheduler.Mssql.MssqlSchedulerOptions! schedulerOptions) -> string!

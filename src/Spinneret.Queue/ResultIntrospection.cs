@@ -5,7 +5,7 @@ namespace Spinneret.Queue;
 /// <summary>
 /// Reads the error state of a <see cref="Result{TError}"/> or <see cref="Result{TOk,TError}"/>
 /// whose concrete generic types are only known at runtime. Uses the public
-/// <c>Reduce</c> method via DLR dispatch -no changes to <c>Result.cs</c>, no
+/// <c>Match</c> method via DLR dispatch -no changes to <c>Result.cs</c>, no
 /// hand-rolled reflection.
 /// </summary>
 internal static class ResultIntrospection
@@ -30,10 +30,10 @@ internal static class ResultIntrospection
     }
 
     private static object? GetErrorFromResult<TError>(Result<TError> res) =>
-        res.Reduce<object?>(() => null, e => e);
+        res.Match<object?>(() => null, e => e);
 
     private static object? GetErrorFromResult2<TOk, TError>(Result<TOk, TError> res) =>
-        res.Reduce(TryGetError, e => (object?)e);
+        res.Match(TryGetError, e => (object?)e);
 
     private static bool IsInstanceOfGenericType(object obj, Type genericType)
     {

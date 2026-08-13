@@ -1,0 +1,57 @@
+#nullable enable
+Microsoft.Extensions.DependencyInjection.MvvmServiceCollectionExtensions
+override sealed Spinneret.View.ViewBase<T>.OnInitializedAsync() -> System.Threading.Tasks.Task!
+override sealed Spinneret.View.ViewBase<T>.OnParametersSetAsync() -> System.Threading.Tasks.Task!
+override Spinneret.View.ViewBase<T>.BuildRenderTree(Microsoft.AspNetCore.Components.Rendering.RenderTreeBuilder! builder) -> void
+Spinneret.View.ClientRenderContext
+Spinneret.View.ClientRenderContext.ClientRenderContext() -> void
+Spinneret.View.ClientRenderContext.IsClient.get -> bool
+Spinneret.View.ClientRenderContext.IsPrerendering.get -> bool
+Spinneret.View.ClientRenderContext.IsServer.get -> bool
+Spinneret.View.IRenderContext
+Spinneret.View.IRenderContext.IsClient.get -> bool
+Spinneret.View.IRenderContext.IsPrerendering.get -> bool
+Spinneret.View.IRenderContext.IsServer.get -> bool
+Spinneret.View.IView
+Spinneret.View.IView.State.get -> Spinneret.View.ViewState
+Spinneret.View.IView<T>
+Spinneret.View.IView<T>.ViewModel.get -> T!
+Spinneret.View.IViewRefreshCoordinator
+Spinneret.View.IViewRefreshCoordinator.RequestRefreshAsync() -> System.Threading.Tasks.Task!
+Spinneret.View.IViewRefreshCoordinator.Subscribe(System.Func<System.Threading.Tasks.Task!>! onRefresh) -> System.IDisposable!
+Spinneret.View.IViewRefreshCoordinator.SubscribePreRefresh(System.Func<System.Threading.Tasks.Task!>! onPreRefresh) -> System.IDisposable!
+Spinneret.View.IViewResolver
+Spinneret.View.IViewResolver.ResolveViewType(System.Type! viewModelType) -> System.Type!
+Spinneret.View.MvvmOptions
+Spinneret.View.MvvmOptions.Assemblies.get -> System.Collections.Generic.IList<System.Reflection.Assembly!>!
+Spinneret.View.MvvmOptions.AutoRegisterViewModels.get -> bool
+Spinneret.View.MvvmOptions.AutoRegisterViewModels.set -> void
+Spinneret.View.MvvmOptions.MvvmOptions() -> void
+Spinneret.View.ServerRenderContext
+Spinneret.View.ServerRenderContext.IsClient.get -> bool
+Spinneret.View.ServerRenderContext.IsPrerendering.get -> bool
+Spinneret.View.ServerRenderContext.IsServer.get -> bool
+Spinneret.View.ServerRenderContext.ServerRenderContext(Microsoft.AspNetCore.Http.IHttpContextAccessor! contextAccessor) -> void
+Spinneret.View.ViewBase<T>
+Spinneret.View.ViewBase<T>.DisposeAsync() -> System.Threading.Tasks.ValueTask
+Spinneret.View.ViewBase<T>.State.get -> Spinneret.View.ViewState
+Spinneret.View.ViewBase<T>.ViewBase() -> void
+Spinneret.View.ViewBase<T>.ViewModel.get -> T!
+Spinneret.View.ViewBase<T>.ViewModel.set -> void
+Spinneret.View.ViewState
+Spinneret.View.ViewState.Disposed = 4 -> Spinneret.View.ViewState
+Spinneret.View.ViewState.InitializationFailed = 3 -> Spinneret.View.ViewState
+Spinneret.View.ViewState.Initialized = 2 -> Spinneret.View.ViewState
+Spinneret.View.ViewState.PreInitialized = 1 -> Spinneret.View.ViewState
+Spinneret.View.ViewState.Uninitialized = 0 -> Spinneret.View.ViewState
+static Microsoft.Extensions.DependencyInjection.MvvmServiceCollectionExtensions.AddMvvm<TRenderContext>(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static Microsoft.Extensions.DependencyInjection.MvvmServiceCollectionExtensions.AddMvvm<TRenderContext>(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Spinneret.View.MvvmOptions!>! configure) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+virtual Spinneret.View.ViewBase<T>.OnDisposeAsync() -> System.Threading.Tasks.ValueTask
+virtual Spinneret.View.ViewBase<T>.OnViewInitializedAsync() -> System.Threading.Tasks.Task!
+virtual Spinneret.View.ViewBase<T>.OnViewParametersSetAsync() -> System.Threading.Tasks.Task!
+virtual Spinneret.View.ViewBase<T>.ParticipatesInRefresh.get -> bool
+Spinneret.View.DynamicView
+Spinneret.View.DynamicView.DynamicView() -> void
+Spinneret.View.DynamicView.ViewModel.get -> Spinneret.ViewModel.IViewModel!
+Spinneret.View.DynamicView.ViewModel.set -> void
+~override Spinneret.View.DynamicView.BuildRenderTree(Microsoft.AspNetCore.Components.Rendering.RenderTreeBuilder __builder) -> void

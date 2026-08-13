@@ -1,3 +1,4 @@
+using Spinneret.Functional;
 using System.Data.Common;
 using Spinneret.Mediator;
 using Spinneret.Queue;

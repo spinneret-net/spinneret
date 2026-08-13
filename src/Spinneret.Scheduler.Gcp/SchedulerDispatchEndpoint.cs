@@ -9,12 +9,12 @@ namespace Spinneret.Scheduler.Gcp;
 
 internal static class SchedulerDispatchEndpoint
 {
-    private const string RoutePattern = "/internal/scheduler/dispatch";
+    internal const string DefaultRoutePattern = "/internal/scheduler/dispatch";
 
-    public static IEndpointRouteBuilder MapGcpSchedulerDispatch(this IEndpointRouteBuilder endpoints)
+    public static IEndpointRouteBuilder MapGcpSchedulerDispatch(this IEndpointRouteBuilder endpoints, string pattern)
     {
         endpoints
-            .MapPost(RoutePattern, (Delegate)Handle)
+            .MapPost(pattern, (Delegate)Handle)
             .RequireAuthorization(OidcAuthSetup.PolicyName)
             .ExcludeFromDescription();
 

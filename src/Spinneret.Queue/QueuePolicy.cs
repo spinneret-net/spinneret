@@ -10,13 +10,13 @@ namespace Spinneret.Queue;
 public enum ErrorResultAction
 {
     /// <summary>Write the task to the dead-letter store immediately (default).</summary>
-    DeadLetter,
+    DeadLetter = 0,
 
     /// <summary>Treat the error result like a transient failure: retry per the policy.</summary>
-    Retry,
+    Retry = 1,
 
     /// <summary>Log and acknowledge the task; the error result is an acceptable non-outcome.</summary>
-    Discard,
+    Discard = 2,
 }
 
 /// <summary>
@@ -29,10 +29,10 @@ public enum ErrorResultAction
 public enum ExhaustedAction
 {
     /// <summary>Write the task to the dead-letter store (default).</summary>
-    DeadLetter,
+    DeadLetter = 0,
 
     /// <summary>Log and drop the task; something else is known to redo or supersede the work.</summary>
-    Discard,
+    Discard = 1,
 }
 
 /// <summary>
@@ -46,15 +46,17 @@ public sealed record QueuePolicy
     // 7 attempts at the default backoff spread ~10 minutes of retrying — matching the transport
     // window this design replaced, so an outage short enough for the old queue config to absorb
     // never bulk-dead-letters unannotated commands (notably every outbox delivery).
-    public const int DefaultMaxAttempts = 7;
-    public const string DefaultMaxAge = "1.00:00:00";
-    public const string DefaultMinBackoff = "00:00:10";
-    public const string DefaultMaxBackoff = "00:10:00";
+    // static readonly, not const: a const default would be baked into every compiled consumer,
+    // so changing it here would leave mixed-version assemblies disagreeing about the default.
+    public static readonly int DefaultMaxAttempts = 7;
+    public static readonly string DefaultMaxAge = "1.00:00:00";
+    public static readonly string DefaultMinBackoff = "00:00:10";
+    public static readonly string DefaultMaxBackoff = "00:10:00";
 
-    /// <summary>The channel commands ride on when they declare none.</summary>
+    /// <summary>The channel commands ride on when they declare none. A protocol constant.</summary>
     public const string DefaultChannel = "default";
 
-    public static readonly QueuePolicy Default = new();
+    public static QueuePolicy Default { get; } = new();
 
     /// <summary>
     /// Named transport channel this command rides on. Channels are logical names the transport maps

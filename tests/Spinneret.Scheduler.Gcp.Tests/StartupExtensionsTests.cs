@@ -19,8 +19,22 @@ public class StartupExtensionsTests
     private static ServiceCollection AddScheduler(IConfiguration? configuration = null)
     {
         var services = new ServiceCollection();
+        // AddGcpScheduler requires the queue to be registered first; the registry is the
+        // marker it checks for.
+        services.AddSingleton(new QueueTypeRegistry([]));
         services.AddGcpScheduler(configuration ?? EmptyConfiguration);
         return services;
+    }
+
+    [Test]
+    public async Task AddGcpScheduler_without_the_queue_fails_at_registration()
+    {
+        var services = new ServiceCollection();
+
+        var ex = Assert.Throws<InvalidOperationException>(
+            () => services.AddGcpScheduler(EmptyConfiguration));
+
+        await Assert.That(ex.Message).Contains("AddGcpQueue");
     }
 
     [Test]
@@ -105,6 +119,7 @@ public class StartupExtensionsTests
     public async Task AddGcpScheduler_called_twice_does_not_duplicate_registrations()
     {
         var services = new ServiceCollection();
+        services.AddSingleton(new QueueTypeRegistry([]));
 
         services.AddGcpScheduler(EmptyConfiguration);
         services.AddGcpScheduler(EmptyConfiguration);

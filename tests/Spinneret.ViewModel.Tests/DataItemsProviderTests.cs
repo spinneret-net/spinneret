@@ -1,4 +1,26 @@
+using System.Linq.Expressions;
+
 namespace Spinneret.ViewModel.Tests;
+
+/// <summary>Shim mapping the old positional call shape onto <see cref="DataItemsRequest{TItem}"/>.</summary>
+file static class ProviderShim
+{
+    public static Task<DataItemsResult<TItem>> GetItems<TItem>(
+        this IDataItemsProvider<TItem> provider,
+        Expression<Func<TItem, object?>>? sortBy,
+        SortDirection sortDirection,
+        string? query,
+        int offset,
+        int count)
+        => provider.GetItems(new DataItemsRequest<TItem>
+        {
+            SortBy = sortBy,
+            SortDirection = sortDirection,
+            Query = query,
+            Offset = offset,
+            Count = count,
+        });
+}
 
 public class DataItemsProviderTests
 {

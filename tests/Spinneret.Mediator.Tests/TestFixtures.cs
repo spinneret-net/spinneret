@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Spinneret.Functional;
 
 namespace Spinneret.Mediator.Tests;
 
@@ -219,12 +220,15 @@ internal static class TestServices
     public static ISpinneretMediator BuildMediator(Action<IServiceCollection>? configure = null)
         => BuildProvider(configure).GetRequiredService<ISpinneretMediator>();
 
-    public static ISpinneretMediator BuildMediator(CountingHandler handler)
-        => BuildMediator(services =>
+    public static ServiceProvider BuildProvider(CountingHandler handler)
+        => BuildProvider(services =>
         {
             services.AddSingleton<IRequestHandler<CachedQuery, int>>(handler);
             services.AddSingleton<IRequestHandler<MultiTagQuery, int>>(handler);
             services.AddSingleton<IRequestHandler<BetaTaggedQuery, int>>(handler);
             services.AddSingleton<IRequestHandler<ShortLivedQuery, int>>(handler);
         });
+
+    public static ISpinneretMediator BuildMediator(CountingHandler handler)
+        => BuildProvider(handler).GetRequiredService<ISpinneretMediator>();
 }

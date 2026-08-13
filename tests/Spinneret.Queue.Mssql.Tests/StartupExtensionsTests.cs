@@ -285,7 +285,7 @@ public sealed class StartupExtensionsTests
 
 internal sealed class CustomBoundary : IQueueDispatchBoundary
 {
-    public Task ExecuteAsync(QueueEnvelope envelope, Func<Task> dispatch, CancellationToken ct) => dispatch();
+    public Task ExecuteAsync(QueueDeliveryContext context, Func<Task> dispatch, CancellationToken ct) => dispatch();
 }
 
 internal sealed class StubSerializer : IQueuePayloadSerializer

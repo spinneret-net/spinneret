@@ -15,14 +15,14 @@ namespace Spinneret.Queue.Gcp;
 /// </summary>
 internal static class QueueDispatchEndpoint
 {
-    private const string RoutePattern = "/internal/queue/dispatch";
+    internal const string DefaultRoutePattern = "/internal/queue/dispatch";
 
     private static readonly TimeSpan UnreadableEnvelopeDeadLetterRetryBackoff = TimeSpan.FromMinutes(1);
 
-    public static IEndpointRouteBuilder MapGcpQueueDispatch(this IEndpointRouteBuilder endpoints)
+    public static IEndpointRouteBuilder MapGcpQueueDispatch(this IEndpointRouteBuilder endpoints, string pattern)
     {
         endpoints
-            .MapPost(RoutePattern, (Delegate)Handle)
+            .MapPost(pattern, (Delegate)Handle)
             .RequireAuthorization(OidcAuthSetup.PolicyName)
             .ExcludeFromDescription();
 
@@ -57,7 +57,8 @@ internal static class QueueDispatchEndpoint
             return await DeadLetterUnreadableEnvelope(httpContext, services, logger, body, taskId, parseError, ct);
 
         var processor = services.GetRequiredService<IQueueDeliveryProcessor>();
-        var outcome = await processor.ProcessAsync(envelope, taskId, ct);
+        var outcome = await processor.ProcessAsync(
+            new QueueDeliveryContext { Envelope = envelope, TaskId = taskId }, ct);
 
         return outcome.Ack ? Results.Ok() : RetryIn(httpContext, outcome.RetryAfter!.Value);
     }

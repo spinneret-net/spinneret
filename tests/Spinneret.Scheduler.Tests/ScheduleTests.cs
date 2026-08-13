@@ -248,4 +248,28 @@ public class ScheduleTests
     {
         await Assert.That(() => Schedule.Parse(text!)).Throws<ArgumentException>();
     }
+
+    [Test]
+    public async Task TryParse_valid_text_returns_true_and_the_schedule()
+    {
+        var parsed = Schedule.TryParse("cron:Europe/Stockholm:0 3 * * *", out var schedule);
+
+        await Assert.That(parsed).IsTrue();
+        await Assert.That(schedule).IsEqualTo(Schedule.Cron("0 3 * * *", "Europe/Stockholm"));
+    }
+
+    [Test]
+    [Arguments(null)]
+    [Arguments("")]
+    [Arguments("   ")]
+    [Arguments("gibberish")]
+    [Arguments("cron:No/Zone:0 3 * * *")]
+    [Arguments("cron:Europe/Stockholm:not cron")]
+    public async Task TryParse_invalid_text_returns_false_without_throwing(string? text)
+    {
+        var parsed = Schedule.TryParse(text, out var schedule);
+
+        await Assert.That(parsed).IsFalse();
+        await Assert.That(schedule).IsNull();
+    }
 }

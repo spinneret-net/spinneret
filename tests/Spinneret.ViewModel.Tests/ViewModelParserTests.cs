@@ -12,7 +12,8 @@ public class ViewModelParserTests
         var viewModel = new FormViewModel { Name = "Ada", Age = "36" };
         var sut = CreateParser();
 
-        var parsed = sut.Parse(viewModel, null, ParseForm, out var isValid);
+        var result = sut.ParseChecked(viewModel, null, ParseForm);
+        var (parsed, isValid) = (result.Value, result.IsValid);
 
         await Assert.That(isValid).IsTrue();
         await Assert.That(parsed).IsEqualTo(new ParsedForm("Ada", 36));
@@ -26,7 +27,7 @@ public class ViewModelParserTests
         viewModel.ValidationState.AddError("Age", "stale");
         var sut = CreateParser();
 
-        sut.Parse(viewModel, null, ParseForm, out _);
+        sut.ParseChecked(viewModel, null, ParseForm);
 
         await Assert.That(viewModel.ValidationState.GetError("Age")).IsNull();
     }
@@ -37,7 +38,8 @@ public class ViewModelParserTests
         var viewModel = new FormViewModel { Name = "Ada", Age = "not-a-number" };
         var sut = CreateParser();
 
-        var parsed = sut.Parse(viewModel, null, ParseForm, out var isValid);
+        var result = sut.ParseChecked(viewModel, null, ParseForm);
+        var (parsed, isValid) = (result.Value, result.IsValid);
 
         await Assert.That(isValid).IsFalse();
         await Assert.That(parsed).IsNull();
@@ -50,7 +52,8 @@ public class ViewModelParserTests
         var viewModel = new FormViewModel { Name = "  ", Age = "36" };
         var sut = CreateParser();
 
-        var parsed = sut.Parse(viewModel, null, ParseForm, out var isValid);
+        var result = sut.ParseChecked(viewModel, null, ParseForm);
+        var (parsed, isValid) = (result.Value, result.IsValid);
 
         await Assert.That(isValid).IsFalse();
         await Assert.That(parsed).IsNull();
@@ -63,7 +66,8 @@ public class ViewModelParserTests
         var viewModel = new FormViewModel { Name = "Ada", Age = "not-a-number" };
         var sut = CreateParser();
 
-        var parsed = sut.Parse(viewModel, ["Name"], ParseForm, out var isValid);
+        var result = sut.ParseChecked(viewModel, ["Name"], ParseForm);
+        var (parsed, isValid) = (result.Value, result.IsValid);
 
         await Assert.That(isValid).IsFalse();
         await Assert.That(parsed).IsNull();
@@ -77,7 +81,7 @@ public class ViewModelParserTests
         viewModel.ValidationState.AddError("Name", "stale");
         var sut = CreateParser();
 
-        sut.Parse(viewModel, ["Name"], ParseForm, out _);
+        sut.ParseChecked(viewModel, ["Name"], ParseForm);
 
         await Assert.That(viewModel.ValidationState.GetError("Name")).IsNull();
     }
@@ -88,15 +92,15 @@ public class ViewModelParserTests
         var viewModel = new FormViewModel { Name = "Ada", Age = "36", Text = { ValueEn = null } };
         var sut = CreateParser();
 
-        sut.Parse(
+        var result = sut.ParseChecked(
             viewModel,
             ["Text.ValueEn"],
             p => p.Parse(
                 x => x.Text,
                 text => text.ValueEn == null
                     ? Result<string, TestError>.Error(new TestError("no-text"))
-                    : Result<string, TestError>.Ok(text.ValueEn)),
-            out var isValid);
+                    : Result<string, TestError>.Ok(text.ValueEn)));
+        var isValid = result.IsValid;
 
         await Assert.That(isValid).IsFalse();
         await Assert.That(viewModel.ValidationState.GetError("Text")).IsEqualTo("loc:no-text");
@@ -108,15 +112,14 @@ public class ViewModelParserTests
         var viewModel = new FormViewModel { Name = "Ada", Age = "36", Text = { ValueEn = null } };
         var sut = CreateParser();
 
-        sut.Parse(
+        sut.ParseChecked(
             viewModel,
             ["Name"],
             p => p.Parse(
                 x => x.Text,
                 text => text.ValueEn == null
                     ? Result<string, TestError>.Error(new TestError("no-text"))
-                    : Result<string, TestError>.Ok(text.ValueEn)),
-            out _);
+                    : Result<string, TestError>.Ok(text.ValueEn)));
 
         await Assert.That(viewModel.ValidationState.GetError("Text")).IsNull();
     }

@@ -1,3 +1,4 @@
+using Spinneret.Functional;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;

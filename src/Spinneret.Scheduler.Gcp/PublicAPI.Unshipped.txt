@@ -1,0 +1,16 @@
+#nullable enable
+const Spinneret.Scheduler.Gcp.GcpSchedulerOptions.SectionName = "Scheduler:Gcp" -> string!
+Microsoft.AspNetCore.Builder.GcpSchedulerEndpointRouteBuilderExtensions
+Microsoft.Extensions.DependencyInjection.GcpSchedulerServiceCollectionExtensions
+Spinneret.Scheduler.Gcp.GcpSchedulerOptions
+Spinneret.Scheduler.Gcp.GcpSchedulerOptions.Collection.get -> string!
+Spinneret.Scheduler.Gcp.GcpSchedulerOptions.Collection.set -> void
+Spinneret.Scheduler.Gcp.GcpSchedulerOptions.GcpSchedulerOptions() -> void
+Spinneret.Scheduler.Gcp.GcpSchedulerOptions.OneShotLeaseWindow.get -> System.TimeSpan
+Spinneret.Scheduler.Gcp.GcpSchedulerOptions.OneShotLeaseWindow.set -> void
+Spinneret.Scheduler.Gcp.IFirestoreTransactionalScheduler
+Spinneret.Scheduler.Gcp.IFirestoreTransactionalScheduler.CancelJob(Google.Cloud.Firestore.Transaction! transaction, string! handle) -> void
+Spinneret.Scheduler.Gcp.IFirestoreTransactionalScheduler.ScheduleJob(Google.Cloud.Firestore.Transaction! transaction, Spinneret.Mediator.IRequest<Spinneret.Functional.Unit>! request, System.DateTimeOffset executeAt) -> string!
+static Microsoft.AspNetCore.Builder.GcpSchedulerEndpointRouteBuilderExtensions.MapGcpSchedulerDispatch(this Microsoft.AspNetCore.Routing.IEndpointRouteBuilder! endpoints, string! pattern = "/internal/scheduler/dispatch") -> Microsoft.AspNetCore.Routing.IEndpointRouteBuilder!
+static Microsoft.Extensions.DependencyInjection.GcpSchedulerServiceCollectionExtensions.AddGcpScheduler(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, Microsoft.Extensions.Configuration.IConfiguration! configuration) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static Microsoft.Extensions.DependencyInjection.GcpSchedulerServiceCollectionExtensions.AddGcpScheduler(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Spinneret.Scheduler.Gcp.GcpSchedulerOptions!>! configure) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!

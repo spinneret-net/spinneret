@@ -1,0 +1,13 @@
+# Analyzer configuration for the shipped packages (src only).
+root = false
+
+[*.cs]
+# RS0026 forbids overload sets where more than one overload has optional parameters.
+# Two such sets are deliberate, documented API shapes here:
+#   - ISpinneretMediator.Send / IQueue.Enqueue: the IRequest<Unit> convenience overload
+#     next to the generic one, both with an optional CancellationToken.
+#   - BindableBase.SetProperty: [CallerMemberName] requires an optional parameter, and the
+#     explicit-name overloads exist precisely for the non-caller-name cases.
+# The trap RS0026 guards against (a later overload making existing calls ambiguous) is
+# covered by the PublicAPI.txt review instead: any new overload shows up as a diff.
+dotnet_diagnostic.RS0026.severity = none

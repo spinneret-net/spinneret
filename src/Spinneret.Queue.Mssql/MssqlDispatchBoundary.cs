@@ -17,8 +17,10 @@ internal sealed class MssqlDispatchBoundary(
 {
     private const string SavepointName = "SpinneretDispatch";
 
-    public async Task ExecuteAsync(QueueEnvelope envelope, Func<Task> dispatch, CancellationToken ct)
+    public async Task ExecuteAsync(QueueDeliveryContext context, Func<Task> dispatch, CancellationToken ct)
     {
+        var envelope = context.Envelope;
+
         // No ambient SQL transaction (or a non-SQL one): nothing to bracket. Savepoints only exist
         // on SqlTransaction, and only the delivery worker publishes one here.
         if (transactions.Current is not SqlTransaction transaction)

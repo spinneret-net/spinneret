@@ -13,6 +13,21 @@
         <ProjectReference Include="..\Spinneret.Parsing\Spinneret.Parsing.csproj" />
     </ItemGroup>
 
+    <ItemGroup>
+        <!-- Used directly by this package's public API; declared explicitly instead of
+             relying on Spinneret.Parsing's transitive references. -->
+        <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.9" />
+        <PackageReference Include="Microsoft.Extensions.Localization.Abstractions" Version="10.0.9" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <!-- Spinneret.View performs the framework-side property injection of
+             ViewModelBase.ExceptionService (internal setter). -->
+        <InternalsVisibleTo Include="Spinneret.View" />
+        <InternalsVisibleTo Include="Spinneret.ViewModel.Tests" />
+        <InternalsVisibleTo Include="Spinneret.View.Tests" />
+    </ItemGroup>
+
     <PropertyGroup>
         <Description>MVVM for Blazor: bindable view models, two-way bindings with conversion and validation state, row collections, and nested view models.</Description>
         <PackageTags>$(PackageTags) blazor mvvm viewmodel data-binding validation</PackageTags>

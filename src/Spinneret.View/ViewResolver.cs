@@ -5,7 +5,7 @@ public interface IViewResolver
     Type ResolveViewType(Type viewModelType);
 }
 
-internal class ViewResolver : IViewResolver
+internal sealed class ViewResolver : IViewResolver
 {
     private const string ViewModelSuffix = "ViewModel";
     private readonly Dictionary<Type, Type[]> _viewModelToViewMapper;

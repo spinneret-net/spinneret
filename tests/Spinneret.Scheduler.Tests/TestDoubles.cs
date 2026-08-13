@@ -1,3 +1,4 @@
+using Spinneret.Functional;
 using Spinneret.Mediator;
 
 namespace Spinneret.Scheduler.Tests;

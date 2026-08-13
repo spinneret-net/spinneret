@@ -81,19 +81,34 @@ public abstract class ViewBase<T> : ComponentBase, IView<T>, IAsyncDisposable wh
             ViewState.Initialized => () => base.BuildRenderTree(builder),
             ViewState.InitializationFailed => () => { },
             ViewState.Disposed => () => { },
+            _ => throw new InvalidOperationException($"Unknown {nameof(ViewState)} value {State}."),
         };
 
         action();
     }
 
-    protected override async Task OnInitializedAsync()
+    // Sealed: a derived view that overrode this and forgot `await base.OnInitializedAsync()`
+    // would silently never initialize its view model. Override OnViewInitializedAsync instead.
+    protected sealed override async Task OnInitializedAsync()
+    {
+        await InitializeViewAsync();
+        await OnViewInitializedAsync();
+    }
+
+    /// <summary>
+    /// Runs after the view's own initialization completes (in whatever <see cref="State"/> it
+    /// produced — check it if the work only makes sense when initialized).
+    /// </summary>
+    protected virtual Task OnViewInitializedAsync() => Task.CompletedTask;
+
+    private async Task InitializeViewAsync()
     {
         if (RenderContext.IsPrerendering)
         {
             State = ViewState.PreInitialized;
             return;
         }
-        
+
         await SafeExecute(() => InitializeViewModel(SpecifiedViewModel), "Initialize updated view model");
 
         // A failed initialization must leave the view in InitializationFailed, mirroring the
@@ -143,13 +158,23 @@ public abstract class ViewBase<T> : ComponentBase, IView<T>, IAsyncDisposable wh
         }
     }
 
-    protected override async Task OnParametersSetAsync()
+    // Sealed for the same reason as OnInitializedAsync. Override OnViewParametersSetAsync instead.
+    protected sealed override async Task OnParametersSetAsync()
+    {
+        await ApplyParametersAsync();
+        await OnViewParametersSetAsync();
+    }
+
+    /// <summary>Runs after the view has applied parameter changes (including view-model swaps).</summary>
+    protected virtual Task OnViewParametersSetAsync() => Task.CompletedTask;
+
+    private async Task ApplyParametersAsync()
     {
         if (State != ViewState.Initialized)
         {
             return;
         }
-        
+
         var specifiedViewModel = SpecifiedViewModel;
         var effectiveViewModel = _effectiveViewModel;
         var viewModelHasChanged = effectiveViewModel?.ViewModel != specifiedViewModel.ViewModel;
@@ -166,7 +191,7 @@ public abstract class ViewBase<T> : ComponentBase, IView<T>, IAsyncDisposable wh
                     DetachViewModel(effectiveViewModel);
                 }
             }
-            
+
             await SafeExecute(() => InitializeViewModel(specifiedViewModel), "Initialize updated view model");
         }
     }
@@ -248,6 +273,10 @@ public abstract class ViewBase<T> : ComponentBase, IView<T>, IAsyncDisposable wh
             return;
         }
 
+        // Derived cleanup runs first, while the view's cancellation token and view model are
+        // still usable.
+        await OnDisposeAsync();
+
         _refreshSubscription?.Dispose();
         _refreshSubscription = null;
 
@@ -273,6 +302,9 @@ public abstract class ViewBase<T> : ComponentBase, IView<T>, IAsyncDisposable wh
         State = ViewState.Disposed;
         GC.SuppressFinalize(this);
     }
+
+    /// <summary>Override for async cleanup owned by the derived view; runs before the base teardown.</summary>
+    protected virtual ValueTask OnDisposeAsync() => ValueTask.CompletedTask;
 
     private void DetachViewModel(ViewModelWrapper viewModel)
     {

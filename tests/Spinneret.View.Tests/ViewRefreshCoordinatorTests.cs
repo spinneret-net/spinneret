@@ -7,7 +7,7 @@ public class ViewRefreshCoordinatorTests
     // ViewRefreshCoordinator is internal; obtain the real implementation through DI.
     private static IViewRefreshCoordinator CreateCoordinator() =>
         new ServiceCollection()
-            .AddMvvm<ClientRenderContext>(autoRegisterViewModels: false, typeof(ViewRefreshCoordinatorTests).Assembly)
+            .AddMvvm<ClientRenderContext>(o => { o.AutoRegisterViewModels = false; o.Assemblies.Add(typeof(ViewRefreshCoordinatorTests).Assembly); })
             .BuildServiceProvider()
             .GetRequiredService<IViewRefreshCoordinator>();
 

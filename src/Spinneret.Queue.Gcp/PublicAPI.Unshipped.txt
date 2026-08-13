@@ -1,0 +1,32 @@
+#nullable enable
+const Spinneret.Queue.Gcp.GcpQueueOptions.SectionName = "Queue:Gcp" -> string!
+const Spinneret.Queue.Gcp.OidcAuthSetup.PolicyName = "QueueOIDC" -> string!
+const Spinneret.Queue.Gcp.OidcAuthSetup.SchemeName = "QueueOIDC" -> string!
+Microsoft.AspNetCore.Builder.GcpQueueEndpointRouteBuilderExtensions
+Microsoft.Extensions.DependencyInjection.GcpQueueServiceCollectionExtensions
+Spinneret.Queue.Gcp.GcpQueueOptions
+Spinneret.Queue.Gcp.GcpQueueOptions.Channels.get -> System.Collections.Generic.Dictionary<string!, string!>!
+Spinneret.Queue.Gcp.GcpQueueOptions.Channels.set -> void
+Spinneret.Queue.Gcp.GcpQueueOptions.DispatcherUrl.get -> string!
+Spinneret.Queue.Gcp.GcpQueueOptions.DispatcherUrl.set -> void
+Spinneret.Queue.Gcp.GcpQueueOptions.EmulatorEndpoint.get -> string?
+Spinneret.Queue.Gcp.GcpQueueOptions.EmulatorEndpoint.set -> void
+Spinneret.Queue.Gcp.GcpQueueOptions.GcpQueueOptions() -> void
+Spinneret.Queue.Gcp.GcpQueueOptions.LocationId.get -> string!
+Spinneret.Queue.Gcp.GcpQueueOptions.LocationId.set -> void
+Spinneret.Queue.Gcp.GcpQueueOptions.OidcAudience.get -> string?
+Spinneret.Queue.Gcp.GcpQueueOptions.OidcAudience.set -> void
+Spinneret.Queue.Gcp.GcpQueueOptions.OidcIssuer.get -> string?
+Spinneret.Queue.Gcp.GcpQueueOptions.OidcIssuer.set -> void
+Spinneret.Queue.Gcp.GcpQueueOptions.ProjectId.get -> string!
+Spinneret.Queue.Gcp.GcpQueueOptions.ProjectId.set -> void
+Spinneret.Queue.Gcp.GcpQueueOptions.QueueIdFor(string! channel) -> string!
+Spinneret.Queue.Gcp.GcpQueueOptions.ResolvedOidcAudience.get -> string!
+Spinneret.Queue.Gcp.GcpQueueOptions.ResolvedOidcIssuer.get -> string!
+Spinneret.Queue.Gcp.GcpQueueOptions.ServiceAccountEmail.get -> string!
+Spinneret.Queue.Gcp.GcpQueueOptions.ServiceAccountEmail.set -> void
+Spinneret.Queue.Gcp.GcpQueueOptions.UsesEmulator.get -> bool
+Spinneret.Queue.Gcp.OidcAuthSetup
+static Microsoft.AspNetCore.Builder.GcpQueueEndpointRouteBuilderExtensions.MapGcpQueueDispatch(this Microsoft.AspNetCore.Routing.IEndpointRouteBuilder! endpoints, string! pattern = "/internal/queue/dispatch") -> Microsoft.AspNetCore.Routing.IEndpointRouteBuilder!
+static Microsoft.Extensions.DependencyInjection.GcpQueueServiceCollectionExtensions.AddGcpQueue(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, Microsoft.Extensions.Configuration.IConfiguration! configuration, params System.Reflection.Assembly![]! requestAssemblies) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static Microsoft.Extensions.DependencyInjection.GcpQueueServiceCollectionExtensions.AddGcpQueue(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Spinneret.Queue.Gcp.GcpQueueOptions!>! configure, params System.Reflection.Assembly![]! requestAssemblies) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!

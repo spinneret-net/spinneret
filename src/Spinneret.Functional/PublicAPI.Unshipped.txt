@@ -1,0 +1,160 @@
+#nullable enable
+override Spinneret.Functional.Either<T1, T2>.Equals(object? obj) -> bool
+override Spinneret.Functional.Either<T1, T2>.GetHashCode() -> int
+override Spinneret.Functional.Either<T1, T2>.ToString() -> string!
+override Spinneret.Functional.Result<TError>.Equals(object? obj) -> bool
+override Spinneret.Functional.Result<TError>.GetHashCode() -> int
+override Spinneret.Functional.Result<TError>.ToString() -> string!
+override Spinneret.Functional.Result<TOk, TError>.Equals(object? obj) -> bool
+override Spinneret.Functional.Result<TOk, TError>.GetHashCode() -> int
+override Spinneret.Functional.Result<TOk, TError>.ToString() -> string!
+override Spinneret.Functional.TaskResult<TError>.GetHashCode() -> int
+override Spinneret.Functional.TaskResult<TOk, TError>.GetHashCode() -> int
+override Spinneret.Functional.Unit.GetHashCode() -> int
+Spinneret.Functional.Either<T1, T2>
+Spinneret.Functional.Either<T1, T2>.<Clone>$() -> Spinneret.Functional.Either<T1, T2>!
+Spinneret.Functional.Either<T1, T2>.Either(T1 value) -> void
+Spinneret.Functional.Either<T1, T2>.Either(T2 value) -> void
+Spinneret.Functional.Either<T1, T2>.Equals(Spinneret.Functional.Either<T1, T2>? other) -> bool
+Spinneret.Functional.Either<T1, T2>.Map<T3, T4>(System.Func<T1, T3>! f1, System.Func<T2, T4>! f2) -> Spinneret.Functional.Either<T3, T4>!
+Spinneret.Functional.Either<T1, T2>.Match<T>(System.Func<T1, T>! f1, System.Func<T2, T>! f2) -> T
+Spinneret.Functional.Either<T1, T2>.Reverse() -> Spinneret.Functional.Either<T2, T1>!
+Spinneret.Functional.Either<T1, T2>.Switch(System.Action<T1>! f1, System.Action<T2>! f2) -> void
+Spinneret.Functional.Either<T1, T2>.TraverseResult<T3, T4, TError>(System.Func<T1, Spinneret.Functional.Result<T3, TError>!>! f1, System.Func<T2, Spinneret.Functional.Result<T4, TError>!>! f2) -> Spinneret.Functional.Result<Spinneret.Functional.Either<T3, T4>!, TError>!
+Spinneret.Functional.LinqExtensions
+Spinneret.Functional.Result
+Spinneret.Functional.Result<TError>
+Spinneret.Functional.Result<TError>.<Clone>$() -> Spinneret.Functional.Result<TError>!
+Spinneret.Functional.Result<TError>.Bind(System.Func<Spinneret.Functional.Result<TError>!>! okFn) -> Spinneret.Functional.Result<TError>!
+Spinneret.Functional.Result<TError>.Bind<TMapped>(System.Func<Spinneret.Functional.Result<TMapped, TError>!>! okFn) -> Spinneret.Functional.Result<TMapped, TError>!
+Spinneret.Functional.Result<TError>.Equals(Spinneret.Functional.Result<TError>? other) -> bool
+Spinneret.Functional.Result<TError>.Map<TMapped>(System.Func<TMapped>! okFn) -> Spinneret.Functional.Result<TMapped, TError>!
+Spinneret.Functional.Result<TError>.MapError<TMappedError>(System.Func<TError, TMappedError>! errorFn) -> Spinneret.Functional.Result<TMappedError>!
+Spinneret.Functional.Result<TError>.Match<T>(System.Func<T>! okFn, System.Func<TError, T>! errorFn) -> T
+Spinneret.Functional.Result<TError>.Switch(System.Action! okFn, System.Action<TError>! errorFn) -> void
+Spinneret.Functional.Result<TError>.ThrowOnError(System.Func<TError, System.Exception!>! fn) -> void
+Spinneret.Functional.Result<TError>.TraverseTask(System.Func<System.Threading.Tasks.Task!>! okFn) -> System.Threading.Tasks.Task<Spinneret.Functional.Result<TError>!>!
+Spinneret.Functional.Result<TError>.TraverseTask<TMapped>(System.Func<System.Threading.Tasks.Task<TMapped>!>! okFn) -> System.Threading.Tasks.Task<Spinneret.Functional.Result<TMapped, TError>!>!
+Spinneret.Functional.Result<TOk, TError>
+Spinneret.Functional.Result<TOk, TError>.<Clone>$() -> Spinneret.Functional.Result<TOk, TError>!
+Spinneret.Functional.Result<TOk, TError>.Bind(System.Func<TOk, Spinneret.Functional.Result<TError>!>! okFn) -> Spinneret.Functional.Result<TError>!
+Spinneret.Functional.Result<TOk, TError>.Bind<TMapped>(System.Func<TOk, Spinneret.Functional.Result<TMapped, TError>!>! okFn) -> Spinneret.Functional.Result<TMapped, TError>!
+Spinneret.Functional.Result<TOk, TError>.Equals(Spinneret.Functional.Result<TOk, TError>? other) -> bool
+Spinneret.Functional.Result<TOk, TError>.Ignore() -> Spinneret.Functional.Result<TError>!
+Spinneret.Functional.Result<TOk, TError>.Map<TMapped>(System.Func<TOk, TMapped>! okFn) -> Spinneret.Functional.Result<TMapped, TError>!
+Spinneret.Functional.Result<TOk, TError>.MapError<TMappedError>(System.Func<TError, TMappedError>! errorFn) -> Spinneret.Functional.Result<TOk, TMappedError>!
+Spinneret.Functional.Result<TOk, TError>.Match<T>(System.Func<TOk, T>! okFn, System.Func<TError, T>! errorFn) -> T
+Spinneret.Functional.Result<TOk, TError>.Switch(System.Action<TOk>! okFn, System.Action<TError>! errorFn) -> void
+Spinneret.Functional.Result<TOk, TError>.ThrowOnError(System.Func<TError, System.Exception!>! fn) -> TOk
+Spinneret.Functional.Result<TOk, TError>.TraverseTask(System.Func<TOk, System.Threading.Tasks.Task!>! okFn) -> System.Threading.Tasks.Task<Spinneret.Functional.Result<TError>!>!
+Spinneret.Functional.Result<TOk, TError>.TraverseTask<TMapped>(System.Func<TOk, System.Threading.Tasks.Task<TMapped>!>! okFn) -> System.Threading.Tasks.Task<Spinneret.Functional.Result<TMapped, TError>!>!
+Spinneret.Functional.ResultExtensions
+Spinneret.Functional.TaskExtensions
+Spinneret.Functional.TaskResult
+Spinneret.Functional.TaskResult<TError>
+Spinneret.Functional.TaskResult<TError>.AsTask() -> System.Threading.Tasks.Task<Spinneret.Functional.Result<TError>!>!
+Spinneret.Functional.TaskResult<TError>.Bind(System.Func<Spinneret.Functional.Result<TError>!>! continuation) -> Spinneret.Functional.TaskResult<TError>
+Spinneret.Functional.TaskResult<TError>.Bind(System.Func<Spinneret.Functional.TaskResult<TError>>! continuation) -> Spinneret.Functional.TaskResult<TError>
+Spinneret.Functional.TaskResult<TError>.Bind(System.Func<System.Threading.Tasks.Task!>! continuation) -> Spinneret.Functional.TaskResult<TError>
+Spinneret.Functional.TaskResult<TError>.Bind(System.Func<System.Threading.Tasks.Task<Spinneret.Functional.Result<TError>!>!>! continuation) -> Spinneret.Functional.TaskResult<TError>
+Spinneret.Functional.TaskResult<TError>.Bind<TOk>(System.Func<Spinneret.Functional.Result<TOk, TError>!>! continuation) -> Spinneret.Functional.TaskResult<TOk, TError>
+Spinneret.Functional.TaskResult<TError>.Bind<TOk>(System.Func<Spinneret.Functional.TaskResult<TOk, TError>>! continuation) -> Spinneret.Functional.TaskResult<TOk, TError>
+Spinneret.Functional.TaskResult<TError>.Bind<TOk>(System.Func<System.Threading.Tasks.Task<Spinneret.Functional.Result<TOk, TError>!>!>! continuation) -> Spinneret.Functional.TaskResult<TOk, TError>
+Spinneret.Functional.TaskResult<TError>.Bind<TOk>(System.Func<System.Threading.Tasks.Task<TOk>!>! continuation) -> Spinneret.Functional.TaskResult<TOk, TError>
+Spinneret.Functional.TaskResult<TError>.BindError<TMappedError>(System.Func<TError, Spinneret.Functional.Result<TMappedError>!>! continuation) -> Spinneret.Functional.TaskResult<TMappedError>
+Spinneret.Functional.TaskResult<TError>.BindError<TMappedError>(System.Func<TError, Spinneret.Functional.TaskResult<TMappedError>>! continuation) -> Spinneret.Functional.TaskResult<TMappedError>
+Spinneret.Functional.TaskResult<TError>.BindError<TMappedError>(System.Func<TError, System.Threading.Tasks.Task<Spinneret.Functional.Result<TMappedError>!>!>! continuation) -> Spinneret.Functional.TaskResult<TMappedError>
+Spinneret.Functional.TaskResult<TError>.BindError<TMappedError>(System.Func<TError, System.Threading.Tasks.Task<TMappedError>!>! continuation) -> Spinneret.Functional.TaskResult<TMappedError>
+Spinneret.Functional.TaskResult<TError>.Deconstruct(out System.Threading.Tasks.Task<Spinneret.Functional.Result<TError>!>! Value) -> void
+Spinneret.Functional.TaskResult<TError>.Equals(Spinneret.Functional.TaskResult<TError> other) -> bool
+Spinneret.Functional.TaskResult<TError>.GetAwaiter() -> System.Runtime.CompilerServices.TaskAwaiter<Spinneret.Functional.Result<TError>!>
+Spinneret.Functional.TaskResult<TError>.Map<TMapped>(System.Func<TMapped>! continuation) -> Spinneret.Functional.TaskResult<TMapped, TError>
+Spinneret.Functional.TaskResult<TError>.MapError<TMappedError>(System.Func<TError, TMappedError>! continuation) -> Spinneret.Functional.TaskResult<TMappedError>
+Spinneret.Functional.TaskResult<TError>.Match<T>(System.Func<T>! okFn, System.Func<TError, T>! errorFn) -> System.Threading.Tasks.Task<T>!
+Spinneret.Functional.TaskResult<TError>.TaskResult() -> void
+Spinneret.Functional.TaskResult<TError>.TaskResult(System.Threading.Tasks.Task<Spinneret.Functional.Result<TError>!>! Value) -> void
+Spinneret.Functional.TaskResult<TError>.Value.get -> System.Threading.Tasks.Task<Spinneret.Functional.Result<TError>!>!
+Spinneret.Functional.TaskResult<TError>.Value.init -> void
+Spinneret.Functional.TaskResult<TOk, TError>
+Spinneret.Functional.TaskResult<TOk, TError>.AsTask() -> System.Threading.Tasks.Task<Spinneret.Functional.Result<TOk, TError>!>!
+Spinneret.Functional.TaskResult<TOk, TError>.Bind(System.Func<TOk, Spinneret.Functional.Result<TError>!>! continuation) -> Spinneret.Functional.TaskResult<TError>
+Spinneret.Functional.TaskResult<TOk, TError>.Bind(System.Func<TOk, Spinneret.Functional.TaskResult<TError>>! continuation) -> Spinneret.Functional.TaskResult<TError>
+Spinneret.Functional.TaskResult<TOk, TError>.Bind(System.Func<TOk, System.Threading.Tasks.Task!>! continuation) -> Spinneret.Functional.TaskResult<TError>
+Spinneret.Functional.TaskResult<TOk, TError>.Bind(System.Func<TOk, System.Threading.Tasks.Task<Spinneret.Functional.Result<TError>!>!>! continuation) -> Spinneret.Functional.TaskResult<TError>
+Spinneret.Functional.TaskResult<TOk, TError>.Bind<TMapped>(System.Func<TOk, Spinneret.Functional.Result<TMapped, TError>!>! continuation) -> Spinneret.Functional.TaskResult<TMapped, TError>
+Spinneret.Functional.TaskResult<TOk, TError>.Bind<TMapped>(System.Func<TOk, Spinneret.Functional.TaskResult<TMapped, TError>>! continuation) -> Spinneret.Functional.TaskResult<TMapped, TError>
+Spinneret.Functional.TaskResult<TOk, TError>.Bind<TMapped>(System.Func<TOk, System.Threading.Tasks.Task<Spinneret.Functional.Result<TMapped, TError>!>!>! continuation) -> Spinneret.Functional.TaskResult<TMapped, TError>
+Spinneret.Functional.TaskResult<TOk, TError>.Bind<TMapped>(System.Func<TOk, System.Threading.Tasks.Task<TMapped>!>! continuation) -> Spinneret.Functional.TaskResult<TMapped, TError>
+Spinneret.Functional.TaskResult<TOk, TError>.BindError<TMappedError>(System.Func<TError, Spinneret.Functional.Result<TOk, TMappedError>!>! continuation) -> Spinneret.Functional.TaskResult<TOk, TMappedError>
+Spinneret.Functional.TaskResult<TOk, TError>.BindError<TMappedError>(System.Func<TError, Spinneret.Functional.TaskResult<TOk, TMappedError>>! continuation) -> Spinneret.Functional.TaskResult<TOk, TMappedError>
+Spinneret.Functional.TaskResult<TOk, TError>.BindError<TMappedError>(System.Func<TError, System.Threading.Tasks.Task<Spinneret.Functional.Result<TOk, TMappedError>!>!>! continuation) -> Spinneret.Functional.TaskResult<TOk, TMappedError>
+Spinneret.Functional.TaskResult<TOk, TError>.BindError<TMappedError>(System.Func<TError, System.Threading.Tasks.Task<TMappedError>!>! continuation) -> Spinneret.Functional.TaskResult<TOk, TMappedError>
+Spinneret.Functional.TaskResult<TOk, TError>.Deconstruct(out System.Threading.Tasks.Task<Spinneret.Functional.Result<TOk, TError>!>! Value) -> void
+Spinneret.Functional.TaskResult<TOk, TError>.Equals(Spinneret.Functional.TaskResult<TOk, TError> other) -> bool
+Spinneret.Functional.TaskResult<TOk, TError>.GetAwaiter() -> System.Runtime.CompilerServices.TaskAwaiter<Spinneret.Functional.Result<TOk, TError>!>
+Spinneret.Functional.TaskResult<TOk, TError>.Ignore() -> Spinneret.Functional.TaskResult<TError>
+Spinneret.Functional.TaskResult<TOk, TError>.Map<TMapped>(System.Func<TOk, TMapped>! continuation) -> Spinneret.Functional.TaskResult<TMapped, TError>
+Spinneret.Functional.TaskResult<TOk, TError>.MapError<TMappedError>(System.Func<TError, TMappedError>! continuation) -> Spinneret.Functional.TaskResult<TOk, TMappedError>
+Spinneret.Functional.TaskResult<TOk, TError>.Match<T>(System.Func<TOk, T>! okFn, System.Func<TError, T>! errorFn) -> System.Threading.Tasks.Task<T>!
+Spinneret.Functional.TaskResult<TOk, TError>.TaskResult() -> void
+Spinneret.Functional.TaskResult<TOk, TError>.TaskResult(System.Threading.Tasks.Task<Spinneret.Functional.Result<TOk, TError>!>! Value) -> void
+Spinneret.Functional.TaskResult<TOk, TError>.Value.get -> System.Threading.Tasks.Task<Spinneret.Functional.Result<TOk, TError>!>!
+Spinneret.Functional.TaskResult<TOk, TError>.Value.init -> void
+Spinneret.Functional.TaskResultExtensions
+Spinneret.Functional.Unit
+Spinneret.Functional.Unit.Equals(Spinneret.Functional.Unit other) -> bool
+Spinneret.Functional.Unit.Unit() -> void
+static Spinneret.Functional.Either<T1, T2>.First(T1 value) -> Spinneret.Functional.Either<T1, T2>!
+static Spinneret.Functional.Either<T1, T2>.operator !=(Spinneret.Functional.Either<T1, T2>? left, Spinneret.Functional.Either<T1, T2>? right) -> bool
+static Spinneret.Functional.Either<T1, T2>.operator ==(Spinneret.Functional.Either<T1, T2>? left, Spinneret.Functional.Either<T1, T2>? right) -> bool
+static Spinneret.Functional.Either<T1, T2>.Second(T2 value) -> Spinneret.Functional.Either<T1, T2>!
+static Spinneret.Functional.LinqExtensions.Choose<T1, T2>(this System.Collections.Generic.IEnumerable<T1>! enumerable, System.Func<T1, T2?>! func) -> System.Collections.Generic.IEnumerable<T2!>!
+static Spinneret.Functional.LinqExtensions.Choose<T1, T2>(this System.Collections.Generic.IEnumerable<T1>! enumerable, System.Func<T1, T2?>! func) -> System.Collections.Generic.IEnumerable<T2>!
+static Spinneret.Functional.Result.Error<TError>(TError error) -> Spinneret.Functional.Result<TError>!
+static Spinneret.Functional.Result.Error<TOk, TError>(TError error) -> Spinneret.Functional.Result<TOk, TError>!
+static Spinneret.Functional.Result.FromNullable<TOk, TError>(TOk? value, System.Func<TError>! errorFn) -> Spinneret.Functional.Result<TOk, TError>!
+static Spinneret.Functional.Result.Ok<TError>() -> Spinneret.Functional.Result<TError>!
+static Spinneret.Functional.Result.Ok<TOk, TError>(TOk value) -> Spinneret.Functional.Result<TOk, TError>!
+static Spinneret.Functional.Result<TError>.Error(TError error) -> Spinneret.Functional.Result<TError>!
+static Spinneret.Functional.Result<TError>.Ok() -> Spinneret.Functional.Result<TError>!
+static Spinneret.Functional.Result<TError>.operator !=(Spinneret.Functional.Result<TError>? left, Spinneret.Functional.Result<TError>? right) -> bool
+static Spinneret.Functional.Result<TError>.operator ==(Spinneret.Functional.Result<TError>? left, Spinneret.Functional.Result<TError>? right) -> bool
+static Spinneret.Functional.Result<TOk, TError>.Error(TError error) -> Spinneret.Functional.Result<TOk, TError>!
+static Spinneret.Functional.Result<TOk, TError>.FromNullable(TOk? value, System.Func<TError>! errorFn) -> Spinneret.Functional.Result<TOk, TError>!
+static Spinneret.Functional.Result<TOk, TError>.Ok(TOk value) -> Spinneret.Functional.Result<TOk, TError>!
+static Spinneret.Functional.Result<TOk, TError>.operator !=(Spinneret.Functional.Result<TOk, TError>? left, Spinneret.Functional.Result<TOk, TError>? right) -> bool
+static Spinneret.Functional.Result<TOk, TError>.operator ==(Spinneret.Functional.Result<TOk, TError>? left, Spinneret.Functional.Result<TOk, TError>? right) -> bool
+static Spinneret.Functional.ResultExtensions.Flatten<TOk, TError1, TError2>(this Spinneret.Functional.Result<Spinneret.Functional.Result<TOk, TError2>!, TError1>! res) -> Spinneret.Functional.Result<TOk, Spinneret.Functional.Either<TError1, TError2>!>!
+static Spinneret.Functional.ResultExtensions.Swap<TError1, TError2>(this Spinneret.Functional.Result<Spinneret.Functional.Result<TError2>!, TError1>! input) -> Spinneret.Functional.Result<Spinneret.Functional.Result<TError1>!, TError2>!
+static Spinneret.Functional.ResultExtensions.Swap<TOk, TError1, TError2>(this Spinneret.Functional.Result<Spinneret.Functional.Result<TOk, TError2>!, TError1>! input) -> Spinneret.Functional.Result<Spinneret.Functional.Result<TOk, TError1>!, TError2>!
+static Spinneret.Functional.TaskExtensions.Bind(this System.Threading.Tasks.Task! task, System.Func<System.Threading.Tasks.Task!>! continuation) -> System.Threading.Tasks.Task!
+static Spinneret.Functional.TaskExtensions.Bind<T, K>(this System.Threading.Tasks.Task<T>! task, System.Func<T, System.Threading.Tasks.Task<K>!>! continuation) -> System.Threading.Tasks.Task<K>!
+static Spinneret.Functional.TaskExtensions.Bind<T>(this System.Threading.Tasks.Task! task, System.Func<System.Threading.Tasks.Task<T>!>! continuation) -> System.Threading.Tasks.Task<T>!
+static Spinneret.Functional.TaskExtensions.Bind<T>(this System.Threading.Tasks.Task<T>! task, System.Func<T, System.Threading.Tasks.Task!>! continuation) -> System.Threading.Tasks.Task!
+static Spinneret.Functional.TaskExtensions.Map(this System.Threading.Tasks.Task! task, System.Action! continuation) -> System.Threading.Tasks.Task!
+static Spinneret.Functional.TaskExtensions.Map<T, K>(this System.Threading.Tasks.Task<T>! task, System.Func<T, K>! continuation) -> System.Threading.Tasks.Task<K>!
+static Spinneret.Functional.TaskExtensions.Map<T>(this System.Threading.Tasks.Task! task, System.Func<T>! continuation) -> System.Threading.Tasks.Task<T>!
+static Spinneret.Functional.TaskExtensions.Map<T>(this System.Threading.Tasks.Task<T>! task, System.Action<T>! continuation) -> System.Threading.Tasks.Task!
+static Spinneret.Functional.TaskResult.Error<TError>(TError error) -> Spinneret.Functional.TaskResult<TError>
+static Spinneret.Functional.TaskResult.Error<TOk, TError>(TError error) -> Spinneret.Functional.TaskResult<TOk, TError>
+static Spinneret.Functional.TaskResult.Ok<TError>() -> Spinneret.Functional.TaskResult<TError>
+static Spinneret.Functional.TaskResult.Ok<TOk, TError>(TOk value) -> Spinneret.Functional.TaskResult<TOk, TError>
+static Spinneret.Functional.TaskResult<TError>.operator !=(Spinneret.Functional.TaskResult<TError> left, Spinneret.Functional.TaskResult<TError> right) -> bool
+static Spinneret.Functional.TaskResult<TError>.operator ==(Spinneret.Functional.TaskResult<TError> left, Spinneret.Functional.TaskResult<TError> right) -> bool
+static Spinneret.Functional.TaskResult<TOk, TError>.operator !=(Spinneret.Functional.TaskResult<TOk, TError> left, Spinneret.Functional.TaskResult<TOk, TError> right) -> bool
+static Spinneret.Functional.TaskResult<TOk, TError>.operator ==(Spinneret.Functional.TaskResult<TOk, TError> left, Spinneret.Functional.TaskResult<TOk, TError> right) -> bool
+static Spinneret.Functional.TaskResultExtensions.AsTaskResult<TError>(this Spinneret.Functional.Result<TError>! result) -> Spinneret.Functional.TaskResult<TError>
+static Spinneret.Functional.TaskResultExtensions.AsTaskResult<TError>(this System.Threading.Tasks.Task! result) -> Spinneret.Functional.TaskResult<TError>
+static Spinneret.Functional.TaskResultExtensions.AsTaskResult<TError>(this System.Threading.Tasks.Task<Spinneret.Functional.Result<TError>!>! taskOfResult) -> Spinneret.Functional.TaskResult<TError>
+static Spinneret.Functional.TaskResultExtensions.AsTaskResult<TOk, TError>(this Spinneret.Functional.Result<TOk, TError>! result) -> Spinneret.Functional.TaskResult<TOk, TError>
+static Spinneret.Functional.TaskResultExtensions.AsTaskResult<TOk, TError>(this System.Threading.Tasks.Task<Spinneret.Functional.Result<TOk, TError>!>! taskOfResult) -> Spinneret.Functional.TaskResult<TOk, TError>
+static Spinneret.Functional.TaskResultExtensions.AsTaskResult<TOk, TError>(this System.Threading.Tasks.Task<TOk>! result) -> Spinneret.Functional.TaskResult<TOk, TError>
+static Spinneret.Functional.Unit.operator !=(Spinneret.Functional.Unit left, Spinneret.Functional.Unit right) -> bool
+static Spinneret.Functional.Unit.operator ==(Spinneret.Functional.Unit left, Spinneret.Functional.Unit right) -> bool
+static Spinneret.Functional.Unit.Value.get -> Spinneret.Functional.Unit
+~override Spinneret.Functional.TaskResult<TError>.Equals(object obj) -> bool
+~override Spinneret.Functional.TaskResult<TError>.ToString() -> string
+~override Spinneret.Functional.TaskResult<TOk, TError>.Equals(object obj) -> bool
+~override Spinneret.Functional.TaskResult<TOk, TError>.ToString() -> string
+~override Spinneret.Functional.Unit.Equals(object obj) -> bool
+~override Spinneret.Functional.Unit.ToString() -> string

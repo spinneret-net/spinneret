@@ -10,14 +10,14 @@ internal static class Expect
 {
     public static TOk Ok<TOk, TError>(Result<TOk, TError> result)
     {
-        return result.Reduce(
+        return result.Match(
             v => v,
             e => throw new InvalidOperationException($"Expected Ok. Got error: {Describe(e)}"));
     }
 
     public static TError Error<TOk, TError>(Result<TOk, TError> result)
     {
-        return result.Reduce(
+        return result.Match(
             v => throw new InvalidOperationException($"Expected Error. Got ok: {v?.ToString() ?? "<null>"}"),
             e => e);
     }
@@ -35,7 +35,7 @@ internal static class Expect
     }
 
     public static InvalidProperty<TError> SingleError<TParsed, TError>(
-        Result<TParsed, IEnumerable<InvalidProperty<TError>>> result)
+        Result<TParsed, IReadOnlyList<InvalidProperty<TError>>> result)
     {
         return Single(Error(result));
     }

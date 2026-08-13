@@ -12,8 +12,8 @@ using Spinneret.Queue.Gcp;
 namespace Spinneret.Scheduler.Gcp.Tests;
 
 /// <summary>
-/// Exercises endpoint registration metadata (against the shipped assembly via the public
-/// <c>StartupExtensions.MapGcpSchedulerDispatch</c>) and the handler's failure path (against the
+/// Exercises endpoint registration metadata (via the internal endpoint, since the public
+/// <c>MapGcpSchedulerDispatch</c> wrapper fail-fasts without FirestoreDb) and the handler's failure path (against the
 /// source-linked copy, whose dispatcher can be constructed with a null FirestoreDb so the sweep
 /// throws). The success path requires a live Firestore query and is intentionally out of scope.
 /// </summary>
@@ -24,7 +24,7 @@ public class SchedulerDispatchEndpointTests
     {
         var builder = CreateRouteBuilder([]);
 
-        StartupExtensions.MapGcpSchedulerDispatch(builder);
+        SchedulerDispatchEndpoint.MapGcpSchedulerDispatch(builder, "/internal/scheduler/dispatch");
 
         var endpoint = (RouteEndpoint)builder.DataSources.Single().Endpoints.Single();
         await Assert.That(endpoint.RoutePattern.RawText).IsEqualTo("/internal/scheduler/dispatch");
@@ -37,7 +37,7 @@ public class SchedulerDispatchEndpointTests
     {
         var builder = CreateRouteBuilder([]);
 
-        StartupExtensions.MapGcpSchedulerDispatch(builder);
+        SchedulerDispatchEndpoint.MapGcpSchedulerDispatch(builder, "/internal/scheduler/dispatch");
 
         var endpoint = builder.DataSources.Single().Endpoints.Single();
         var authorize = endpoint.Metadata.GetMetadata<IAuthorizeData>();
@@ -50,7 +50,7 @@ public class SchedulerDispatchEndpointTests
     {
         var builder = CreateRouteBuilder([]);
 
-        StartupExtensions.MapGcpSchedulerDispatch(builder);
+        SchedulerDispatchEndpoint.MapGcpSchedulerDispatch(builder, "/internal/scheduler/dispatch");
 
         var endpoint = builder.DataSources.Single().Endpoints.Single();
         await Assert.That(endpoint.Metadata.GetMetadata<IExcludeFromDescriptionMetadata>()).IsNotNull();
@@ -61,7 +61,7 @@ public class SchedulerDispatchEndpointTests
     {
         var builder = CreateRouteBuilder([]);
 
-        var returned = StartupExtensions.MapGcpSchedulerDispatch(builder);
+        var returned = SchedulerDispatchEndpoint.MapGcpSchedulerDispatch(builder, "/internal/scheduler/dispatch");
 
         await Assert.That(returned).IsSameReferenceAs(builder);
     }
@@ -81,7 +81,7 @@ public class SchedulerDispatchEndpointTests
             new FakeDeadLetterWriter(),
             NullLogger<GcpSchedulerDispatcher>.Instance));
         var builder = CreateRouteBuilder(services);
-        SchedulerDispatchEndpoint.MapGcpSchedulerDispatch(builder);
+        SchedulerDispatchEndpoint.MapGcpSchedulerDispatch(builder, "/internal/scheduler/dispatch");
         var endpoint = builder.DataSources.Single().Endpoints.Single();
         var httpContext = new DefaultHttpContext { RequestServices = builder.ServiceProvider };
 
@@ -89,6 +89,16 @@ public class SchedulerDispatchEndpointTests
 
         await Assert.That(httpContext.Response.StatusCode)
             .IsEqualTo(StatusCodes.Status500InternalServerError);
+    }
+
+    [Test]
+    public async Task Public_MapGcpSchedulerDispatch_without_firestore_db_fails_at_map_time()
+    {
+        var builder = CreateRouteBuilder([]);
+
+        var ex = Assert.Throws<InvalidOperationException>(() => builder.MapGcpSchedulerDispatch());
+
+        await Assert.That(ex.Message).Contains("FirestoreDb");
     }
 
     private static TestEndpointRouteBuilder CreateRouteBuilder(ServiceCollection services)

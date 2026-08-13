@@ -29,21 +29,21 @@ public class TaskResultTests
     }
 
     [Test]
-    public async Task Reduce_on_ok_invokes_success_case()
+    public async Task Match_on_ok_invokes_success_case()
     {
         var taskResult = TaskResult.Ok<int, string>(42);
 
-        var reduced = await taskResult.Reduce(ok => $"ok:{ok}", error => $"error:{error}");
+        var reduced = await taskResult.Match(ok => $"ok:{ok}", error => $"error:{error}");
 
         await Assert.That(reduced).IsEqualTo("ok:42");
     }
 
     [Test]
-    public async Task Reduce_on_error_invokes_error_case()
+    public async Task Match_on_error_invokes_error_case()
     {
         var taskResult = TaskResult.Error<int, string>("boom");
 
-        var reduced = await taskResult.Reduce(ok => $"ok:{ok}", error => $"error:{error}");
+        var reduced = await taskResult.Match(ok => $"ok:{ok}", error => $"error:{error}");
 
         await Assert.That(reduced).IsEqualTo("error:boom");
     }
@@ -99,7 +99,7 @@ public class TaskResultTests
     {
         var taskResult = TaskResult.Ok<int, string>(42);
 
-        var ignored = await taskResult.Ignore<int>();
+        var ignored = await taskResult.Ignore();
 
         await Assert.That(ignored).IsEqualTo(Result.Ok<string>());
     }
@@ -109,7 +109,7 @@ public class TaskResultTests
     {
         var taskResult = TaskResult.Error<int, string>("boom");
 
-        var ignored = await taskResult.Ignore<int>();
+        var ignored = await taskResult.Ignore();
 
         await Assert.That(ignored).IsEqualTo(Result.Error<string>("boom"));
     }
@@ -337,21 +337,21 @@ public class UnitTaskResultTests
     }
 
     [Test]
-    public async Task Reduce_on_ok_invokes_success_case()
+    public async Task Match_on_ok_invokes_success_case()
     {
         var taskResult = TaskResult.Ok<string>();
 
-        var reduced = await taskResult.Reduce(() => "ok", error => $"error:{error}");
+        var reduced = await taskResult.Match(() => "ok", error => $"error:{error}");
 
         await Assert.That(reduced).IsEqualTo("ok");
     }
 
     [Test]
-    public async Task Reduce_on_error_invokes_error_case()
+    public async Task Match_on_error_invokes_error_case()
     {
         var taskResult = TaskResult.Error("boom");
 
-        var reduced = await taskResult.Reduce(() => "ok", error => $"error:{error}");
+        var reduced = await taskResult.Match(() => "ok", error => $"error:{error}");
 
         await Assert.That(reduced).IsEqualTo("error:boom");
     }

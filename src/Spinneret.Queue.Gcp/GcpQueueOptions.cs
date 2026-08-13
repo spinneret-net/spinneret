@@ -12,7 +12,7 @@ public sealed class GcpQueueOptions
     /// <c>[QueuePolicy(Channel = ...)]</c> and rides <see cref="QueuePolicy.DefaultChannel"/> when it
     /// declares none, so that entry is mandatory; every other declared channel must be mapped here too.
     /// </summary>
-    public Dictionary<string, string> Channels { get; set; } = new();
+    public Dictionary<string, string> Channels { get; set; } = new(StringComparer.Ordinal);
 
     /// <summary>
     /// Absolute URL Cloud Tasks should POST to with each dispatched task.

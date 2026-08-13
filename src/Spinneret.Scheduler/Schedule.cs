@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using Cronos;
 
 namespace Spinneret.Scheduler;
@@ -149,6 +150,27 @@ public sealed record Schedule
             // Parse promises FormatException for any non-canonical text — a well-formed wrapper
             // around an expression the schedule rejects is still non-canonical.
             throw new FormatException($"Invalid schedule '{text}': {ex.Message}", ex);
+        }
+    }
+
+    /// <summary>
+    /// Non-throwing counterpart of <see cref="Parse"/>, for probing text whose origin makes
+    /// invalidity an expected case (user input, external configuration).
+    /// </summary>
+    public static bool TryParse(string? text, [NotNullWhen(true)] out Schedule? schedule)
+    {
+        schedule = null;
+        if (string.IsNullOrWhiteSpace(text))
+            return false;
+
+        try
+        {
+            schedule = Parse(text);
+            return true;
+        }
+        catch (FormatException)
+        {
+            return false;
         }
     }
 

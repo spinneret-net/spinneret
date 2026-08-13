@@ -108,7 +108,8 @@ internal sealed class MssqlQueueWorker(
             }
 
             var processor = scope.ServiceProvider.GetRequiredService<IQueueDeliveryProcessor>();
-            var outcome = await processor.ProcessAsync(envelope, id.InvariantTaskId(), ct);
+            var outcome = await processor.ProcessAsync(
+                new QueueDeliveryContext { Envelope = envelope, TaskId = id.InvariantTaskId() }, ct);
 
             if (outcome.Ack)
             {

@@ -20,10 +20,10 @@ public sealed class QueueDispatchEndpointTests
         public QueueEnvelope? Envelope { get; private set; }
         public string? TaskId { get; private set; }
 
-        public Task<QueueDeliveryOutcome> ProcessAsync(QueueEnvelope envelope, string taskId, CancellationToken ct)
+        public Task<QueueDeliveryOutcome> ProcessAsync(QueueDeliveryContext context, CancellationToken ct)
         {
-            Envelope = envelope;
-            TaskId = taskId;
+            Envelope = context.Envelope;
+            TaskId = context.TaskId;
             return Task.FromResult(Outcome);
         }
     }
@@ -118,11 +118,43 @@ public sealed class QueueDispatchEndpointTests
         var services = new ServiceCollection();
         services.AddLogging();
         services.AddRouting();
+        services.AddSingleton<IDeadLetterWriter, FakeDeadLetterWriter>();
         var builder = new TestEndpointRouteBuilder(services.BuildServiceProvider());
 
         var returned = builder.MapGcpQueueDispatch();
 
         await Assert.That(ReferenceEquals(returned, builder)).IsTrue();
+    }
+
+    [Test]
+    public async Task MapGcpQueueDispatch_without_dead_letter_writer_fails_at_map_time()
+    {
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddRouting();
+        var builder = new TestEndpointRouteBuilder(services.BuildServiceProvider());
+
+        var ex = Assert.Throws<InvalidOperationException>(() => builder.MapGcpQueueDispatch());
+
+        await Assert.That(ex.Message).Contains("IDeadLetterWriter");
+    }
+
+    [Test]
+    public async Task MapGcpQueueDispatch_maps_a_custom_route_pattern()
+    {
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddRouting();
+        services.AddSingleton<IDeadLetterWriter, FakeDeadLetterWriter>();
+        var builder = new TestEndpointRouteBuilder(services.BuildServiceProvider());
+
+        builder.MapGcpQueueDispatch("/hooks/queue");
+
+        var endpoint = builder.DataSources
+            .SelectMany(s => s.Endpoints)
+            .OfType<RouteEndpoint>()
+            .Single();
+        await Assert.That(endpoint.RoutePattern.RawText).IsEqualTo("/hooks/queue");
     }
 
     [Test]

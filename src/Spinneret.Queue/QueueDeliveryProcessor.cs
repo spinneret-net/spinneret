@@ -11,7 +11,7 @@ namespace Spinneret.Queue;
 /// </summary>
 public sealed record QueueDeliveryOutcome
 {
-    public static readonly QueueDeliveryOutcome Acked = new();
+    public static QueueDeliveryOutcome Acked { get; } = new();
     public static QueueDeliveryOutcome RetryIn(TimeSpan after) => new() { RetryAfter = after };
 
     public TimeSpan? RetryAfter { get; private init; }
@@ -30,10 +30,7 @@ public sealed record QueueDeliveryOutcome
 /// </summary>
 public interface IQueueDeliveryProcessor
 {
-    /// <param name="envelope">The delivered envelope.</param>
-    /// <param name="taskId">Transport task id, used as the dead-letter idempotency key.</param>
-    /// <param name="ct"></param>
-    Task<QueueDeliveryOutcome> ProcessAsync(QueueEnvelope envelope, string taskId, CancellationToken ct);
+    Task<QueueDeliveryOutcome> ProcessAsync(QueueDeliveryContext context, CancellationToken ct);
 }
 
 internal sealed class QueueDeliveryProcessor(
@@ -48,21 +45,23 @@ internal sealed class QueueDeliveryProcessor(
 {
     private static readonly TimeSpan DeadLetterWriteRetryBackoff = TimeSpan.FromMinutes(1);
 
-    public async Task<QueueDeliveryOutcome> ProcessAsync(
-        QueueEnvelope envelope, string taskId, CancellationToken ct)
+    public async Task<QueueDeliveryOutcome> ProcessAsync(QueueDeliveryContext context, CancellationToken ct)
     {
+        var envelope = context.Envelope;
+        var taskId = context.TaskId;
+
         QueuePolicy policy;
         try
         {
             policy = registry.Resolve(envelope.RequestTypeName).Policy;
         }
-        catch (InvalidOperationException ex)
+        catch (UnknownRequestTypeException ex)
         {
             // Producer and consumer are out of sync (e.g. a command type renamed across a deploy).
             // No retry can resolve a type that no longer exists.
             logger.LogError(ex, "Queue task for unknown request type {RequestType}; dead-lettering",
                 envelope.RequestTypeName);
-            
+
             return await DeadLetterAsync(envelope, taskId, envelope.PriorFailures + 1, ex.Message, ct);
         }
 
@@ -75,7 +74,7 @@ internal sealed class QueueDeliveryProcessor(
 
         try
         {
-            await dispatchBoundary.ExecuteAsync(envelope, () => dispatcher.Dispatch(envelope, ct), ct);
+            await dispatchBoundary.ExecuteAsync(context, () => dispatcher.Dispatch(envelope, ct), ct);
             return QueueDeliveryOutcome.Acked;
         }
         catch (QueueHandlerRetryAfterException ex)
@@ -89,21 +88,33 @@ internal sealed class QueueDeliveryProcessor(
                 envelope.RequestTypeName, attempt);
             return await DeadLetterAsync(envelope, taskId, attempt, ex.Message, ct);
         }
-        catch (QueueHandlerFailedException ex) when (policy.OnErrorResult == ErrorResultAction.DeadLetter)
+        catch (QueueHandlerFailedException ex)
         {
-            logger.LogError(ex,
-                "Queue handler for {RequestType} returned an error result on attempt {Attempt}; dead-lettering: {@Error}",
-                envelope.RequestTypeName, attempt, ex.Error);
-            return await DeadLetterAsync(envelope, taskId, attempt, ex.Message, ct);
+            // Every ErrorResultAction is handled explicitly: a value this build does not know
+            // (mixed-version deploy) must fail loudly rather than silently behave like Retry.
+            switch (policy.OnErrorResult)
+            {
+                case ErrorResultAction.DeadLetter:
+                    logger.LogError(ex,
+                        "Queue handler for {RequestType} returned an error result on attempt {Attempt}; dead-lettering: {@Error}",
+                        envelope.RequestTypeName, attempt, ex.Error);
+                    return await DeadLetterAsync(envelope, taskId, attempt, ex.Message, ct);
+
+                case ErrorResultAction.Discard:
+                    logger.LogWarning(ex,
+                        "Queue handler for {RequestType} returned an error result; discarding per policy: {@Error}",
+                        envelope.RequestTypeName, ex.Error);
+                    return QueueDeliveryOutcome.Acked;
+
+                case ErrorResultAction.Retry:
+                    return await FailAsync(envelope, policy, attempt, age, ex, taskId, ct);
+
+                default:
+                    throw new InvalidOperationException(
+                        $"Unknown {nameof(ErrorResultAction)} value {policy.OnErrorResult} on {envelope.RequestTypeName}.");
+            }
         }
-        catch (QueueHandlerFailedException ex) when (policy.OnErrorResult == ErrorResultAction.Discard)
-        {
-            logger.LogWarning(ex,
-                "Queue handler for {RequestType} returned an error result; discarding per policy: {@Error}",
-                envelope.RequestTypeName, ex.Error);
-            return QueueDeliveryOutcome.Acked;
-        }
-        catch (Exception ex) // includes QueueHandlerFailedException under ErrorResultAction.Retry
+        catch (Exception ex)
         {
             return await FailAsync(envelope, policy, attempt, age, ex, taskId, ct);
         }

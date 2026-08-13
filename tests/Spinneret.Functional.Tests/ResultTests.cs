@@ -7,7 +7,7 @@ public class ResultTests
     {
         var result = Result.Ok<int, string>(42);
 
-        var reduced = result.Reduce(ok => $"ok:{ok}", error => $"error:{error}");
+        var reduced = result.Match(ok => $"ok:{ok}", error => $"error:{error}");
 
         await Assert.That(reduced).IsEqualTo("ok:42");
     }
@@ -17,7 +17,7 @@ public class ResultTests
     {
         var result = Result.Error<int, string>("boom");
 
-        var reduced = result.Reduce(ok => $"ok:{ok}", error => $"error:{error}");
+        var reduced = result.Match(ok => $"ok:{ok}", error => $"error:{error}");
 
         await Assert.That(reduced).IsEqualTo("error:boom");
     }
@@ -135,7 +135,7 @@ public class ResultTests
     {
         var result = Result.Ok<int, string>(42);
 
-        var ignored = result.Ignore<int>();
+        var ignored = result.Ignore();
 
         await Assert.That(ignored).IsEqualTo(Result.Ok<string>());
     }
@@ -145,7 +145,7 @@ public class ResultTests
     {
         var result = Result.Error<int, string>("boom");
 
-        var ignored = result.Ignore<int>();
+        var ignored = result.Ignore();
 
         await Assert.That(ignored).IsEqualTo(Result.Error<string>("boom"));
     }
@@ -234,26 +234,26 @@ public class ResultTests
     }
 
     [Test]
-    public async Task Iter_on_ok_result_invokes_only_ok_action()
+    public async Task Switch_on_ok_result_invokes_only_ok_action()
     {
         var result = Result.Ok<int, string>(42);
         var okCalls = new List<int>();
         var errorCalls = new List<string>();
 
-        result.Iter(okCalls.Add, errorCalls.Add);
+        result.Switch(okCalls.Add, errorCalls.Add);
 
         await Assert.That(okCalls).IsEquivalentTo([42]);
         await Assert.That(errorCalls.Count).IsEqualTo(0);
     }
 
     [Test]
-    public async Task Iter_on_error_result_invokes_only_error_action()
+    public async Task Switch_on_error_result_invokes_only_error_action()
     {
         var result = Result.Error<int, string>("boom");
         var okCalls = new List<int>();
         var errorCalls = new List<string>();
 
-        result.Iter(okCalls.Add, errorCalls.Add);
+        result.Switch(okCalls.Add, errorCalls.Add);
 
         await Assert.That(okCalls.Count).IsEqualTo(0);
         await Assert.That(errorCalls).IsEquivalentTo(["boom"]);
@@ -314,6 +314,28 @@ public class ResultTests
 
         await Assert.That(ok).IsNotEqualTo(error);
     }
+
+    [Test]
+    public async Task ToString_names_the_outcome_and_value()
+    {
+        await Assert.That(Result.Ok<int, string>(42).ToString()).IsEqualTo("Ok(42)");
+        await Assert.That(Result.Error<int, string>("boom").ToString()).IsEqualTo("Error(boom)");
+        await Assert.That(Result.Ok<string>().ToString()).IsEqualTo("Ok");
+        await Assert.That(Result.Error("boom").ToString()).IsEqualTo("Error(boom)");
+    }
+
+    [Test]
+    public async Task FromNullable_unwraps_nullable_value_types()
+    {
+        int? present = 7;
+        int? absent = null;
+
+        var ok = Result.FromNullable<int, string>(present, () => "missing");
+        var error = Result.FromNullable<int, string>(absent, () => "missing");
+
+        await Assert.That(ok).IsEqualTo(Result.Ok<int, string>(7));
+        await Assert.That(error).IsEqualTo(Result.Error<int, string>("missing"));
+    }
 }
 
 public class UnitResultTests
@@ -323,7 +345,7 @@ public class UnitResultTests
     {
         var result = Result.Ok<string>();
 
-        var reduced = result.Reduce(() => "ok", error => $"error:{error}");
+        var reduced = result.Match(() => "ok", error => $"error:{error}");
 
         await Assert.That(reduced).IsEqualTo("ok");
     }
@@ -333,7 +355,7 @@ public class UnitResultTests
     {
         var result = Result.Error("boom");
 
-        var reduced = result.Reduce(() => "ok", error => $"error:{error}");
+        var reduced = result.Match(() => "ok", error => $"error:{error}");
 
         await Assert.That(reduced).IsEqualTo("error:boom");
     }
@@ -522,26 +544,26 @@ public class UnitResultTests
     }
 
     [Test]
-    public async Task Iter_on_ok_result_invokes_only_ok_action()
+    public async Task Switch_on_ok_result_invokes_only_ok_action()
     {
         var result = Result.Ok<string>();
         var okCalls = 0;
         var errorCalls = new List<string>();
 
-        result.Iter(() => okCalls++, errorCalls.Add);
+        result.Switch(() => okCalls++, errorCalls.Add);
 
         await Assert.That(okCalls).IsEqualTo(1);
         await Assert.That(errorCalls.Count).IsEqualTo(0);
     }
 
     [Test]
-    public async Task Iter_on_error_result_invokes_only_error_action()
+    public async Task Switch_on_error_result_invokes_only_error_action()
     {
         var result = Result.Error("boom");
         var okCalls = 0;
         var errorCalls = new List<string>();
 
-        result.Iter(() => okCalls++, errorCalls.Add);
+        result.Switch(() => okCalls++, errorCalls.Add);
 
         await Assert.That(okCalls).IsEqualTo(0);
         await Assert.That(errorCalls).IsEquivalentTo(["boom"]);

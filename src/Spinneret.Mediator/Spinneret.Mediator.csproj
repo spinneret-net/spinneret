@@ -13,6 +13,10 @@
         <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.9" />
     </ItemGroup>
 
+    <ItemGroup>
+        <ProjectReference Include="..\Spinneret.Functional\Spinneret.Functional.csproj" />
+    </ItemGroup>
+
     <PropertyGroup>
         <Description>Lightweight in-process request dispatch with declarative, tag-invalidated caching and request coalescing.</Description>
         <PackageTags>$(PackageTags) mediator cqrs cache caching</PackageTags>

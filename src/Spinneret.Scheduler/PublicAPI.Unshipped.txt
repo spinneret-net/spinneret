@@ -1,0 +1,29 @@
+#nullable enable
+Microsoft.Extensions.DependencyInjection.SchedulerServiceCollectionExtensions
+override Spinneret.Scheduler.Schedule.Equals(object? obj) -> bool
+override Spinneret.Scheduler.Schedule.GetHashCode() -> int
+override Spinneret.Scheduler.Schedule.ToString() -> string!
+Spinneret.Scheduler.IRecurringJob
+Spinneret.Scheduler.IRecurringJob.CreateRequest() -> Spinneret.Mediator.IRequest<Spinneret.Functional.Unit>!
+Spinneret.Scheduler.IRecurringJob.Key.get -> string!
+Spinneret.Scheduler.IRecurringJob.Schedule.get -> Spinneret.Scheduler.Schedule!
+Spinneret.Scheduler.IRecurringJobScheduler
+Spinneret.Scheduler.IRecurringJobScheduler.RegisterAsync(string! key, Spinneret.Mediator.IRequest<Spinneret.Functional.Unit>! request, Spinneret.Scheduler.Schedule! schedule, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Spinneret.Scheduler.IRecurringJobScheduler.UnregisterAsync(string! key, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Spinneret.Scheduler.IRetiredRecurringJob
+Spinneret.Scheduler.IRetiredRecurringJob.Key.get -> string!
+Spinneret.Scheduler.Schedule
+Spinneret.Scheduler.Schedule.<Clone>$() -> Spinneret.Scheduler.Schedule!
+Spinneret.Scheduler.Schedule.Equals(Spinneret.Scheduler.Schedule? other) -> bool
+Spinneret.Scheduler.Schedule.Expression.get -> string!
+Spinneret.Scheduler.Schedule.NextRun(System.DateTimeOffset now) -> System.DateTimeOffset
+Spinneret.Scheduler.Schedule.TimeZoneId.get -> string!
+static Microsoft.Extensions.DependencyInjection.SchedulerServiceCollectionExtensions.AddRecurringJob(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, string! key, Spinneret.Scheduler.Schedule! schedule, System.Func<Spinneret.Mediator.IRequest<Spinneret.Functional.Unit>!>! requestFactory) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static Microsoft.Extensions.DependencyInjection.SchedulerServiceCollectionExtensions.AddRecurringJobInstaller(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static Microsoft.Extensions.DependencyInjection.SchedulerServiceCollectionExtensions.RetireRecurringJob(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, string! key) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static Spinneret.Scheduler.Schedule.Cron(string! expression, string! timeZoneId) -> Spinneret.Scheduler.Schedule!
+static Spinneret.Scheduler.Schedule.Cron(string! expression, System.TimeZoneInfo! zone) -> Spinneret.Scheduler.Schedule!
+static Spinneret.Scheduler.Schedule.operator !=(Spinneret.Scheduler.Schedule? left, Spinneret.Scheduler.Schedule? right) -> bool
+static Spinneret.Scheduler.Schedule.operator ==(Spinneret.Scheduler.Schedule? left, Spinneret.Scheduler.Schedule? right) -> bool
+static Spinneret.Scheduler.Schedule.Parse(string! text) -> Spinneret.Scheduler.Schedule!
+static Spinneret.Scheduler.Schedule.TryParse(string? text, out Spinneret.Scheduler.Schedule? schedule) -> bool

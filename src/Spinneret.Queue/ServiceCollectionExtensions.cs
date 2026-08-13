@@ -1,10 +1,12 @@
 using System.Reflection;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Spinneret.Queue;
 
-namespace Spinneret.Queue;
+// ReSharper disable once CheckNamespace — deliberate: registration extensions live in the
+// DI namespace so every Add* call is discoverable without a using directive.
+namespace Microsoft.Extensions.DependencyInjection;
 
-public static class StartupExtensions
+public static class QueueCoreServiceCollectionExtensions
 {
     /// <summary>
     /// Registers transport-agnostic queue infrastructure: the type registry, the

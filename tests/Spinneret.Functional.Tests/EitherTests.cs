@@ -5,46 +5,46 @@ namespace Spinneret.Functional.Tests;
 public class EitherTests
 {
     [Test]
-    public async Task Reduce_on_first_branch_invokes_first_function()
+    public async Task Match_on_first_branch_invokes_first_function()
     {
         var either = new Either<int, string>(42);
 
-        var reduced = either.Reduce(i => $"first:{i}", s => $"second:{s}");
+        var reduced = either.Match(i => $"first:{i}", s => $"second:{s}");
 
         await Assert.That(reduced).IsEqualTo("first:42");
     }
 
     [Test]
-    public async Task Reduce_on_second_branch_invokes_second_function()
+    public async Task Match_on_second_branch_invokes_second_function()
     {
         var either = new Either<int, string>("hello");
 
-        var reduced = either.Reduce(i => $"first:{i}", s => $"second:{s}");
+        var reduced = either.Match(i => $"first:{i}", s => $"second:{s}");
 
         await Assert.That(reduced).IsEqualTo("second:hello");
     }
 
     [Test]
-    public async Task Iter_on_first_branch_invokes_only_first_action()
+    public async Task Switch_on_first_branch_invokes_only_first_action()
     {
         var either = new Either<int, string>(7);
         var firstCalls = new List<int>();
         var secondCalls = new List<string>();
 
-        either.Iter(firstCalls.Add, secondCalls.Add);
+        either.Switch(firstCalls.Add, secondCalls.Add);
 
         await Assert.That(firstCalls).IsEquivalentTo([7]);
         await Assert.That(secondCalls.Count).IsEqualTo(0);
     }
 
     [Test]
-    public async Task Iter_on_second_branch_invokes_only_second_action()
+    public async Task Switch_on_second_branch_invokes_only_second_action()
     {
         var either = new Either<int, string>("hello");
         var firstCalls = new List<int>();
         var secondCalls = new List<string>();
 
-        either.Iter(firstCalls.Add, secondCalls.Add);
+        either.Switch(firstCalls.Add, secondCalls.Add);
 
         await Assert.That(firstCalls.Count).IsEqualTo(0);
         await Assert.That(secondCalls).IsEquivalentTo(["hello"]);
@@ -57,7 +57,7 @@ public class EitherTests
 
         var mapped = either.Map(i => i * 2, s => s.Length.ToString());
 
-        var reduced = mapped.Reduce(i => $"first:{i}", s => $"second:{s}");
+        var reduced = mapped.Match(i => $"first:{i}", s => $"second:{s}");
         await Assert.That(reduced).IsEqualTo("first:42");
     }
 
@@ -68,7 +68,7 @@ public class EitherTests
 
         var mapped = either.Map(i => (long)i, s => s.ToUpperInvariant());
 
-        var reduced = mapped.Reduce(l => $"first:{l}", s => $"second:{s}");
+        var reduced = mapped.Match(l => $"first:{l}", s => $"second:{s}");
         await Assert.That(reduced).IsEqualTo("second:HELLO");
     }
 
@@ -94,7 +94,7 @@ public class EitherTests
 
         var reversed = either.Reverse();
 
-        var reduced = reversed.Reduce(s => $"first:{s}", i => $"second:{i}");
+        var reduced = reversed.Match(s => $"first:{s}", i => $"second:{i}");
         await Assert.That(reduced).IsEqualTo("second:5");
     }
 
@@ -105,7 +105,7 @@ public class EitherTests
 
         var reversed = either.Reverse();
 
-        var reduced = reversed.Reduce(s => $"first:{s}", i => $"second:{i}");
+        var reduced = reversed.Match(s => $"first:{s}", i => $"second:{i}");
         await Assert.That(reduced).IsEqualTo("first:hello");
     }
 
@@ -226,5 +226,41 @@ public class EitherTests
         var deserialized = JsonSerializer.Deserialize<Either<int, string>>(json);
 
         await Assert.That(deserialized).IsEqualTo(either);
+    }
+
+    [Test]
+    public async Task Json_wire_contract_is_tag_value1_value2()
+    {
+        // Pins the persisted shape: renaming the private fields breaks stored data.
+        var json = JsonSerializer.Serialize(new Either<int, string>(42));
+
+        await Assert.That(json).IsEqualTo("""{"tag":1,"value1":42,"value2":null}""");
+    }
+
+    [Test]
+    public async Task First_factory_selects_first_branch_when_types_are_ambiguous()
+    {
+        var either = Either<string, string>.First("value");
+
+        var matched = either.Match(s => $"first:{s}", s => $"second:{s}");
+
+        await Assert.That(matched).IsEqualTo("first:value");
+    }
+
+    [Test]
+    public async Task Second_factory_selects_second_branch_when_types_are_ambiguous()
+    {
+        var either = Either<string, string>.Second("value");
+
+        var matched = either.Match(s => $"first:{s}", s => $"second:{s}");
+
+        await Assert.That(matched).IsEqualTo("second:value");
+    }
+
+    [Test]
+    public async Task ToString_names_the_branch_and_value()
+    {
+        await Assert.That(new Either<int, string>(42).ToString()).IsEqualTo("First(42)");
+        await Assert.That(new Either<int, string>("hi").ToString()).IsEqualTo("Second(hi)");
     }
 }

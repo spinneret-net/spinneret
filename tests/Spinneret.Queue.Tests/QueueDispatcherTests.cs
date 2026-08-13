@@ -101,12 +101,12 @@ public class QueueDispatcherTests
     }
 
     [Test]
-    public async Task Dispatch_unknown_request_type_throws_invalid_operation_before_deserializing()
+    public async Task Dispatch_unknown_request_type_throws_unknown_request_type_before_deserializing()
     {
         var dispatcher = CreateDispatcher();
         var envelope = Envelope<UnannotatedCommand>() with { RequestTypeName = "No.Such.Type" };
 
-        await Assert.ThrowsAsync<InvalidOperationException>(
+        await Assert.ThrowsAsync<UnknownRequestTypeException>(
             () => dispatcher.Dispatch(envelope, CancellationToken.None));
 
         await Assert.That(_mediator.Calls).IsEqualTo(0);

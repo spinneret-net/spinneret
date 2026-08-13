@@ -1,0 +1,32 @@
+#nullable enable
+const Spinneret.Queue.Mssql.MssqlQueueOptions.SectionName = "Queue:Mssql" -> string!
+Microsoft.Extensions.DependencyInjection.MssqlQueueServiceCollectionExtensions
+Spinneret.Queue.Mssql.IMssqlTransactionalQueue
+Spinneret.Queue.Mssql.IMssqlTransactionalQueue.Enqueue(Spinneret.Mediator.IRequest<Spinneret.Functional.Unit>! request, System.Data.Common.DbTransaction! transaction, Spinneret.Queue.QueueOptions? options = null, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Spinneret.Queue.Mssql.IMssqlTransactionalQueue.Enqueue<TResponse>(Spinneret.Mediator.IRequest<TResponse>! request, System.Data.Common.DbTransaction! transaction, Spinneret.Queue.QueueOptions? options = null, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Spinneret.Queue.Mssql.IMssqlTransactionProvider
+Spinneret.Queue.Mssql.IMssqlTransactionProvider.Current.get -> System.Data.Common.DbTransaction?
+Spinneret.Queue.Mssql.IMssqlTransactionProvider.Use(System.Data.Common.DbTransaction? transaction) -> void
+Spinneret.Queue.Mssql.MssqlQueueOptions
+Spinneret.Queue.Mssql.MssqlQueueOptions.ChannelParallelism.get -> System.Collections.Generic.Dictionary<string!, int>!
+Spinneret.Queue.Mssql.MssqlQueueOptions.ChannelParallelism.set -> void
+Spinneret.Queue.Mssql.MssqlQueueOptions.ConnectionString.get -> string!
+Spinneret.Queue.Mssql.MssqlQueueOptions.ConnectionString.set -> void
+Spinneret.Queue.Mssql.MssqlQueueOptions.ConnectionStringName.get -> string?
+Spinneret.Queue.Mssql.MssqlQueueOptions.ConnectionStringName.set -> void
+Spinneret.Queue.Mssql.MssqlQueueOptions.CreateSchema.get -> bool
+Spinneret.Queue.Mssql.MssqlQueueOptions.CreateSchema.set -> void
+Spinneret.Queue.Mssql.MssqlQueueOptions.DeadLetterTableName.get -> string!
+Spinneret.Queue.Mssql.MssqlQueueOptions.DeadLetterTableName.set -> void
+Spinneret.Queue.Mssql.MssqlQueueOptions.MssqlQueueOptions() -> void
+Spinneret.Queue.Mssql.MssqlQueueOptions.PollInterval.get -> System.TimeSpan
+Spinneret.Queue.Mssql.MssqlQueueOptions.PollInterval.set -> void
+Spinneret.Queue.Mssql.MssqlQueueOptions.QueueTableName.get -> string!
+Spinneret.Queue.Mssql.MssqlQueueOptions.QueueTableName.set -> void
+Spinneret.Queue.Mssql.MssqlQueueOptions.SchemaName.get -> string!
+Spinneret.Queue.Mssql.MssqlQueueOptions.SchemaName.set -> void
+Spinneret.Queue.Mssql.MssqlQueueSchema
+static Microsoft.Extensions.DependencyInjection.MssqlQueueServiceCollectionExtensions.AddMssqlQueue(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, Microsoft.Extensions.Configuration.IConfiguration! configuration, params System.Reflection.Assembly![]! requestAssemblies) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static Microsoft.Extensions.DependencyInjection.MssqlQueueServiceCollectionExtensions.AddMssqlQueue(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Spinneret.Queue.Mssql.MssqlQueueOptions!>! configure, params System.Reflection.Assembly![]! requestAssemblies) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static Microsoft.Extensions.DependencyInjection.MssqlQueueServiceCollectionExtensions.AddMssqlQueueWorker(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static Spinneret.Queue.Mssql.MssqlQueueSchema.CreateScript(Spinneret.Queue.Mssql.MssqlQueueOptions! options) -> string!

@@ -219,13 +219,13 @@ public class PropertyParserCoreTests
             StringProperty = "test"
         });
 
-        var parseRes = ModelParser.Parse(sut, parser => parser.Either(
+        var parseRes = ModelParser.Parse(sut, parser => parser.ParseEither(
             (_, p) => new ChildClass { StringProperty = p.Require(x => x.StringProperty) },
             (x, _) => x));
 
         var res = Expect.Ok(parseRes);
 
-        var parsedChild = res.Reduce(
+        var parsedChild = res.Match(
             child => child,
             _ => throw new InvalidOperationException("Expected first alternative."));
 
@@ -237,13 +237,13 @@ public class PropertyParserCoreTests
     {
         var sut = new Either<ChildClass, int>(41);
 
-        var parseRes = ModelParser.Parse(sut, parser => parser.Either(
+        var parseRes = ModelParser.Parse(sut, parser => parser.ParseEither(
             (x, _) => x,
             (x, _) => x + 1));
 
         var res = Expect.Ok(parseRes);
 
-        var parsedValue = res.Reduce(
+        var parsedValue = res.Match(
             _ => throw new InvalidOperationException("Expected second alternative."),
             value => value);
 
@@ -258,7 +258,7 @@ public class PropertyParserCoreTests
             StringProperty = null!
         });
 
-        var parseRes = ModelParser.Parse(sut, parser => parser.Either(
+        var parseRes = ModelParser.Parse(sut, parser => parser.ParseEither(
             (_, p) => new ChildClass { StringProperty = p.Require(x => x.StringProperty) },
             (x, _) => x));
 

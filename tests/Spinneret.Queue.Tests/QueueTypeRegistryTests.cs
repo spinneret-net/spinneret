@@ -55,11 +55,11 @@ public class QueueTypeRegistryTests
     }
 
     [Test]
-    public async Task Resolve_unknown_type_name_throws_invalid_operation()
+    public async Task Resolve_unknown_type_name_throws_unknown_request_type()
     {
         var registry = CreateRegistry();
 
-        var ex = Assert.Throws<InvalidOperationException>(() => registry.Resolve("No.Such.Type"));
+        var ex = Assert.Throws<UnknownRequestTypeException>(() => registry.Resolve("No.Such.Type"));
 
         await Assert.That(ex.Message).Contains("No.Such.Type");
         await Assert.That(ex.Message).Contains("out of sync");
@@ -186,7 +186,7 @@ public class QueueTypeRegistryTests
         // response type; the registry rejects it at boot instead of registering whichever
         // interface enumeration happens to yield last.
         var assembly = DynamicRequestAssembly.WithRequest(
-            "Dyn.DualInterfaceCommand", [typeof(Spinneret.Mediator.Unit), typeof(string)]);
+            "Dyn.DualInterfaceCommand", [typeof(Spinneret.Functional.Unit), typeof(string)]);
 
         var ex = Assert.Throws<InvalidOperationException>(() => new QueueTypeRegistry([assembly]));
 

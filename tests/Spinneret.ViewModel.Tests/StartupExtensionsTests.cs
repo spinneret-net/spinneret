@@ -35,13 +35,13 @@ public class StartupExtensionsTests
         var parser = provider.GetRequiredService<IViewModelParser<TestError>>();
         var viewModel = new FormViewModel();
 
-        parser.Parse(
+        var result = parser.ParseChecked(
             viewModel,
             null,
             p => p.Parse(
                 x => x.Name,
-                _ => Result<string, TestError>.Error(new TestError("bad-name"))),
-            out var isValid);
+                _ => Result<string, TestError>.Error(new TestError("bad-name"))));
+        var isValid = result.IsValid;
 
         await Assert.That(isValid).IsFalse();
         await Assert.That(viewModel.ValidationState.GetError("Name")).IsEqualTo("loc:bad-name");
@@ -54,7 +54,7 @@ public class StartupExtensionsTests
         var parser = provider.GetRequiredService<IViewModelParser<TestError>>();
         var viewModel = new FormViewModel { Name = null };
 
-        parser.Parse(viewModel, null, p => p.Require(x => x.Name), out var isValid);
+        var isValid = parser.ParseChecked(viewModel, null, p => p.Require(x => x.Name)).IsValid;
 
         await Assert.That(isValid).IsFalse();
         await Assert.That(viewModel.ValidationState.GetError("Name")).IsEqualTo("loc:missing");

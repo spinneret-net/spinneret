@@ -3,37 +3,51 @@ using Spinneret.Parsing;
 
 namespace Spinneret.ViewModel;
 
-public interface IViewModelParser<TParseError> where TParseError: ILocalizable
+/// <summary>
+/// The outcome of parsing a view model: whether it was valid, and the parsed value.
+/// <see cref="Value"/> can be null for a valid view model whose parse function chose to
+/// produce nothing — only <see cref="IsValid"/> distinguishes the two.
+/// </summary>
+public sealed record ViewModelParseResult<TParsed>
+{
+    public required bool IsValid { get; init; }
+    public TParsed? Value { get; init; }
+}
+
+/// <summary>
+/// Parses a view model with the same parse-don't-validate machinery as the HTTP boundary,
+/// binding each error to the view-model property that caused it. Implemented by the library —
+/// register with AddViewModelParser and inject.
+/// </summary>
+public interface IViewModelParser<TParseError> where TParseError : ILocalizable
 {
     TParsed? Parse<TViewModel, TParsed>(
         TViewModel viewModel,
         ICollection<string>? propertiesToValidate,
         Func<PropertyParser<TViewModel, TParseError>, TParsed> parseFn)
         where TViewModel : IValidationStateProvider =>
-        Parse(viewModel, propertiesToValidate, parseFn, out _);
+        ParseChecked(viewModel, propertiesToValidate, parseFn).Value;
 
     /// <summary>
-    /// Parses, and reports through <paramref name="isValid"/> whether the view model held a value the
-    /// parser rejected. A parse function is free to return <c>null</c> for a well-formed view model that
-    /// has nothing to send — a null result therefore does not mean invalid, and only this overload can
-    /// tell the two apart.
+    /// Parses, and reports whether the view model held a value the parser rejected. A parse
+    /// function is free to return <c>null</c> for a well-formed view model that has nothing to
+    /// send — a null value therefore does not mean invalid, and only this overload can tell
+    /// the two apart.
     /// </summary>
-    TParsed? Parse<TViewModel, TParsed>(
+    ViewModelParseResult<TParsed> ParseChecked<TViewModel, TParsed>(
         TViewModel viewModel,
         ICollection<string>? propertiesToValidate,
-        Func<PropertyParser<TViewModel, TParseError>, TParsed> parseFn,
-        out bool isValid)
+        Func<PropertyParser<TViewModel, TParseError>, TParsed> parseFn)
         where TViewModel : IValidationStateProvider;
 }
 
-public class ViewModelParser<TParseError>(IStringLocalizer localizer, TParseError missingPropertyError) : IViewModelParser<TParseError>
-    where TParseError: ILocalizable
+public sealed class ViewModelParser<TParseError>(IStringLocalizer localizer, TParseError missingPropertyError) : IViewModelParser<TParseError>
+    where TParseError : ILocalizable
 {
-    public TParsed? Parse<TViewModel, TParsed>(
+    public ViewModelParseResult<TParsed> ParseChecked<TViewModel, TParsed>(
         TViewModel viewModel,
         ICollection<string>? propertiesToValidate,
-        Func<PropertyParser<TViewModel, TParseError>, TParsed> parseFn,
-        out bool isValid)
+        Func<PropertyParser<TViewModel, TParseError>, TParsed> parseFn)
         where TViewModel : IValidationStateProvider
     {
         var parsedProperties = new List<string>();
@@ -43,8 +57,6 @@ public class ViewModelParser<TParseError>(IStringLocalizer localizer, TParseErro
 
         var relevantProperties = GetRelevantProperties(parsedProperties, propertiesToValidate);
 
-        isValid = errors.Count == 0;
-
         if (errors.Count == 0)
         {
             foreach (var property in relevantProperties)
@@ -52,7 +64,7 @@ public class ViewModelParser<TParseError>(IStringLocalizer localizer, TParseErro
                 viewModel.ValidationState.RemoveError(property);
             }
 
-            return parsed;
+            return new ViewModelParseResult<TParsed> { IsValid = true, Value = parsed };
         }
 
         var invalidProperties = errors.Where(x => relevantProperties.Contains(x.PropertyName)).ToList();
@@ -60,14 +72,14 @@ public class ViewModelParser<TParseError>(IStringLocalizer localizer, TParseErro
         {
             viewModel.ValidationState.AddError(invalidProperty.PropertyName, invalidProperty.Error.Localize(localizer));
         }
-                
+
         var validProperties = relevantProperties.Except(invalidProperties.Select(x => x.PropertyName));
         foreach (var validProperty in validProperties)
         {
             viewModel.ValidationState.RemoveError(validProperty);
         }
 
-        return default;
+        return new ViewModelParseResult<TParsed> { IsValid = false };
     }
 
     /// <summary>

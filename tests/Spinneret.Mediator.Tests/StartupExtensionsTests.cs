@@ -138,6 +138,18 @@ public class StartupExtensionsTests
     }
 
     [Test]
+    public async Task AddMediator_registers_the_mediator_cache()
+    {
+        var services = new ServiceCollection();
+        services.AddMediator(typeof(StartupExtensionsTests).Assembly);
+        await using var provider = services.BuildServiceProvider();
+
+        var cache = provider.GetService<IMediatorCache>();
+
+        await Assert.That(cache).IsNotNull();
+    }
+
+    [Test]
     public async Task AddMediator_without_arguments_scans_the_entry_assembly()
     {
         // In this test host the entry assembly is the test assembly itself,

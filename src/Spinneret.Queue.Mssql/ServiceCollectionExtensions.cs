@@ -1,12 +1,15 @@
 using System.Reflection;
 using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
+using Spinneret.Queue;
+using Spinneret.Queue.Mssql;
 
-namespace Spinneret.Queue.Mssql;
+// ReSharper disable once CheckNamespace — deliberate: registration extensions live in the
+// DI namespace so every Add* call is discoverable without a using directive.
+namespace Microsoft.Extensions.DependencyInjection;
 
-public static class StartupExtensions
+public static class MssqlQueueServiceCollectionExtensions
 {
     /// <summary>
     /// Registers the SQL Server queue: <see cref="IQueue"/> and <see cref="IMssqlTransactionalQueue"/>
@@ -16,6 +19,8 @@ public static class StartupExtensions
     /// <remarks>
     /// Call <c>AddMssqlQueueWorker()</c> on the host that should consume messages — producers-only
     /// hosts skip it. Configuration is read from the <c>Queue:Mssql</c> section.
+    /// Invalid configuration fails here when bindable, and again at host start via options
+    /// validation for values changed by later Configure/PostConfigure calls.
     /// </remarks>
     public static IServiceCollection AddMssqlQueue(
         this IServiceCollection services,
@@ -23,17 +28,54 @@ public static class StartupExtensions
         params Assembly[] requestAssemblies)
     {
         var section = configuration.GetSection(MssqlQueueOptions.SectionName);
-        services.Configure<MssqlQueueOptions>(section);
-        // The section carries only the name when ConnectionStringName is used; resolve it into
-        // ConnectionString both for the eager validation below and for runtime consumers.
-        services.PostConfigure<MssqlQueueOptions>(o => ResolveConnectionString(o, configuration));
 
         var bound = new MssqlQueueOptions();
         section.Bind(bound);
         ResolveConnectionString(bound, configuration);
 
+        return services.AddMssqlQueueCore(
+            options =>
+            {
+                section.Bind(options);
+                // The section carries only the name when ConnectionStringName is used; resolve it
+                // into ConnectionString for runtime consumers.
+                ResolveConnectionString(options, configuration);
+            },
+            bound,
+            requestAssemblies);
+    }
+
+    /// <summary>
+    /// Overload for hosts that configure the queue in code instead of via
+    /// <see cref="IConfiguration"/> (tests, embedded scenarios).
+    /// </summary>
+    public static IServiceCollection AddMssqlQueue(
+        this IServiceCollection services,
+        Action<MssqlQueueOptions> configure,
+        params Assembly[] requestAssemblies)
+    {
+        var bound = new MssqlQueueOptions();
+        configure(bound);
+
+        return services.AddMssqlQueueCore(configure, bound, requestAssemblies);
+    }
+
+    private static IServiceCollection AddMssqlQueueCore(
+        this IServiceCollection services,
+        Action<MssqlQueueOptions> configure,
+        MssqlQueueOptions eagerlyBound,
+        Assembly[] requestAssemblies)
+    {
         var registry = new QueueTypeRegistry(requestAssemblies);
-        Validate(bound, registry);
+
+        // Fail as early as possible on broken configuration; the options-pipeline validation
+        // below re-validates at host start to also cover later Configure/PostConfigure changes.
+        MssqlQueueOptionsValidator.ValidateOrThrow(eagerlyBound, registry);
+
+        services.AddOptions<MssqlQueueOptions>()
+            .Configure(configure)
+            .ValidateOnStart();
+        services.AddSingleton<IValidateOptions<MssqlQueueOptions>>(new MssqlQueueOptionsValidator(registry));
 
         // The savepoint boundary must win over the pass-through default even when something else
         // (another transport, a direct AddQueueCore call) already registered it — but a custom
@@ -58,7 +100,7 @@ public static class StartupExtensions
     }
 
     /// <summary>
-    /// Registers the polling delivery worker. Separate from <see cref="AddMssqlQueue"/> so hosts
+    /// Registers the polling delivery worker. Separate from <c>AddMssqlQueue</c> so hosts
     /// that only produce (e.g. a public API next to a worker service) never consume messages.
     /// </summary>
     public static IServiceCollection AddMssqlQueueWorker(this IServiceCollection services)
@@ -71,38 +113,5 @@ public static class StartupExtensions
     {
         if (string.IsNullOrWhiteSpace(o.ConnectionString) && !string.IsNullOrWhiteSpace(o.ConnectionStringName))
             o.ConnectionString = configuration.GetConnectionString(o.ConnectionStringName) ?? string.Empty;
-    }
-
-    private static void Validate(MssqlQueueOptions o, QueueTypeRegistry registry)
-    {
-        if (string.IsNullOrWhiteSpace(o.ConnectionString))
-            throw new InvalidOperationException(
-                "Queue:Mssql:ConnectionString must be set — directly, or as a ConnectionStrings entry named by Queue:Mssql:ConnectionStringName.");
-
-        ValidateIdentifier(o.SchemaName, "Queue:Mssql:SchemaName");
-        ValidateIdentifier(o.QueueTableName, "Queue:Mssql:QueueTableName");
-        ValidateIdentifier(o.DeadLetterTableName, "Queue:Mssql:DeadLetterTableName");
-
-        if (o.PollInterval <= TimeSpan.Zero)
-            throw new InvalidOperationException("Queue:Mssql:PollInterval must be positive.");
-
-        // Parallelism keys are validated against the declared channels so a typo fails the host at
-        // boot instead of silently spinning workers for a channel no command rides on.
-        foreach (var (channel, parallelism) in o.ChannelParallelism)
-        {
-            if (channel != QueuePolicy.DefaultChannel && !registry.DeclaredChannels.Contains(channel, StringComparer.Ordinal))
-                throw new InvalidOperationException(
-                    $"Queue:Mssql:ChannelParallelism:{channel} does not match any channel declared by a [QueuePolicy].");
-            if (parallelism < 1)
-                throw new InvalidOperationException(
-                    $"Queue:Mssql:ChannelParallelism:{channel} must be at least 1.");
-        }
-    }
-
-    private static void ValidateIdentifier(string value, string configKey)
-    {
-        if (!Identifier.IsValid(value))
-            throw new InvalidOperationException(
-                $"{configKey} must be a plain SQL identifier (letters, digits, underscore); got '{value}'.");
     }
 }

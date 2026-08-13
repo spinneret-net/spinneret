@@ -1,14 +1,34 @@
 using System.Reflection;
 using System.Runtime.ExceptionServices;
 using Microsoft.Extensions.DependencyInjection;
+using Spinneret.Functional;
 
 namespace Spinneret.Mediator;
 
+/// <summary>
+/// Dispatches requests to their registered handler. Implemented by the library — inject and call.
+/// <para>
+/// Caching contract: when a request type carries <see cref="CacheAttribute"/>, the request
+/// object itself is the cache and coalescing key, so cached request types need value equality
+/// (records are the natural fit). A request type without value equality never hits the cache.
+/// </para>
+/// </summary>
 public interface ISpinneretMediator
 {
+    /// <summary>Sends a request that produces no response.</summary>
     Task Send(IRequest<Unit> request, CancellationToken cancellationToken = default);
+
+    /// <summary>Sends a request and returns its handler's response.</summary>
     Task<TResponse> Send<TResponse>(IRequest<TResponse> request, CancellationToken cancellationToken = default);
-    void ClearCache();
+}
+
+/// <summary>
+/// Controls the mediator's response cache. Implemented by the library — inject and call.
+/// </summary>
+public interface IMediatorCache
+{
+    /// <summary>Removes every cached response.</summary>
+    void Clear();
 }
 
 internal sealed class SpinneretMediator(IServiceProvider serviceProvider, ITagIndexedCache cache) : ISpinneretMediator
@@ -47,8 +67,6 @@ internal sealed class SpinneretMediator(IServiceProvider serviceProvider, ITagIn
         return response;
     }
 
-    public void ClearCache() => cache.Clear();
-
     private Task<TResponse> Dispatch<TResponse>(IRequest<TResponse> request, CancellationToken cancellationToken)
     {
         var handlerType = typeof(IRequestHandler<,>).MakeGenericType(request.GetType(), typeof(TResponse));
@@ -66,4 +84,9 @@ internal sealed class SpinneretMediator(IServiceProvider serviceProvider, ITagIn
             throw; // Unreachable.
         }
     }
+}
+
+internal sealed class MediatorCache(ITagIndexedCache cache) : IMediatorCache
+{
+    public void Clear() => cache.Clear();
 }

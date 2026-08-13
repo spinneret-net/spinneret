@@ -20,7 +20,7 @@ public class ValidationStateTests
 
         await Assert.That(sut.GetError("Name")).IsEqualTo("required");
         await Assert.That(sut.HasErrors).IsTrue();
-        await Assert.That(sut.Errors.ToList()).IsEquivalentTo([("Name", "required")]);
+        await Assert.That(sut.Errors.ToList()).IsEquivalentTo([new ValidationError("Name", "required")]);
     }
 
     [Test]
@@ -174,8 +174,8 @@ public class ValidationStateTests
         sut.AddError("Name", "bound error");
         sut.AddError("Age", "unbound error");
 
-        await Assert.That(sut.BoundErrors.ToList()).IsEquivalentTo([("Name", "bound error")]);
-        await Assert.That(sut.UnboundErrors.ToList()).IsEquivalentTo([("Age", "unbound error")]);
+        await Assert.That(sut.BoundErrors.ToList()).IsEquivalentTo([new ValidationError("Name", "bound error")]);
+        await Assert.That(sut.UnboundErrors.ToList()).IsEquivalentTo([new ValidationError("Age", "unbound error")]);
     }
 
     [Test]
@@ -187,7 +187,7 @@ public class ValidationStateTests
 
         sut.RegisterBoundProperty("Name");
 
-        await Assert.That(sut.BoundErrors.ToList()).IsEquivalentTo([("Name", "required")]);
+        await Assert.That(sut.BoundErrors.ToList()).IsEquivalentTo([new ValidationError("Name", "required")]);
         await Assert.That(string.Join(",", raised)).IsEqualTo("BoundErrors,UnboundErrors");
     }
 

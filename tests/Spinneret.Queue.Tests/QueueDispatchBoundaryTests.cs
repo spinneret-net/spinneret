@@ -106,10 +106,10 @@ internal sealed class RecordingBoundary : IQueueDispatchBoundary
     public List<QueueEnvelope> Envelopes { get; } = [];
     public List<Exception> Observed { get; } = [];
 
-    public async Task ExecuteAsync(QueueEnvelope envelope, Func<Task> dispatch, CancellationToken ct)
+    public async Task ExecuteAsync(QueueDeliveryContext context, Func<Task> dispatch, CancellationToken ct)
     {
         Calls++;
-        Envelopes.Add(envelope);
+        Envelopes.Add(context.Envelope);
         try
         {
             await dispatch();

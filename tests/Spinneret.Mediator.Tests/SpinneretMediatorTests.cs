@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Spinneret.Functional;
 
 namespace Spinneret.Mediator.Tests;
 

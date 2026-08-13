@@ -69,10 +69,6 @@ public class ServerRenderContextTests
         public override HttpRequest Request => throw new NotSupportedException();
         public override ConnectionInfo Connection => throw new NotSupportedException();
         public override WebSocketManager WebSockets => throw new NotSupportedException();
-#pragma warning disable CS0672, CS0618
-        public override Microsoft.AspNetCore.Http.Authentication.AuthenticationManager Authentication =>
-            throw new NotSupportedException();
-#pragma warning restore CS0672, CS0618
         public override ClaimsPrincipal User { get; set; } = new();
         public override IDictionary<object, object> Items { get; set; } = new Dictionary<object, object>();
         public override IServiceProvider RequestServices { get; set; } = null!;

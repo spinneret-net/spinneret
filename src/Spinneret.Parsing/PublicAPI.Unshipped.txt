@@ -1,0 +1,47 @@
+#nullable enable
+Microsoft.Extensions.DependencyInjection.ParsingServiceCollectionExtensions
+override Spinneret.Parsing.InvalidProperty<T>.Equals(object? obj) -> bool
+override Spinneret.Parsing.InvalidProperty<T>.GetHashCode() -> int
+override Spinneret.Parsing.InvalidProperty<T>.ToString() -> string!
+Spinneret.Parsing.ExpressionPropertyPath
+Spinneret.Parsing.ILocalizable
+Spinneret.Parsing.ILocalizable.Localize(Microsoft.Extensions.Localization.IStringLocalizer! localizer) -> string!
+Spinneret.Parsing.IModelParser<TError>
+Spinneret.Parsing.IModelParser<TError>.Parse<TModel, TParsed>(TModel model, System.Func<Spinneret.Parsing.PropertyParser<TModel, TError>!, TParsed>! parseFn) -> Spinneret.Functional.Result<TParsed, System.Collections.Generic.IReadOnlyList<Spinneret.Parsing.InvalidProperty<TError>!>!>!
+Spinneret.Parsing.InvalidProperty<T>
+Spinneret.Parsing.InvalidProperty<T>.<Clone>$() -> Spinneret.Parsing.InvalidProperty<T>!
+Spinneret.Parsing.InvalidProperty<T>.Equals(Spinneret.Parsing.InvalidProperty<T>? other) -> bool
+Spinneret.Parsing.InvalidProperty<T>.Error.get -> T
+Spinneret.Parsing.InvalidProperty<T>.Error.init -> void
+Spinneret.Parsing.InvalidProperty<T>.InvalidProperty() -> void
+Spinneret.Parsing.InvalidProperty<T>.PropertyName.get -> string!
+Spinneret.Parsing.InvalidProperty<T>.PropertyName.init -> void
+Spinneret.Parsing.ModelParser<TError>
+Spinneret.Parsing.ModelParser<TError>.ModelParser(TError missingPropertyError) -> void
+Spinneret.Parsing.ModelParser<TError>.Parse<TModel, TParsed>(TModel model, System.Func<Spinneret.Parsing.PropertyParser<TModel, TError>!, TParsed>! parseFn) -> Spinneret.Functional.Result<TParsed, System.Collections.Generic.IReadOnlyList<Spinneret.Parsing.InvalidProperty<TError>!>!>!
+Spinneret.Parsing.PropertyParser<TModel, TError>
+Spinneret.Parsing.PropertyParser<TModel, TError>.Many<TMember, TParsed>(System.Linq.Expressions.Expression<System.Func<TModel, System.Collections.Generic.IEnumerable<TMember>?>!>! expression, System.Func<TMember, Spinneret.Functional.Result<TParsed, TError>!>! parser) -> System.Collections.Generic.IEnumerable<TParsed>!
+Spinneret.Parsing.PropertyParser<TModel, TError>.Model.get -> TModel
+Spinneret.Parsing.PropertyParser<TModel, TError>.NestMany<TNestedModel, TParsed>(System.Linq.Expressions.Expression<System.Func<TModel, System.Collections.Generic.IEnumerable<TNestedModel>?>!>! expression, System.Func<Spinneret.Parsing.PropertyParser<TNestedModel, TError>!, TParsed>! nestedParser) -> System.Collections.Generic.IEnumerable<TParsed>!
+Spinneret.Parsing.PropertyParser<TModel, TError>.NestOptional<TNestedModel, TParsed>(System.Linq.Expressions.Expression<System.Func<TModel, TNestedModel?>!>! expression, System.Func<Spinneret.Parsing.PropertyParser<TNestedModel!, TError>!, TParsed!>! nestedParser) -> TParsed?
+Spinneret.Parsing.PropertyParser<TModel, TError>.NestOptional<TNestedModel, TParsed>(System.Linq.Expressions.Expression<System.Func<TModel, TNestedModel?>!>! expression, System.Func<Spinneret.Parsing.PropertyParser<TNestedModel, TError>!, TParsed!>! nestedParser) -> TParsed?
+Spinneret.Parsing.PropertyParser<TModel, TError>.NestOptionalStruct<TNestedModel, TParsed>(System.Linq.Expressions.Expression<System.Func<TModel, TNestedModel?>!>! expression, System.Func<Spinneret.Parsing.PropertyParser<TNestedModel!, TError>!, TParsed>! nestedParser) -> TParsed?
+Spinneret.Parsing.PropertyParser<TModel, TError>.NestOptionalStruct<TNestedModel, TParsed>(System.Linq.Expressions.Expression<System.Func<TModel, TNestedModel?>!>! expression, System.Func<Spinneret.Parsing.PropertyParser<TNestedModel, TError>!, TParsed>! nestedParser) -> TParsed?
+Spinneret.Parsing.PropertyParser<TModel, TError>.NestRequired<TNestedModel, TParsed>(System.Linq.Expressions.Expression<System.Func<TModel, TNestedModel>!>! expression, System.Func<Spinneret.Parsing.PropertyParser<TNestedModel, TError>!, TParsed>! nestedParser) -> TParsed
+Spinneret.Parsing.PropertyParser<TModel, TError>.Optional<TMember, TParsed>(System.Linq.Expressions.Expression<System.Func<TModel, TMember?>!>! expression, System.Func<TMember!, Spinneret.Functional.Result<TParsed!, TError>!>! parser) -> TParsed?
+Spinneret.Parsing.PropertyParser<TModel, TError>.Optional<TMember, TParsed>(System.Linq.Expressions.Expression<System.Func<TModel, TMember?>!>! expression, System.Func<TMember, Spinneret.Functional.Result<TParsed!, TError>!>! parser) -> TParsed?
+Spinneret.Parsing.PropertyParser<TModel, TError>.OptionalStruct<TMember, TParsed>(System.Linq.Expressions.Expression<System.Func<TModel, TMember?>!>! expression, System.Func<TMember!, Spinneret.Functional.Result<TParsed, TError>!>! parser) -> TParsed?
+Spinneret.Parsing.PropertyParser<TModel, TError>.OptionalStruct<TMember, TParsed>(System.Linq.Expressions.Expression<System.Func<TModel, TMember?>!>! expression, System.Func<TMember, Spinneret.Functional.Result<TParsed, TError>!>! parser) -> TParsed?
+Spinneret.Parsing.PropertyParser<TModel, TError>.Parse<TMember, TParsed>(System.Linq.Expressions.Expression<System.Func<TModel, TMember>!>! expression, System.Func<TMember, Spinneret.Functional.Result<TParsed, TError>!>! parser) -> TParsed
+Spinneret.Parsing.PropertyParser<TModel, TError>.Require<TMember, TParsed>(System.Linq.Expressions.Expression<System.Func<TModel, TMember?>!>! expression, System.Func<TMember!, Spinneret.Functional.Result<TParsed, TError>!>! parser) -> TParsed
+Spinneret.Parsing.PropertyParser<TModel, TError>.Require<TMember, TParsed>(System.Linq.Expressions.Expression<System.Func<TModel, TMember?>!>! expression, System.Func<TMember, Spinneret.Functional.Result<TParsed, TError>!>! parser) -> TParsed
+Spinneret.Parsing.PropertyParser<TModel, TError>.Require<TMember>(System.Linq.Expressions.Expression<System.Func<TModel, TMember?>!>! expression) -> TMember
+Spinneret.Parsing.PropertyParser<TModel, TError>.Require<TMember>(System.Linq.Expressions.Expression<System.Func<TModel, TMember?>!>! expression) -> TMember!
+Spinneret.Parsing.PropertyParser<TModel, TError>.WithModel<TNewModel>(System.Func<TModel, TNewModel>! mapper) -> Spinneret.Parsing.PropertyParser<TNewModel, TError>!
+Spinneret.Parsing.PropertyParserExtensions
+static Microsoft.Extensions.DependencyInjection.ParsingServiceCollectionExtensions.AddModelParser<T>(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, T missingPropertyError) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static Spinneret.Parsing.ExpressionPropertyPath.GetDottedPath(System.Linq.Expressions.LambdaExpression! expression) -> string!
+static Spinneret.Parsing.ExpressionPropertyPath.TryGetDottedPath(System.Linq.Expressions.LambdaExpression! expression, out string? path) -> bool
+static Spinneret.Parsing.InvalidProperty<T>.operator !=(Spinneret.Parsing.InvalidProperty<T>? left, Spinneret.Parsing.InvalidProperty<T>? right) -> bool
+static Spinneret.Parsing.InvalidProperty<T>.operator ==(Spinneret.Parsing.InvalidProperty<T>? left, Spinneret.Parsing.InvalidProperty<T>? right) -> bool
+static Spinneret.Parsing.PropertyParserExtensions.ParseEither<TModel1, TModel2, TParsed1, TParsed2, TError>(this Spinneret.Parsing.PropertyParser<Spinneret.Functional.Either<TModel1, TModel2>!, TError>! parser, System.Func<TModel1, Spinneret.Parsing.PropertyParser<TModel1, TError>!, TParsed1>! parser1, System.Func<TModel2, Spinneret.Parsing.PropertyParser<TModel2, TError>!, TParsed2>! parser2) -> Spinneret.Functional.Either<TParsed1, TParsed2>!

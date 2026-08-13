@@ -16,9 +16,18 @@ namespace Spinneret.ViewModel;
 /// revalidated, while adding, removing or moving rows is raised as a change to the collection.</item>
 /// </list>
 /// </summary>
-public sealed class RowCollection<TRow>(ViewModelBase owner, string name) : ObservableCollection<TRow>
+public sealed class RowCollection<TRow> : ObservableCollection<TRow>
     where TRow : BindableBase
 {
+    private readonly ViewModelBase owner;
+    private readonly string name;
+
+    internal RowCollection(ViewModelBase owner, string name)
+    {
+        this.owner = owner;
+        this.name = name;
+    }
+
     /// <summary>
     /// The order as of the last notification. A <see cref="NotifyCollectionChangedAction.Reset"/> — which
     /// is what <see cref="Collection{T}.Clear"/> and <see cref="ReplaceAll"/> raise — carries no items, so

@@ -1,0 +1,199 @@
+#nullable enable
+const Spinneret.Queue.QueuePolicy.DefaultChannel = "default" -> string!
+Microsoft.Extensions.DependencyInjection.QueueCoreServiceCollectionExtensions
+override Spinneret.Queue.DeadLetterEntry.Equals(object? obj) -> bool
+override Spinneret.Queue.DeadLetterEntry.GetHashCode() -> int
+override Spinneret.Queue.DeadLetterEntry.ToString() -> string!
+override Spinneret.Queue.QueueDeliveryContext.Equals(object? obj) -> bool
+override Spinneret.Queue.QueueDeliveryContext.GetHashCode() -> int
+override Spinneret.Queue.QueueDeliveryContext.ToString() -> string!
+override Spinneret.Queue.QueueDeliveryOutcome.Equals(object? obj) -> bool
+override Spinneret.Queue.QueueDeliveryOutcome.GetHashCode() -> int
+override Spinneret.Queue.QueueDeliveryOutcome.ToString() -> string!
+override Spinneret.Queue.QueueEnvelope.Equals(object? obj) -> bool
+override Spinneret.Queue.QueueEnvelope.GetHashCode() -> int
+override Spinneret.Queue.QueueEnvelope.ToString() -> string!
+override Spinneret.Queue.QueueOptions.Equals(object? obj) -> bool
+override Spinneret.Queue.QueueOptions.GetHashCode() -> int
+override Spinneret.Queue.QueueOptions.ToString() -> string!
+override Spinneret.Queue.QueuePolicy.Equals(object? obj) -> bool
+override Spinneret.Queue.QueuePolicy.GetHashCode() -> int
+override Spinneret.Queue.QueuePolicy.ToString() -> string!
+override Spinneret.Queue.QueueTypeRegistry.RegisteredRequest.Equals(object? obj) -> bool
+override Spinneret.Queue.QueueTypeRegistry.RegisteredRequest.GetHashCode() -> int
+override Spinneret.Queue.QueueTypeRegistry.RegisteredRequest.ToString() -> string!
+Spinneret.Queue.DeadLetterEntry
+Spinneret.Queue.DeadLetterEntry.<Clone>$() -> Spinneret.Queue.DeadLetterEntry!
+Spinneret.Queue.DeadLetterEntry.Attempts.get -> int
+Spinneret.Queue.DeadLetterEntry.Attempts.init -> void
+Spinneret.Queue.DeadLetterEntry.CommandTypeName.get -> string!
+Spinneret.Queue.DeadLetterEntry.CommandTypeName.init -> void
+Spinneret.Queue.DeadLetterEntry.DeadLetterEntry() -> void
+Spinneret.Queue.DeadLetterEntry.Description.get -> string?
+Spinneret.Queue.DeadLetterEntry.Description.init -> void
+Spinneret.Queue.DeadLetterEntry.Equals(Spinneret.Queue.DeadLetterEntry? other) -> bool
+Spinneret.Queue.DeadLetterEntry.Error.get -> string!
+Spinneret.Queue.DeadLetterEntry.Error.init -> void
+Spinneret.Queue.DeadLetterEntry.IdempotencyKey.get -> string!
+Spinneret.Queue.DeadLetterEntry.IdempotencyKey.init -> void
+Spinneret.Queue.DeadLetterEntry.PayloadJson.get -> string!
+Spinneret.Queue.DeadLetterEntry.PayloadJson.init -> void
+Spinneret.Queue.DeadLetterEntry.Source.get -> Spinneret.Queue.DeadLetterSource
+Spinneret.Queue.DeadLetterEntry.Source.init -> void
+Spinneret.Queue.DeadLetterSource
+Spinneret.Queue.DeadLetterSource.Queue = 0 -> Spinneret.Queue.DeadLetterSource
+Spinneret.Queue.DeadLetterSource.Scheduler = 1 -> Spinneret.Queue.DeadLetterSource
+Spinneret.Queue.DirectDispatchBoundary
+Spinneret.Queue.DirectDispatchBoundary.DirectDispatchBoundary() -> void
+Spinneret.Queue.DirectDispatchBoundary.ExecuteAsync(Spinneret.Queue.QueueDeliveryContext! context, System.Func<System.Threading.Tasks.Task!>! dispatch, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task!
+Spinneret.Queue.ErrorResultAction
+Spinneret.Queue.ErrorResultAction.DeadLetter = 0 -> Spinneret.Queue.ErrorResultAction
+Spinneret.Queue.ErrorResultAction.Discard = 2 -> Spinneret.Queue.ErrorResultAction
+Spinneret.Queue.ErrorResultAction.Retry = 1 -> Spinneret.Queue.ErrorResultAction
+Spinneret.Queue.ExhaustedAction
+Spinneret.Queue.ExhaustedAction.DeadLetter = 0 -> Spinneret.Queue.ExhaustedAction
+Spinneret.Queue.ExhaustedAction.Discard = 1 -> Spinneret.Queue.ExhaustedAction
+Spinneret.Queue.IDeadLetterWriter
+Spinneret.Queue.IDeadLetterWriter.WriteAsync(Spinneret.Queue.DeadLetterEntry! entry, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Spinneret.Queue.IEnvelopeQueue
+Spinneret.Queue.IEnvelopeQueue.Enqueue(Spinneret.Queue.QueueEnvelope! envelope, System.TimeSpan? delay = null, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Spinneret.Queue.IQueue
+Spinneret.Queue.IQueue.Enqueue(Spinneret.Mediator.IRequest<Spinneret.Functional.Unit>! request, Spinneret.Queue.QueueOptions? options = null, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Spinneret.Queue.IQueue.Enqueue<TResponse>(Spinneret.Mediator.IRequest<TResponse>! request, Spinneret.Queue.QueueOptions? options = null, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Spinneret.Queue.IQueueDeliveryProcessor
+Spinneret.Queue.IQueueDeliveryProcessor.ProcessAsync(Spinneret.Queue.QueueDeliveryContext! context, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<Spinneret.Queue.QueueDeliveryOutcome!>!
+Spinneret.Queue.IQueueDispatchBoundary
+Spinneret.Queue.IQueueDispatchBoundary.ExecuteAsync(Spinneret.Queue.QueueDeliveryContext! context, System.Func<System.Threading.Tasks.Task!>! dispatch, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task!
+Spinneret.Queue.IQueueDispatcher
+Spinneret.Queue.IQueueDispatcher.Dispatch(Spinneret.Queue.QueueEnvelope! envelope, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task!
+Spinneret.Queue.IQueuePayloadSerializer
+Spinneret.Queue.IQueuePayloadSerializer.Deserialize(string! json, System.Type! requestType) -> object?
+Spinneret.Queue.IQueuePayloadSerializer.Serialize(object! request, System.Type! requestType) -> string!
+Spinneret.Queue.QueueDeliveryContext
+Spinneret.Queue.QueueDeliveryContext.<Clone>$() -> Spinneret.Queue.QueueDeliveryContext!
+Spinneret.Queue.QueueDeliveryContext.Envelope.get -> Spinneret.Queue.QueueEnvelope!
+Spinneret.Queue.QueueDeliveryContext.Envelope.init -> void
+Spinneret.Queue.QueueDeliveryContext.Equals(Spinneret.Queue.QueueDeliveryContext? other) -> bool
+Spinneret.Queue.QueueDeliveryContext.QueueDeliveryContext() -> void
+Spinneret.Queue.QueueDeliveryContext.TaskId.get -> string!
+Spinneret.Queue.QueueDeliveryContext.TaskId.init -> void
+Spinneret.Queue.QueueDeliveryOutcome
+Spinneret.Queue.QueueDeliveryOutcome.<Clone>$() -> Spinneret.Queue.QueueDeliveryOutcome!
+Spinneret.Queue.QueueDeliveryOutcome.Ack.get -> bool
+Spinneret.Queue.QueueDeliveryOutcome.Equals(Spinneret.Queue.QueueDeliveryOutcome? other) -> bool
+Spinneret.Queue.QueueDeliveryOutcome.QueueDeliveryOutcome() -> void
+Spinneret.Queue.QueueDeliveryOutcome.RetryAfter.get -> System.TimeSpan?
+Spinneret.Queue.QueueEnvelope
+Spinneret.Queue.QueueEnvelope.<Clone>$() -> Spinneret.Queue.QueueEnvelope!
+Spinneret.Queue.QueueEnvelope.Description.get -> string?
+Spinneret.Queue.QueueEnvelope.Description.init -> void
+Spinneret.Queue.QueueEnvelope.EnqueuedAtUtc.get -> System.DateTimeOffset
+Spinneret.Queue.QueueEnvelope.EnqueuedAtUtc.init -> void
+Spinneret.Queue.QueueEnvelope.Equals(Spinneret.Queue.QueueEnvelope? other) -> bool
+Spinneret.Queue.QueueEnvelope.PayloadJson.get -> string!
+Spinneret.Queue.QueueEnvelope.PayloadJson.init -> void
+Spinneret.Queue.QueueEnvelope.PriorFailures.get -> int
+Spinneret.Queue.QueueEnvelope.PriorFailures.init -> void
+Spinneret.Queue.QueueEnvelope.QueueEnvelope() -> void
+Spinneret.Queue.QueueEnvelope.RequestTypeName.get -> string!
+Spinneret.Queue.QueueEnvelope.RequestTypeName.init -> void
+Spinneret.Queue.QueueEnvelope.SchemaVersion.get -> int
+Spinneret.Queue.QueueEnvelope.SchemaVersion.init -> void
+Spinneret.Queue.QueueEnvelope.TraceId.get -> string?
+Spinneret.Queue.QueueEnvelope.TraceId.init -> void
+Spinneret.Queue.QueueHandlerFailedException
+Spinneret.Queue.QueueHandlerFailedException.Error.get -> object?
+Spinneret.Queue.QueueHandlerFailedException.QueueHandlerFailedException(object? error) -> void
+Spinneret.Queue.QueueHandlerPermanentException
+Spinneret.Queue.QueueHandlerPermanentException.QueueHandlerPermanentException(string! message, System.Exception? inner = null) -> void
+Spinneret.Queue.QueueHandlerRetryAfterException
+Spinneret.Queue.QueueHandlerRetryAfterException.QueueHandlerRetryAfterException(System.TimeSpan retryAfter, string? message = null, System.Exception? inner = null) -> void
+Spinneret.Queue.QueueHandlerRetryAfterException.RetryAfter.get -> System.TimeSpan
+Spinneret.Queue.QueueOptions
+Spinneret.Queue.QueueOptions.<Clone>$() -> Spinneret.Queue.QueueOptions!
+Spinneret.Queue.QueueOptions.DedupeKey.get -> string?
+Spinneret.Queue.QueueOptions.DedupeKey.init -> void
+Spinneret.Queue.QueueOptions.Delay.get -> System.TimeSpan?
+Spinneret.Queue.QueueOptions.Delay.init -> void
+Spinneret.Queue.QueueOptions.Description.get -> string?
+Spinneret.Queue.QueueOptions.Description.init -> void
+Spinneret.Queue.QueueOptions.Equals(Spinneret.Queue.QueueOptions? other) -> bool
+Spinneret.Queue.QueueOptions.QueueOptions() -> void
+Spinneret.Queue.QueuePolicy
+Spinneret.Queue.QueuePolicy.<Clone>$() -> Spinneret.Queue.QueuePolicy!
+Spinneret.Queue.QueuePolicy.BackoffFor(int attempt) -> System.TimeSpan
+Spinneret.Queue.QueuePolicy.Channel.get -> string?
+Spinneret.Queue.QueuePolicy.Channel.init -> void
+Spinneret.Queue.QueuePolicy.Equals(Spinneret.Queue.QueuePolicy? other) -> bool
+Spinneret.Queue.QueuePolicy.MaxAge.get -> System.TimeSpan
+Spinneret.Queue.QueuePolicy.MaxAge.init -> void
+Spinneret.Queue.QueuePolicy.MaxAttempts.get -> int
+Spinneret.Queue.QueuePolicy.MaxAttempts.init -> void
+Spinneret.Queue.QueuePolicy.MaxBackoff.get -> System.TimeSpan
+Spinneret.Queue.QueuePolicy.MaxBackoff.init -> void
+Spinneret.Queue.QueuePolicy.MinBackoff.get -> System.TimeSpan
+Spinneret.Queue.QueuePolicy.MinBackoff.init -> void
+Spinneret.Queue.QueuePolicy.OnErrorResult.get -> Spinneret.Queue.ErrorResultAction
+Spinneret.Queue.QueuePolicy.OnErrorResult.init -> void
+Spinneret.Queue.QueuePolicy.OnExhausted.get -> Spinneret.Queue.ExhaustedAction
+Spinneret.Queue.QueuePolicy.OnExhausted.init -> void
+Spinneret.Queue.QueuePolicy.QueuePolicy() -> void
+Spinneret.Queue.QueuePolicy.ResolvedChannel.get -> string!
+Spinneret.Queue.QueuePolicyAttribute
+Spinneret.Queue.QueuePolicyAttribute.Channel.get -> string?
+Spinneret.Queue.QueuePolicyAttribute.Channel.set -> void
+Spinneret.Queue.QueuePolicyAttribute.MaxAge.get -> string!
+Spinneret.Queue.QueuePolicyAttribute.MaxAge.set -> void
+Spinneret.Queue.QueuePolicyAttribute.MaxAttempts.get -> int
+Spinneret.Queue.QueuePolicyAttribute.MaxAttempts.set -> void
+Spinneret.Queue.QueuePolicyAttribute.MaxBackoff.get -> string!
+Spinneret.Queue.QueuePolicyAttribute.MaxBackoff.set -> void
+Spinneret.Queue.QueuePolicyAttribute.MinBackoff.get -> string!
+Spinneret.Queue.QueuePolicyAttribute.MinBackoff.set -> void
+Spinneret.Queue.QueuePolicyAttribute.OnErrorResult.get -> Spinneret.Queue.ErrorResultAction
+Spinneret.Queue.QueuePolicyAttribute.OnErrorResult.set -> void
+Spinneret.Queue.QueuePolicyAttribute.OnExhausted.get -> Spinneret.Queue.ExhaustedAction
+Spinneret.Queue.QueuePolicyAttribute.OnExhausted.set -> void
+Spinneret.Queue.QueuePolicyAttribute.QueuePolicyAttribute() -> void
+Spinneret.Queue.QueueTypeRegistry
+Spinneret.Queue.QueueTypeRegistry.DeclaredChannels.get -> System.Collections.Generic.IReadOnlyCollection<string!>!
+Spinneret.Queue.QueueTypeRegistry.GetName(System.Type! requestType) -> string!
+Spinneret.Queue.QueueTypeRegistry.GetPolicy(System.Type! requestType) -> Spinneret.Queue.QueuePolicy!
+Spinneret.Queue.QueueTypeRegistry.QueueTypeRegistry(System.Collections.Generic.IEnumerable<System.Reflection.Assembly!>! assemblies) -> void
+Spinneret.Queue.QueueTypeRegistry.RegisteredRequest
+Spinneret.Queue.QueueTypeRegistry.RegisteredRequest.<Clone>$() -> Spinneret.Queue.QueueTypeRegistry.RegisteredRequest!
+Spinneret.Queue.QueueTypeRegistry.RegisteredRequest.Equals(Spinneret.Queue.QueueTypeRegistry.RegisteredRequest? other) -> bool
+Spinneret.Queue.QueueTypeRegistry.RegisteredRequest.Policy.get -> Spinneret.Queue.QueuePolicy!
+Spinneret.Queue.QueueTypeRegistry.RegisteredRequest.Policy.init -> void
+Spinneret.Queue.QueueTypeRegistry.RegisteredRequest.RegisteredRequest() -> void
+Spinneret.Queue.QueueTypeRegistry.RegisteredRequest.RequestType.get -> System.Type!
+Spinneret.Queue.QueueTypeRegistry.RegisteredRequest.RequestType.init -> void
+Spinneret.Queue.QueueTypeRegistry.RegisteredRequest.ResponseType.get -> System.Type!
+Spinneret.Queue.QueueTypeRegistry.RegisteredRequest.ResponseType.init -> void
+Spinneret.Queue.QueueTypeRegistry.Resolve(string! typeName) -> Spinneret.Queue.QueueTypeRegistry.RegisteredRequest!
+Spinneret.Queue.UnknownRequestTypeException
+Spinneret.Queue.UnknownRequestTypeException.TypeName.get -> string!
+Spinneret.Queue.UnknownRequestTypeException.UnknownRequestTypeException(string! typeName) -> void
+static Microsoft.Extensions.DependencyInjection.QueueCoreServiceCollectionExtensions.AddQueueCore(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, params System.Reflection.Assembly![]! requestAssemblies) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static Microsoft.Extensions.DependencyInjection.QueueCoreServiceCollectionExtensions.AddQueueCore(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, Spinneret.Queue.QueueTypeRegistry! registry) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static readonly Spinneret.Queue.QueuePolicy.DefaultMaxAge -> string!
+static readonly Spinneret.Queue.QueuePolicy.DefaultMaxAttempts -> int
+static readonly Spinneret.Queue.QueuePolicy.DefaultMaxBackoff -> string!
+static readonly Spinneret.Queue.QueuePolicy.DefaultMinBackoff -> string!
+static Spinneret.Queue.DeadLetterEntry.operator !=(Spinneret.Queue.DeadLetterEntry? left, Spinneret.Queue.DeadLetterEntry? right) -> bool
+static Spinneret.Queue.DeadLetterEntry.operator ==(Spinneret.Queue.DeadLetterEntry? left, Spinneret.Queue.DeadLetterEntry? right) -> bool
+static Spinneret.Queue.QueueDeliveryContext.operator !=(Spinneret.Queue.QueueDeliveryContext? left, Spinneret.Queue.QueueDeliveryContext? right) -> bool
+static Spinneret.Queue.QueueDeliveryContext.operator ==(Spinneret.Queue.QueueDeliveryContext? left, Spinneret.Queue.QueueDeliveryContext? right) -> bool
+static Spinneret.Queue.QueueDeliveryOutcome.Acked.get -> Spinneret.Queue.QueueDeliveryOutcome!
+static Spinneret.Queue.QueueDeliveryOutcome.operator !=(Spinneret.Queue.QueueDeliveryOutcome? left, Spinneret.Queue.QueueDeliveryOutcome? right) -> bool
+static Spinneret.Queue.QueueDeliveryOutcome.operator ==(Spinneret.Queue.QueueDeliveryOutcome? left, Spinneret.Queue.QueueDeliveryOutcome? right) -> bool
+static Spinneret.Queue.QueueDeliveryOutcome.RetryIn(System.TimeSpan after) -> Spinneret.Queue.QueueDeliveryOutcome!
+static Spinneret.Queue.QueueEnvelope.operator !=(Spinneret.Queue.QueueEnvelope? left, Spinneret.Queue.QueueEnvelope? right) -> bool
+static Spinneret.Queue.QueueEnvelope.operator ==(Spinneret.Queue.QueueEnvelope? left, Spinneret.Queue.QueueEnvelope? right) -> bool
+static Spinneret.Queue.QueueOptions.operator !=(Spinneret.Queue.QueueOptions? left, Spinneret.Queue.QueueOptions? right) -> bool
+static Spinneret.Queue.QueueOptions.operator ==(Spinneret.Queue.QueueOptions? left, Spinneret.Queue.QueueOptions? right) -> bool
+static Spinneret.Queue.QueuePolicy.Default.get -> Spinneret.Queue.QueuePolicy!
+static Spinneret.Queue.QueuePolicy.operator !=(Spinneret.Queue.QueuePolicy? left, Spinneret.Queue.QueuePolicy? right) -> bool
+static Spinneret.Queue.QueuePolicy.operator ==(Spinneret.Queue.QueuePolicy? left, Spinneret.Queue.QueuePolicy? right) -> bool
+static Spinneret.Queue.QueueTypeRegistry.RegisteredRequest.operator !=(Spinneret.Queue.QueueTypeRegistry.RegisteredRequest? left, Spinneret.Queue.QueueTypeRegistry.RegisteredRequest? right) -> bool
+static Spinneret.Queue.QueueTypeRegistry.RegisteredRequest.operator ==(Spinneret.Queue.QueueTypeRegistry.RegisteredRequest? left, Spinneret.Queue.QueueTypeRegistry.RegisteredRequest? right) -> bool

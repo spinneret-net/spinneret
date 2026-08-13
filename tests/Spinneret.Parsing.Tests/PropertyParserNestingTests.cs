@@ -15,7 +15,7 @@ public class PropertyParserNestingTests
             }
         };
 
-        var parseRes = ModelParser.Parse(sut, parser => parser.Nest(
+        var parseRes = ModelParser.Parse(sut, parser => parser.NestRequired(
             x => x.OnlyChildClass,
             nestedParser => nestedParser.Require(x => x.StringProperty, x => TestParseResult<string>.Error($"{x}_error"))));
 
@@ -36,7 +36,7 @@ public class PropertyParserNestingTests
             }
         };
 
-        var parseRes = ModelParser.Parse(sut, parser => parser.Nest(
+        var parseRes = ModelParser.Parse(sut, parser => parser.NestRequired(
             x => x.OnlyChildClass,
             nestedParser => nestedParser.Require(x => x.StringProperty)));
 
@@ -59,7 +59,7 @@ public class PropertyParserNestingTests
             }
         };
 
-        var parseRes = ModelParser.Parse(sut, parser => parser.Nest(
+        var parseRes = ModelParser.Parse(sut, parser => parser.NestRequired(
             x => x.GroupEditor.Label,
             nestedParser => new
             {
@@ -86,9 +86,9 @@ public class PropertyParserNestingTests
             }
         };
 
-        var parseRes = ModelParser.Parse(sut, parser => parser.Nest(
+        var parseRes = ModelParser.Parse(sut, parser => parser.NestRequired(
             x => x.GroupEditor,
-            groupParser => groupParser.Nest(
+            groupParser => groupParser.NestRequired(
                 x => x.Label,
                 labelParser => labelParser.Require(x => x.StringProperty))));
 
@@ -108,7 +108,7 @@ public class PropertyParserNestingTests
 
         var nestedParserInvoked = false;
 
-        var parseRes = ModelParser.Parse(sut, parser => parser.Nest(
+        var parseRes = ModelParser.Parse(sut, parser => parser.NestRequired(
             x => x.OnlyChildClass,
             nestedParser =>
             {
@@ -134,7 +134,7 @@ public class PropertyParserNestingTests
             }
         };
 
-        var parseRes = ModelParser.Parse(sut, parser => parser.Nest(
+        var parseRes = ModelParser.Parse(sut, parser => parser.NestRequired(
             x => x.GroupEditor.Label,
             nestedParser => nestedParser.Require(x => x.StringProperty)));
 

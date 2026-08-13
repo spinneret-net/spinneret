@@ -60,8 +60,8 @@ public class BindingTests
         await Assert.That(binding0.PropertyPath).IsEqualTo("Options[0].Label");
         await Assert.That(binding1.PropertyPath).IsEqualTo("Options[1].Label");
         var errors = viewModel.ValidationState.Errors.ToList();
-        await Assert.That(errors.Contains(("Options[0].Label", "bad"))).IsTrue();
-        await Assert.That(errors.Contains(("Options[1].Label", "bad"))).IsTrue();
+        await Assert.That(errors.Contains(new ValidationError("Options[0].Label", "bad"))).IsTrue();
+        await Assert.That(errors.Contains(new ValidationError("Options[1].Label", "bad"))).IsTrue();
     }
 
     [Test]
@@ -334,7 +334,7 @@ public class BindingTests
         viewModel.ValidationState.AddError("Nested.Value", "bad");
 
         await Assert.That(viewModel.ValidationState.BoundErrors.ToList())
-            .IsEquivalentTo([("Nested.Value", "bad")]);
+            .IsEquivalentTo([new ValidationError("Nested.Value", "bad")]);
         await Assert.That(viewModel.ValidationState.UnboundErrors.ToList()).IsEmpty();
     }
 

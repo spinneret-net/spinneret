@@ -70,10 +70,13 @@ public abstract class ViewModelBase : BindableBase, IViewModel, IValidationState
         RaisePropertyChanged(nameof(ValidationState));
     }
 
-    public async Task InitializeAsync(CancellationToken cancellationToken)
+    // Implemented explicitly so the lifecycle entry points are called only through IViewModel
+    // (which is how the view drives them) and cannot be shadowed by a derived class; derived
+    // classes participate via OnInitializeAsync / OnUpdateAsync.
+    async Task IViewModel.InitializeAsync(CancellationToken cancellationToken)
     {
         _cancellationToken = cancellationToken;
-        
+
         if (_initializationPending)
         {
             await _updateLock.WaitAsync(cancellationToken);
@@ -89,11 +92,11 @@ public abstract class ViewModelBase : BindableBase, IViewModel, IValidationState
         }
     }
 
-    public async Task UpdateAsync(ICollection<string> changedProperties)
+    async Task IViewModel.UpdateAsync(ICollection<string> changedProperties)
     {
         if (_cancellationToken is null)
             throw new InvalidOperationException(
-                $"{nameof(InitializeAsync)} must be called before {nameof(UpdateAsync)}.");
+                $"{nameof(IViewModel.InitializeAsync)} must be called before {nameof(IViewModel.UpdateAsync)}.");
 
         await _updateLock.WaitAsync(_cancellationToken.Value);
         try
@@ -148,7 +151,12 @@ public abstract class ViewModelBase : BindableBase, IViewModel, IValidationState
         return true;
     }
     
-    public IViewModelExceptionService? ExceptionService { get; set; }
+    /// <summary>
+    /// Handles exceptions thrown inside <see cref="Run"/> / <see cref="RunIfNotBusy"/>.
+    /// Assigned by the owning view (property injection); internal so consumers cannot
+    /// overwrite it mid-lifetime.
+    /// </summary>
+    public IViewModelExceptionService? ExceptionService { get; internal set; }
 
     private async Task Execute(Func<CancellationToken, Task> function)
     {

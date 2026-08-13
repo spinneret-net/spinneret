@@ -10,10 +10,10 @@ namespace Spinneret.Queue;
 /// </summary>
 public interface IQueueDispatchBoundary
 {
-    /// <param name="envelope">The envelope being delivered.</param>
+    /// <param name="context">The delivery being executed.</param>
     /// <param name="dispatch">Invokes the handler; exceptions must propagate to the caller.</param>
     /// <param name="ct"></param>
-    Task ExecuteAsync(QueueEnvelope envelope, Func<Task> dispatch, CancellationToken ct);
+    Task ExecuteAsync(QueueDeliveryContext context, Func<Task> dispatch, CancellationToken ct);
 }
 
 /// <summary>
@@ -23,5 +23,5 @@ public interface IQueueDispatchBoundary
 /// </summary>
 public sealed class DirectDispatchBoundary : IQueueDispatchBoundary
 {
-    public Task ExecuteAsync(QueueEnvelope envelope, Func<Task> dispatch, CancellationToken ct) => dispatch();
+    public Task ExecuteAsync(QueueDeliveryContext context, Func<Task> dispatch, CancellationToken ct) => dispatch();
 }

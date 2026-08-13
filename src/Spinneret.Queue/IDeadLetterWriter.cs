@@ -1,10 +1,19 @@
 namespace Spinneret.Queue;
 
+/// <summary>
+/// Persists tasks the queue has given up on. Implemented by transports or hosts (the MSSQL
+/// transport ships one; GCP hosts must register their own). Additions to this interface ship
+/// as default interface members so existing implementations keep compiling.
+/// </summary>
 public interface IDeadLetterWriter
 {
     Task WriteAsync(DeadLetterEntry entry, CancellationToken ct = default);
 }
 
+/// <summary>
+/// One dead-lettered task. Constructed by transports; new members must be optional
+/// (non-required) so out-of-tree writers keep compiling.
+/// </summary>
 public sealed record DeadLetterEntry
 {
     /// <summary>
@@ -28,4 +37,12 @@ public sealed record DeadLetterEntry
     public required int Attempts { get; init; }
 }
 
-public enum DeadLetterSource { Queue, Scheduler }
+/// <summary>
+/// Where a dead letter came from. Member names are persisted (e.g. as strings in the MSSQL
+/// dead-letter table), so they are a data contract: never rename or renumber.
+/// </summary>
+public enum DeadLetterSource
+{
+    Queue = 0,
+    Scheduler = 1,
+}
