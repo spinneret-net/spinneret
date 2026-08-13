@@ -14,24 +14,42 @@ public sealed class RecordingRecurringJobScheduler : IRecurringJobScheduler
 {
     public List<(string Key, IRequest<Unit> Request, Schedule Schedule, CancellationToken Ct)> Registrations { get; } = [];
     public List<(string Key, CancellationToken Ct)> Unregistrations { get; } = [];
+
+    /// <summary>Keys that fail every time — a permanently broken job.</summary>
     public HashSet<string> FailingKeys { get; } = [];
+
+    /// <summary>Keys that fail the given number of times and then succeed — a transient outage.</summary>
+    public Dictionary<string, int> FailingAttempts { get; } = [];
+
+    /// <summary>Attempts made per key, successful or not.</summary>
+    public Dictionary<string, int> Attempts { get; } = [];
 
     public Task RegisterAsync(string key, IRequest<Unit> request, Schedule schedule, CancellationToken ct = default)
     {
-        if (FailingKeys.Contains(key))
-            throw new InvalidOperationException($"Registration failed for '{key}'.");
-
+        RecordAttempt(key, "Registration");
         Registrations.Add((key, request, schedule, ct));
         return Task.CompletedTask;
     }
 
     public Task UnregisterAsync(string key, CancellationToken ct = default)
     {
-        if (FailingKeys.Contains(key))
-            throw new InvalidOperationException($"Unregistration failed for '{key}'.");
-
+        RecordAttempt(key, "Unregistration");
         Unregistrations.Add((key, ct));
         return Task.CompletedTask;
+    }
+
+    private void RecordAttempt(string key, string what)
+    {
+        Attempts[key] = Attempts.GetValueOrDefault(key) + 1;
+
+        if (FailingKeys.Contains(key))
+            throw new InvalidOperationException($"{what} failed for '{key}'.");
+
+        if (FailingAttempts.GetValueOrDefault(key) is var remaining and > 0)
+        {
+            FailingAttempts[key] = remaining - 1;
+            throw new InvalidOperationException($"{what} failed for '{key}' ({remaining} left).");
+        }
     }
 }
 

@@ -110,6 +110,49 @@ public sealed class MssqlSchedulerIntegrationTests(MssqlContainerFixture fixture
         await Assert.That(await host.JobStatus("declared-job")).IsEqualTo("pending");
     }
 
+    [Test]
+    public async Task RegisterAsync_from_many_instances_at_once_yields_one_job()
+    {
+        // Ten instances of the same application all assert the same job as they start. JobKey is the
+        // primary key and the register-or-refresh holds a key-range lock (UPDLOCK, HOLDLOCK) over
+        // it, so the concurrent attempts serialise into one insert and nine in-place refreshes.
+        await using var host = await SchedulerTestHost.StartAsync(fixture.ConnectionString, sweeper: false);
+
+        await Task.WhenAll(Enumerable.Range(0, 10).Select(i =>
+            host.Scheduler.RegisterAsync("contested-parallel", new TickCommand($"instance-{i}"), Hourly)));
+
+        await Assert.That(await host.ScalarAsync<int>(
+                $"SELECT COUNT(*) FROM [{host.JobsTable}] WHERE JobKey = N'contested-parallel'"))
+            .IsEqualTo(1);
+        await Assert.That(await host.JobStatus("contested-parallel")).IsEqualTo("pending");
+    }
+
+    [Test]
+    public async Task Parallel_installers_converge_on_one_job_per_key()
+    {
+        // The same thing one level up: ten hosts sharing the tables, each running its own installer.
+        var suffix = Guid.NewGuid().ToString("N")[..12];
+        var hosts = await Task.WhenAll(Enumerable.Range(0, 10).Select(_ => SchedulerTestHost.StartAsync(
+            fixture.ConnectionString,
+            sweeper: false,
+            configure: services => services.AddRecurringJob(
+                "fleet-wide", Schedule.Cron("0 */3 * * *", Stockholm), () => new TickCommand("fleet")),
+            reuseSuffix: suffix)));
+
+        try
+        {
+            await Wait.Until(
+                async () => await hosts[0].ScalarAsync<int>(
+                    $"SELECT COUNT(*) FROM [{hosts[0].JobsTable}] WHERE JobKey = N'fleet-wide'") == 1,
+                "the fleet-wide job to be installed exactly once");
+        }
+        finally
+        {
+            foreach (var host in hosts)
+                await host.DisposeAsync();
+        }
+    }
+
     // ------------------------------------------------------------------------- retiring ---
 
     [Test]

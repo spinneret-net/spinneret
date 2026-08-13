@@ -174,7 +174,9 @@ Deleting a job from code does **not** stop it. Its definition is durable, so it 
 services.RetireRecurringJob("project-month-close-reminder");
 ```
 
-The installer unregisters retired keys at startup, next to installing the declared ones — so the removal travels with the deploy and shows up in review. Leave the line in for at least one full deploy: while old instances are still running they re-install the job, and the retirement only wins once the last one is gone. Retiring is idempotent and never touches one-shot jobs. Registering two jobs under one key, or declaring and retiring the same key, fails startup rather than silently dropping a job.
+The installer unregisters retired keys alongside installing the declared ones — so the removal travels with the deploy and shows up in review. Leave the line in for at least one full deploy: while old instances are still running they re-install the job, and the retirement only wins once the last one is gone. Retiring is idempotent and never touches one-shot jobs. Registering two jobs under one key, or declaring and retiring the same key, fails startup rather than silently dropping a job.
+
+Installing happens in the background and retries with capped, jittered backoff until it succeeds, so a store that is briefly unreachable costs a short delay rather than a missing job — a single always-on host would otherwise carry that gap until its next restart. Startup is never held up by it, and each job stops being retried as soon as it is installed: this is a retry, not a reconciliation loop, so two revisions never fight over a definition during a rolling deploy. Running many instances needs no coordination — registration is idempotent and guarded by the store (the job key is the primary key in SQL Server and the document id in Firestore), so ten instances asserting the same job converge on one job.
 
 The scheduler itself is infrastructure-agnostic. `Spinneret.Scheduler.Gcp` provides Firestore-backed scheduling with transactional dispatch, while `Spinneret.Scheduler.Mssql` provides the SQL Server-backed equivalent. The job declaration and application-facing scheduling model stay the same.
 
