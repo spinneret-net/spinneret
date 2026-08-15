@@ -1,0 +1,3 @@
+#nullable enable
+Microsoft.AspNetCore.Builder.SchedulerSweepEndpointRouteBuilderExtensions
+static Microsoft.AspNetCore.Builder.SchedulerSweepEndpointRouteBuilderExtensions.MapSchedulerSweep(this Microsoft.AspNetCore.Routing.IEndpointRouteBuilder! endpoints, string! authorizationPolicy, string? pattern = null) -> Microsoft.AspNetCore.Routing.IEndpointRouteBuilder!

@@ -1,0 +1,44 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+        <NoWarn>$(NoWarn);CS8524</NoWarn>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <!-- No framework reference: this package is storage. The HTTP trigger that used to live
+             here is Spinneret.Scheduler.Http, so a worker with no web stack can consume this. -->
+        <PackageReference Include="Google.Cloud.Firestore" Version="4.3.0" />
+        <!-- Was arriving transitively through the AspNetCore framework reference this package no
+             longer takes. Configuration.Binder is what ConfigurationBinder.Bind lives in, which is
+             what the IConfiguration overload of AddFirestoreScheduler actually calls. -->
+        <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="10.0.9" />
+        <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.9" />
+        <PackageReference Include="Microsoft.Extensions.Options" Version="10.0.9" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\Spinneret.Scheduler\Spinneret.Scheduler.csproj" />
+        <!-- The provider-agnostic queue, never a specific transport: jobs are dispatched onto
+             whatever IQueue the host registered, so Firestore scheduling composes with Cloud
+             Tasks, SQL Server, or anything else. -->
+        <ProjectReference Include="..\Spinneret.Queue\Spinneret.Queue.csproj" />
+        <!-- Both appear in this package's own public API (IFirestoreTransactionalScheduler takes an
+             IRequest<Unit>), so they are declared rather than left to arrive through the queue. -->
+        <ProjectReference Include="..\Spinneret.Mediator\Spinneret.Mediator.csproj" />
+        <ProjectReference Include="..\Spinneret.Functional\Spinneret.Functional.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <InternalsVisibleTo Include="Spinneret.Scheduler.Firestore.Tests" />
+    </ItemGroup>
+
+    <PropertyGroup>
+        <Description>Firestore-backed implementation of Spinneret.Scheduler with transactional dispatch, usable behind any queue transport.</Description>
+        <PackageTags>$(PackageTags) scheduler firestore gcp google-cloud</PackageTags>
+    </PropertyGroup>
+
+</Project>

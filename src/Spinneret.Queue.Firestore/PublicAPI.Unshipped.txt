@@ -1,0 +1,10 @@
+#nullable enable
+Microsoft.Extensions.DependencyInjection.FirestoreDeadLetterServiceCollectionExtensions
+Spinneret.Queue.Firestore.FirestoreDeadLetterOptions
+Spinneret.Queue.Firestore.FirestoreDeadLetterOptions.Collection.get -> string!
+Spinneret.Queue.Firestore.FirestoreDeadLetterOptions.Collection.set -> void
+Spinneret.Queue.Firestore.FirestoreDeadLetterOptions.FirestoreDeadLetterOptions() -> void
+static Microsoft.Extensions.DependencyInjection.FirestoreDeadLetterServiceCollectionExtensions.AddFirestoreDeadLetters(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static Microsoft.Extensions.DependencyInjection.FirestoreDeadLetterServiceCollectionExtensions.AddFirestoreDeadLetters(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, Microsoft.Extensions.Configuration.IConfiguration! configuration) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static Microsoft.Extensions.DependencyInjection.FirestoreDeadLetterServiceCollectionExtensions.AddFirestoreDeadLetters(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Spinneret.Queue.Firestore.FirestoreDeadLetterOptions!>! configure) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static readonly Spinneret.Queue.Firestore.FirestoreDeadLetterOptions.SectionName -> string!

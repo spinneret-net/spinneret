@@ -13,14 +13,15 @@ public static class MssqlSchedulerServiceCollectionExtensions
 {
     /// <summary>
     /// Registers the SQL Server scheduler: <see cref="IRecurringJobScheduler"/>,
-    /// <see cref="IMssqlTransactionalScheduler"/>, the recurring-job installer and the schema
-    /// initializer. Requires <c>AddMssqlQueue</c> to be called first — the scheduler stores its
-    /// jobs next to the queue and dispatches onto it in one transaction.
+    /// <see cref="IMssqlTransactionalScheduler"/>, the sweep engine, the recurring-job installer and
+    /// the schema initializer. Requires <c>AddMssqlQueue</c> — in either registration order — since
+    /// the scheduler stores its jobs next to the queue and dispatches onto it in one transaction.
     /// </summary>
     /// <remarks>
-    /// Call <c>AddMssqlSchedulerSweeper()</c> on the host(s) that should dispatch due jobs;
-    /// sweeps race safely across hosts. Configuration is read from the <c>Scheduler:Mssql</c>
-    /// section.
+    /// This registers no trigger. Add <c>AddSchedulerSweeper()</c> on the host(s) that should
+    /// dispatch due jobs, or map the endpoint from <c>Spinneret.Scheduler.Http</c> to be driven by an
+    /// external cron; sweeps race safely across hosts either way. Configuration is read from the
+    /// <c>Scheduler:Mssql</c> section, and the sweep cadence from <c>Scheduler:Sweeper:SweepInterval</c>.
     /// </remarks>
     public static IServiceCollection AddMssqlScheduler(this IServiceCollection services, IConfiguration configuration)
     {
@@ -49,10 +50,9 @@ public static class MssqlSchedulerServiceCollectionExtensions
         Action<MssqlSchedulerOptions> configure,
         MssqlSchedulerOptions eagerlyBound)
     {
-        if (services.All(d => d.ServiceType != typeof(MssqlQueue)))
-            throw new InvalidOperationException(
-                "AddMssqlScheduler requires AddMssqlQueue to be called first: the scheduler stores its "
-                + "jobs in the queue's database and dispatches onto the queue transactionally.");
+        // No "was AddMssqlQueue called first?" guard: this method registers lazily and reads nothing
+        // from the collection, so it composes in any order. A genuinely missing queue surfaces when
+        // the container resolves the sweep and names the service it could not supply.
 
         // Fail as early as possible on broken configuration; the options-pipeline validation
         // below re-validates at host start to also cover later Configure/PostConfigure changes.
@@ -68,22 +68,15 @@ public static class MssqlSchedulerServiceCollectionExtensions
             sp.GetRequiredService<IOptions<MssqlSchedulerOptions>>().Value));
         services.TryAddSingleton<IRecurringJobScheduler, MssqlScheduler>();
         services.TryAddSingleton<IMssqlTransactionalScheduler, MssqlTransactionalScheduler>();
+        // The sweep engine, not the trigger: registering it costs nothing until something drives it,
+        // and the host chooses that separately with AddSchedulerSweeper() or an HTTP trigger.
+        services.TryAddSingleton<ISchedulerSweep, MssqlSchedulerSweeper>();
         services.AddHostedService<MssqlSchedulerSchemaInitializer>();
         // After the schema initializer: hosted services start in registration order, and the
         // installer writes job rows into the table that initializer creates. The installer retries,
         // so getting this order wrong would cost a backoff rather than the jobs.
         services.AddRecurringJobInstaller();
 
-        return services;
-    }
-
-    /// <summary>
-    /// Registers the sweep that dispatches due jobs. Separate from <c>AddMssqlScheduler</c>
-    /// so hosts that only declare or one-shot-schedule jobs don't also dispatch them.
-    /// </summary>
-    public static IServiceCollection AddMssqlSchedulerSweeper(this IServiceCollection services)
-    {
-        services.AddHostedService<MssqlSchedulerSweeper>();
         return services;
     }
 }

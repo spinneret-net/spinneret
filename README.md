@@ -39,9 +39,11 @@ Utility libraries tend to be junk drawers. Spinneret is the opposite: every pack
 | `Spinneret.Queue` | **The egg sac** | A durable command queue where the application owns the retry policy — attempts, backoff, channels, dead-lettering — per command type. Safe until it hatches. |
 | `Spinneret.Queue.Gcp` | | Google Cloud Tasks transport with an OIDC-authenticated dispatch endpoint. |
 | `Spinneret.Queue.Mssql` | | SQL Server-backed durable queue transport. |
-| `Spinneret.Scheduler` | **The nightly respin** | Recurring jobs declared in code and installed idempotently at startup. Orb-weavers rebuild their web every night; so do your jobs. |
-| `Spinneret.Scheduler.Gcp` | | Firestore-backed scheduling with transactional dispatch. |
+| `Spinneret.Queue.Firestore` | | Firestore-backed dead-letter store, usable behind any transport. |
+| `Spinneret.Scheduler` | **The nightly respin** | Recurring jobs declared in code and installed idempotently at startup, swept on a timer. Orb-weavers rebuild their web every night; so do your jobs. |
+| `Spinneret.Scheduler.Firestore` | | Firestore-backed scheduling with transactional dispatch. |
 | `Spinneret.Scheduler.Mssql` | | SQL Server-backed scheduling with transactional dispatch. |
+| `Spinneret.Scheduler.Http` | | An authorized endpoint that sweeps once per request, for hosts whose clock is an external cron. |
 | `Spinneret.ViewModel` | **The attachment discs** | MVVM for Blazor: bindable view models, two-way bindings with conversion and validation state, row collections, nested view models — the silk cement that fastens view to model. |
 | `Spinneret.View` | **The hub** | `ViewBase<T>` components that resolve their view model from DI, with lifecycle state and app-wide refresh coordination. Where the spider sits and feels everything. |
 | `Spinneret.View.Server` | | Blazor Server host support: the render context that reports whether the current render is a prerender. |
@@ -136,6 +138,8 @@ throw new QueueHandlerRetryAfterException(TimeSpan.FromMinutes(10));
 
 `Spinneret.Queue.Gcp` and `Spinneret.Queue.Mssql` provide the transport while the core queue owns delivery semantics. The GCP adapter uses Google Cloud Tasks with OIDC-authenticated dispatch; the MSSQL adapter uses SQL Server. The application-facing queue API stays the same either way.
 
+Dead letters need a store the transport does not always provide: the MSSQL transport writes them to a table in the same database, while Cloud Tasks has nowhere to put them, so `Spinneret.Queue.Firestore` supplies a Firestore-backed writer. It depends on the core queue rather than any transport, so it composes with either. Setup for each package — configuration, infrastructure, Terraform and the local emulator — is documented per package under **[docs/](docs/README.md)**.
+
 ### The nightly respin — `Spinneret.Scheduler`
 
 A recurring job is an interface, not infrastructure. Register it in DI and it installs itself idempotently at startup:
@@ -181,7 +185,7 @@ The installer unregisters retired keys alongside installing the declared ones �
 
 Installing happens in the background and retries with capped, jittered backoff until it succeeds, so a store that is briefly unreachable costs a short delay rather than a missing job — a single always-on host would otherwise carry that gap until its next restart. Startup is never held up by it, and each job stops being retried as soon as it is installed: this is a retry, not a reconciliation loop, so two revisions never fight over a definition during a rolling deploy. Running many instances needs no coordination — registration is idempotent and guarded by the store (the job key is the primary key in SQL Server and the document id in Firestore), so ten instances asserting the same job converge on one job.
 
-The scheduler itself is infrastructure-agnostic. `Spinneret.Scheduler.Gcp` provides Firestore-backed scheduling with transactional dispatch, while `Spinneret.Scheduler.Mssql` provides the SQL Server-backed equivalent. The job declaration and application-facing scheduling model stay the same.
+The scheduler itself is infrastructure-agnostic. `Spinneret.Scheduler.Firestore` provides Firestore-backed scheduling with transactional dispatch, while `Spinneret.Scheduler.Mssql` provides the SQL Server-backed equivalent. The job declaration and application-facing scheduling model stay the same. Storage and transport are chosen independently — Firestore scheduling depends only on the core queue, so it runs just as happily behind Cloud Tasks as behind SQL Server. What each package needs is documented per package under **[docs/](docs/README.md)**.
 
 ### The hub — `Spinneret.View` + `Spinneret.ViewModel`
 
@@ -216,7 +220,19 @@ var rate = Binding.Create(ViewModel, x => x.Rate, EmploymentRate.Parse);
 
 ## Anatomy
 
-Each thread stands alone; together they make a web. The core packages remain provider-agnostic — provider-specific packages such as `.Gcp` and `.Mssql` keep infrastructure concerns at the edges.
+Each thread stands alone; together they make a web. The core packages remain provider-agnostic — provider-specific packages such as `.Gcp`, `.Mssql` and `.Firestore` keep infrastructure concerns at the edges.
+
+Transport, storage and trigger are separate axes, chosen one call at a time and in any order:
+
+```csharp
+services.AddMssqlQueue(config, assemblies);   // transport
+services.AddFirestoreScheduler(config);       // where schedules live
+services.AddSchedulerSweeper();               // what drives them
+```
+
+SQL Server is transport and storage at once — the queue table *is* the store — but Cloud Tasks stores nothing you can query, so its dead letters and scheduled jobs live in Firestore. The `.Firestore` packages depend only on the provider-agnostic core, so they compose with any transport rather than with Cloud Tasks specifically.
+
+The trigger is likewise independent of where jobs are stored. `AddSchedulerSweeper()` runs a timer inside the host; `Spinneret.Scheduler.Http` exposes an authorized endpoint instead, for a host that scales to zero and has no thread of its own to tick. Both drive the same `ISchedulerSweep`.
 
 ```mermaid
 graph BT
@@ -226,9 +242,11 @@ graph BT
   Queue["Spinneret.Queue"] --> Mediator & Functional
   QueueGcp["Spinneret.Queue.Gcp"] --> Queue
   QueueMssql["Spinneret.Queue.Mssql"] --> Queue
+  QueueFirestore["Spinneret.Queue.Firestore"] --> Queue
   Scheduler["Spinneret.Scheduler"] --> Mediator
-  SchedulerGcp["Spinneret.Scheduler.Gcp"] --> Scheduler & QueueGcp
+  SchedulerFirestore["Spinneret.Scheduler.Firestore"] --> Scheduler & Queue
   SchedulerMssql["Spinneret.Scheduler.Mssql"] --> Scheduler & QueueMssql
+  SchedulerHttp["Spinneret.Scheduler.Http"] --> Scheduler
   ViewModel["Spinneret.ViewModel"] --> Functional & Parsing
   View["Spinneret.View"] --> ViewModel
   ViewServer["Spinneret.View.Server"] --> View

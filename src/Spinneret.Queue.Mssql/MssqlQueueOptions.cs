@@ -2,7 +2,7 @@ namespace Spinneret.Queue.Mssql;
 
 public sealed class MssqlQueueOptions
 {
-    public const string SectionName = "Queue:Mssql";
+    public static readonly string SectionName = "Queue:Mssql";
 
     /// <summary>
     /// SQL Server connection string for the queue tables. The queue must live in the same database

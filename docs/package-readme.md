@@ -12,8 +12,10 @@ A *spinneret* is the organ a spider uses to spin its web — different silks for
 | `Spinneret.Queue` | Durable command queue — the app owns the retry policy per command |
 | `Spinneret.Queue.Gcp` | Google Cloud Tasks transport with OIDC-authenticated dispatch |
 | `Spinneret.Queue.Mssql` | SQL Server transport with transactional enqueue and polling workers |
+| `Spinneret.Queue.Firestore` | Firestore-backed dead-letter store for any queue transport |
 | `Spinneret.Scheduler` | Recurring jobs declared in code, installed idempotently at startup |
-| `Spinneret.Scheduler.Gcp` | Firestore-backed scheduling with transactional dispatch |
+| `Spinneret.Scheduler.Firestore` | Firestore-backed scheduling with transactional dispatch |
+| `Spinneret.Scheduler.Http` | HTTP trigger that sweeps due jobs once per request |
 | `Spinneret.Scheduler.Mssql` | SQL Server-backed scheduling with transactional dispatch |
 | `Spinneret.ViewModel` | MVVM for Blazor: typed two-way bindings with validation state |
 | `Spinneret.View` | Blazor views that resolve their view model from DI |

@@ -2,7 +2,7 @@ namespace Spinneret.Queue.Gcp;
 
 public sealed class GcpQueueOptions
 {
-    public const string SectionName = "Queue:Gcp";
+    public static readonly string SectionName = "Queue:Gcp";
 
     public string ProjectId { get; set; } = string.Empty;
     public string LocationId { get; set; } = string.Empty;

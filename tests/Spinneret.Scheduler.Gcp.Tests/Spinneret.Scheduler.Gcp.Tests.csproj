@@ -1,7 +1,0 @@
-<Project Sdk="Microsoft.NET.Sdk">
-
-  <ItemGroup>
-    <ProjectReference Include="..\..\src\Spinneret.Scheduler.Gcp\Spinneret.Scheduler.Gcp.csproj" />
-  </ItemGroup>
-
-</Project>

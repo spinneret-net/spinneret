@@ -9,11 +9,24 @@
     </PropertyGroup>
 
     <ItemGroup>
+        <!-- Declared rather than left to arrive through Spinneret.Queue.Mssql: this package opens its
+             own SqlConnections, hosts its own schema initializer and binds its own options section,
+             so a reorganisation of the queue package's references must not be able to break it. -->
+        <PackageReference Include="Microsoft.Data.SqlClient" Version="6.1.1" />
+        <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="10.0.9" />
+        <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.9" />
+        <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.9" />
+        <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.9" />
+        <PackageReference Include="Microsoft.Extensions.Options" Version="10.0.9" />
     </ItemGroup>
 
     <ItemGroup>
         <ProjectReference Include="..\Spinneret.Scheduler\Spinneret.Scheduler.csproj" />
         <ProjectReference Include="..\Spinneret.Queue.Mssql\Spinneret.Queue.Mssql.csproj" />
+        <!-- Used directly, and MssqlSchedulerSchema.CreateScript exposes MssqlQueueOptions. -->
+        <ProjectReference Include="..\Spinneret.Queue\Spinneret.Queue.csproj" />
+        <ProjectReference Include="..\Spinneret.Mediator\Spinneret.Mediator.csproj" />
+        <ProjectReference Include="..\Spinneret.Functional\Spinneret.Functional.csproj" />
     </ItemGroup>
 
     <ItemGroup>

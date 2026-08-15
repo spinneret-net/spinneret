@@ -100,7 +100,6 @@ public sealed class SchedulerTestHost : IAsyncDisposable
             ["Queue:Mssql:DeadLetterTableName"] = $"DL_{suffix}",
             ["Queue:Mssql:PollInterval"] = "00:00:00.050",
             ["Scheduler:Mssql:TableName"] = $"Jobs_{suffix}",
-            ["Scheduler:Mssql:SweepInterval"] = "00:00:00.100",
         }).Build();
 
         var services = new ServiceCollection();
@@ -111,7 +110,8 @@ public sealed class SchedulerTestHost : IAsyncDisposable
         services.AddMssqlQueueWorker();
         services.AddMssqlScheduler(configuration);
         if (sweeper)
-            services.AddMssqlSchedulerSweeper();
+            // Fast ticks so integration tests do not wait out the 15s default.
+            services.AddSchedulerSweeper(o => o.SweepInterval = TimeSpan.FromMilliseconds(100));
         configure?.Invoke(services);
 
         var provider = services.BuildServiceProvider();

@@ -29,14 +29,21 @@ public sealed class StartupExtensionsTests
     }
 
     [Test]
-    public async Task AddMssqlScheduler_without_the_queue_fails_at_startup()
+    public async Task AddMssqlScheduler_composes_in_either_order_relative_to_the_queue()
     {
-        var services = new ServiceCollection();
+        // Previously this threw when the scheduler was registered first, even though the resulting
+        // container was identical. Nothing here reads the collection, so the calls commute.
+        var configuration = Configuration();
 
-        var ex = Assert.Throws<InvalidOperationException>(() =>
-            services.AddMssqlScheduler(Configuration()));
+        var after = new ServiceCollection();
+        after.AddSingleton(typeof(Microsoft.Extensions.Logging.ILogger<>),
+            typeof(Microsoft.Extensions.Logging.Abstractions.NullLogger<>));
+        after.AddMssqlScheduler(configuration);
+        after.AddMssqlQueue(configuration, typeof(StartupExtensionsTests).Assembly);
 
-        await Assert.That(ex.Message).Contains("AddMssqlQueue");
+        var provider = after.BuildServiceProvider();
+        await Assert.That(provider.GetRequiredService<IRecurringJobScheduler>()).IsTypeOf<MssqlScheduler>();
+        await Assert.That(provider.GetRequiredService<ISchedulerSweep>()).IsTypeOf<MssqlSchedulerSweeper>();
     }
 
     [Test]
@@ -74,15 +81,21 @@ public sealed class StartupExtensionsTests
     }
 
     [Test]
-    public async Task AddMssqlSchedulerSweeper_registers_the_sweeper()
+    public async Task AddMssqlScheduler_registers_the_sweep_engine_but_not_a_trigger()
     {
+        // The engine is always available; what drives it is the host's choice — a timer via
+        // AddSchedulerSweeper(), or the HTTP endpoint in Spinneret.Scheduler.Http.
         var configuration = Configuration();
         var services = ServicesWithQueue(configuration);
+
         services.AddMssqlScheduler(configuration);
 
-        services.AddMssqlSchedulerSweeper();
-
-        await Assert.That(services.Any(d => d.ImplementationType == typeof(MssqlSchedulerSweeper))).IsTrue();
+        var sweep = services.Single(d => d.ServiceType == typeof(ISchedulerSweep));
+        await Assert.That(sweep.ImplementationType).IsEqualTo(typeof(MssqlSchedulerSweeper));
+        await Assert.That(services
+            .Where(d => d.ServiceType == typeof(Microsoft.Extensions.Hosting.IHostedService))
+            .Select(d => d.ImplementationType?.FullName))
+            .DoesNotContain("Spinneret.Scheduler.SchedulerSweeperService");
     }
 
     [Test]
@@ -96,7 +109,6 @@ public sealed class StartupExtensionsTests
             .GetRequiredService<IOptions<MssqlSchedulerOptions>>().Value;
 
         await Assert.That(options.TableName).IsEqualTo("SpinneretScheduledJobs");
-        await Assert.That(options.SweepInterval).IsEqualTo(TimeSpan.FromSeconds(15));
     }
 
     [Test]
@@ -105,7 +117,6 @@ public sealed class StartupExtensionsTests
         var configuration = Configuration(new()
         {
             ["Scheduler:Mssql:TableName"] = "MyJobs",
-            ["Scheduler:Mssql:SweepInterval"] = "00:01:00",
         });
         var services = ServicesWithQueue(configuration);
 
@@ -114,7 +125,6 @@ public sealed class StartupExtensionsTests
             .GetRequiredService<IOptions<MssqlSchedulerOptions>>().Value;
 
         await Assert.That(options.TableName).IsEqualTo("MyJobs");
-        await Assert.That(options.SweepInterval).IsEqualTo(TimeSpan.FromMinutes(1));
     }
 
     [Test]
@@ -128,16 +138,8 @@ public sealed class StartupExtensionsTests
         await Assert.That(ex.Message).Contains("Scheduler:Mssql:TableName");
     }
 
-    [Test]
-    public async Task Non_positive_sweep_interval_fails_at_startup()
-    {
-        var configuration = Configuration(new() { ["Scheduler:Mssql:SweepInterval"] = "00:00:00" });
-        var services = ServicesWithQueue(configuration);
-
-        var ex = Assert.Throws<InvalidOperationException>(() => services.AddMssqlScheduler(configuration));
-
-        await Assert.That(ex.Message).Contains("Scheduler:Mssql:SweepInterval");
-    }
+    // The sweep interval moved to Scheduler:SweepInterval on the core options, along with the
+    // trigger that reads it; its validation is covered by SchedulerSweeperTests.
 
     [Test]
     public async Task Schema_script_uses_the_configured_names()

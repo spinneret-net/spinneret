@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+        <NoWarn>$(NoWarn);CS8524</NoWarn>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <!-- The scheduler abstraction only: this package is a trigger, so it knows nothing about
+             where jobs are stored. Keeping the framework reference here is what lets the storage
+             packages stay plain libraries. -->
+        <ProjectReference Include="..\Spinneret.Scheduler\Spinneret.Scheduler.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <InternalsVisibleTo Include="Spinneret.Scheduler.Http.Tests" />
+    </ItemGroup>
+
+    <PropertyGroup>
+        <Description>HTTP trigger for Spinneret.Scheduler: an authorized endpoint that runs one sweep per request, for hosts whose clock is an external scheduler.</Description>
+        <PackageTags>$(PackageTags) scheduler http endpoint cron</PackageTags>
+    </PropertyGroup>
+
+</Project>

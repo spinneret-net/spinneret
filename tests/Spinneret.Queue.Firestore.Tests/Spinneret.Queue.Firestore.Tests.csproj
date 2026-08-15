@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <!-- The package itself needs only the DI abstractions; building a provider to assert what the
+         Add* call registered is a test-only concern. -->
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.9" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Spinneret.Queue.Firestore\Spinneret.Queue.Firestore.csproj" />
+  </ItemGroup>
+
+</Project>

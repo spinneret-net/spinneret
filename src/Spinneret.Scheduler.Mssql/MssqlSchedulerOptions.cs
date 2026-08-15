@@ -2,7 +2,7 @@ namespace Spinneret.Scheduler.Mssql;
 
 public sealed class MssqlSchedulerOptions
 {
-    public const string SectionName = "Scheduler:Mssql";
+    public static readonly string SectionName = "Scheduler:Mssql";
 
     /// <summary>
     /// Table holding scheduled jobs. Connection, schema name and schema creation follow the queue's
@@ -11,6 +11,6 @@ public sealed class MssqlSchedulerOptions
     /// </summary>
     public string TableName { get; set; } = "SpinneretScheduledJobs";
 
-    /// <summary>How often each host sweeps for due jobs. Sweeps race safely across hosts.</summary>
-    public TimeSpan SweepInterval { get; set; } = TimeSpan.FromSeconds(15);
+    // Sweep cadence lives on the trigger, not the store: see Scheduler:Sweeper:SweepInterval on
+    // SchedulerOptions, which applies whichever scheduler provider a host registered.
 }

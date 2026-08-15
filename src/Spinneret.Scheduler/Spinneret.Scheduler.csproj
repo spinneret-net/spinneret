@@ -13,10 +13,15 @@
         <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.9" />
         <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.9" />
         <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.9" />
+        <!-- IOptions/AddOptions/ValidateOnStart, used by AddSchedulerSweeper. Reaches us anyway
+             through Hosting.Abstractions, but this package uses it directly. -->
+        <PackageReference Include="Microsoft.Extensions.Options" Version="10.0.9" />
     </ItemGroup>
 
     <ItemGroup>
         <ProjectReference Include="..\Spinneret.Mediator\Spinneret.Mediator.csproj" />
+        <!-- Unit appears in this package's public API, on IRecurringJob.CreateRequest(). -->
+        <ProjectReference Include="..\Spinneret.Functional\Spinneret.Functional.csproj" />
     </ItemGroup>
 
     <ItemGroup>

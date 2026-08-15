@@ -2,12 +2,19 @@
 root = false
 
 [*.cs]
-# RS0026 forbids overload sets where more than one overload has optional parameters.
-# Two such sets are deliberate, documented API shapes here:
-#   - ISpinneretMediator.Send / IQueue.Enqueue: the IRequest<Unit> convenience overload
-#     next to the generic one, both with an optional CancellationToken.
-#   - BindableBase.SetProperty: [CallerMemberName] requires an optional parameter, and the
-#     explicit-name overloads exist precisely for the non-caller-name cases.
-# The trap RS0026 guards against (a later overload making existing calls ambiguous) is
-# covered by the PublicAPI.txt review instead: any new overload shows up as a diff.
+# RS0026 forbids overload sets where more than one overload has optional parameters. It guards a
+# real trap: adding such an overload can silently re-bind an existing consumer's unchanged call site
+# the next time they recompile. PublicAPI.txt review does not catch that — it records *that* an
+# overload was added, not that the addition changed which method existing source binds to. So this
+# stays on everywhere, and the deliberate exceptions are scoped to their own files below.
+dotnet_diagnostic.RS0026.severity = warning
+
+# The IRequest<Unit> convenience overload sits next to the generic one, both carrying an optional
+# CancellationToken. The pair is the documented shape of these APIs, not an accident.
+[{IQueue.cs,SpinneretMediator.cs,MssqlQueue.cs}]
+dotnet_diagnostic.RS0026.severity = none
+
+# [CallerMemberName] requires an optional parameter, and the explicit-name overloads exist precisely
+# for the cases where the caller's name is not the property name.
+[BindableBase.cs]
 dotnet_diagnostic.RS0026.severity = none

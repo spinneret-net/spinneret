@@ -9,10 +9,15 @@ namespace Microsoft.Extensions.DependencyInjection;
 public static class QueueCoreServiceCollectionExtensions
 {
     /// <summary>
-    /// Registers transport-agnostic queue infrastructure: the type registry, the
-    /// dispatcher, and a default no-op serializer that callers (e.g. the GCP transport)
-    /// should replace with one that uses the host's JsonSerializerOptions.
+    /// Registers transport-agnostic queue infrastructure: the type registry, the dispatcher and the
+    /// delivery processor. Called by the transport packages' own registration, so applications wire
+    /// up a queue by calling that one instead of this.
     /// </summary>
+    /// <remarks>
+    /// Deliberately registers no <see cref="IQueuePayloadSerializer"/>, <see cref="IQueue"/>,
+    /// <see cref="IEnvelopeQueue"/> or <see cref="IDeadLetterWriter"/> — every one of those is a
+    /// transport or host decision, and each transport supplies its own default.
+    /// </remarks>
     public static IServiceCollection AddQueueCore(this IServiceCollection services, params Assembly[] requestAssemblies)
     {
         if (requestAssemblies.Length == 0)

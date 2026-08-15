@@ -26,7 +26,11 @@ public sealed class FakeCloudTasksClient : CloudTasksClient
 {
     public List<CreateTaskRequest> Requests { get; } = [];
 
+    /// <summary>Queue resources created through <c>CreateQueueAsync</c>, in call order.</summary>
+    public List<CreateQueueRequest> CreatedQueues { get; } = [];
+
     public Exception? ThrowOnCreateTask { get; set; }
+    public Exception? ThrowOnCreateQueue { get; set; }
 
     public CreateTaskRequest SingleRequest => Requests.Single();
 
@@ -38,6 +42,16 @@ public sealed class FakeCloudTasksClient : CloudTasksClient
         Requests.Add(request);
         return Task.FromResult(request.Task);
     }
+
+    public override Task<Google.Cloud.Tasks.V2.Queue> CreateQueueAsync(
+        CreateQueueRequest request, CallSettings? callSettings = null)
+    {
+        if (ThrowOnCreateQueue is not null)
+            throw ThrowOnCreateQueue;
+
+        CreatedQueues.Add(request);
+        return Task.FromResult(request.Queue);
+    }
 }
 
 internal static class TestSetup
@@ -48,6 +62,21 @@ internal static class TestSetup
     public const string BulkQueueId = "bulk-queue";
     public const string DispatcherUrl = "https://worker.example.com/internal/queue/dispatch";
     public const string ServiceAccountEmail = "tasks@test-project.iam.gserviceaccount.com";
+    public const string EmulatorEndpoint = "localhost:8123";
+    public const string EmulatorIssuer = "http://localhost:8980";
+
+    /// <summary>
+    /// Emulator configuration. The issuer travels with the endpoint because the two are only valid
+    /// together: with an emulator but no issuer, the dispatch endpoint would still validate against
+    /// accounts.google.com and reject every emulator-minted token.
+    /// </summary>
+    public static IConfiguration EmulatorConfig(Action<Dictionary<string, string?>>? mutate = null) =>
+        Config(values =>
+        {
+            values["Queue:Gcp:EmulatorEndpoint"] = EmulatorEndpoint;
+            values["Queue:Gcp:OidcIssuer"] = EmulatorIssuer;
+            mutate?.Invoke(values);
+        });
 
     public static IConfiguration Config(Action<Dictionary<string, string?>>? mutate = null)
     {

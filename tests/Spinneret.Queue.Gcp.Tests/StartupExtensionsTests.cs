@@ -110,8 +110,7 @@ public sealed class StartupExtensionsTests
     [Test]
     public async Task AddGcpQueue_with_emulator_endpoint_builds_client_without_credentials()
     {
-        var config = TestSetup.Config(values => values["Queue:Gcp:EmulatorEndpoint"] = "localhost:8123");
-        var provider = TestSetup.BuildProvider(config);
+        var provider = TestSetup.BuildProvider(TestSetup.EmulatorConfig());
 
         var client = provider.GetRequiredService<CloudTasksClient>();
 
@@ -135,5 +134,73 @@ public sealed class StartupExtensionsTests
             () => services.AddGcpQueue(config, typeof(PlainCommand).Assembly));
 
         await Assert.That(ex.Message).Contains(expectedMessagePart);
+    }
+
+    [Test]
+    [Arguments("worker.example.com/dispatch", "absolute")]
+    [Arguments("/internal/queue/dispatch", "absolute")]
+    [Arguments("http://worker.example.com/dispatch", "https")]
+    public async Task AddGcpQueue_malformed_dispatcher_url_fails_at_startup(string url, string expectedMessagePart)
+    {
+        var config = TestSetup.Config(values => values["Queue:Gcp:DispatcherUrl"] = url);
+        var services = new ServiceCollection();
+
+        var ex = Assert.Throws<InvalidOperationException>(
+            () => services.AddGcpQueue(config, typeof(PlainCommand).Assembly));
+
+        await Assert.That(ex.Message).Contains(expectedMessagePart);
+    }
+
+    [Test]
+    public async Task AddGcpQueue_allows_an_http_dispatcher_url_against_the_emulator()
+    {
+        // The emulator calls back to a locally hosted app, which has no certificate.
+        var config = TestSetup.EmulatorConfig(
+            values => values["Queue:Gcp:DispatcherUrl"] = "http://host.docker.internal:5028/internal/queue/dispatch");
+
+        var provider = TestSetup.BuildProvider(config);
+
+        var options = provider.GetRequiredService<IOptions<GcpQueueOptions>>().Value;
+        await Assert.That(options.UsesEmulator).IsTrue();
+    }
+
+    [Test]
+    public async Task AddGcpQueue_with_an_emulator_but_no_issuer_fails_at_startup()
+    {
+        // Binds and starts happily today, then rejects every delivery: the endpoint keeps validating
+        // emulator-minted tokens against accounts.google.com.
+        var config = TestSetup.Config(
+            values => values["Queue:Gcp:EmulatorEndpoint"] = TestSetup.EmulatorEndpoint);
+        var services = new ServiceCollection();
+
+        var ex = Assert.Throws<InvalidOperationException>(
+            () => services.AddGcpQueue(config, typeof(PlainCommand).Assembly));
+
+        await Assert.That(ex.Message).Contains("OidcIssuer");
+        await Assert.That(ex.Message).Contains("EmulatorEndpoint");
+    }
+
+    [Test]
+    public async Task AddGcpQueue_malformed_oidc_issuer_fails_at_startup()
+    {
+        var config = TestSetup.Config(values => values["Queue:Gcp:OidcIssuer"] = "not-a-url");
+        var services = new ServiceCollection();
+
+        var ex = Assert.Throws<InvalidOperationException>(
+            () => services.AddGcpQueue(config, typeof(PlainCommand).Assembly));
+
+        await Assert.That(ex.Message).Contains("OidcIssuer");
+    }
+
+    [Test]
+    public async Task AddGcpQueue_accepts_an_opaque_oidc_audience()
+    {
+        // A JWT 'aud' is an opaque string, not a URL — Cloud Tasks sends it verbatim.
+        var config = TestSetup.Config(values => values["Queue:Gcp:OidcAudience"] = "custom-audience");
+
+        var provider = TestSetup.BuildProvider(config);
+
+        var options = provider.GetRequiredService<IOptions<GcpQueueOptions>>().Value;
+        await Assert.That(options.ResolvedOidcAudience).IsEqualTo("custom-audience");
     }
 }

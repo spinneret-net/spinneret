@@ -20,7 +20,6 @@ namespace Spinneret.Scheduler.Mssql;
 /// </summary>
 internal sealed class MssqlSchedulerSweeper(
     IOptions<MssqlQueueOptions> queueOptions,
-    IOptions<MssqlSchedulerOptions> schedulerOptions,
     ScheduledJobSql sql,
     QueueTypeRegistry registry,
     IQueuePayloadSerializer serializer,
@@ -29,44 +28,28 @@ internal sealed class MssqlSchedulerSweeper(
     IMssqlTransactionProvider transactions,
     TimeProvider timeProvider,
     ILogger<MssqlSchedulerSweeper> logger)
-    : BackgroundService
+    : ISchedulerSweep
 {
     /// <summary>How far an unreadable job is pushed out before the sweep sees it again.</summary>
     private static readonly TimeSpan QuarantineDelay = TimeSpan.FromMinutes(5);
 
-    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    /// <summary>
+    /// Drains everything currently due, one job per transaction. Draining rather than taking a
+    /// fixed batch is safe because each job commits on its own and competing hosts skip locked rows,
+    /// so a backlog clears at full speed instead of one job per tick.
+    /// </summary>
+    /// <remarks>
+    /// Returns as soon as a job cannot be booked, deliberately: continuing would re-claim the same
+    /// still-due job in a tight loop. The caller's interval is what backs that off — see
+    /// <c>Compensate</c>.
+    /// </remarks>
+    public async Task<SweepResult> SweepAsync(CancellationToken ct)
     {
-        logger.LogInformation("Scheduler sweep started (every {SweepInterval})", schedulerOptions.Value.SweepInterval);
+        var dispatched = 0;
+        while (await TryDispatchNextDue(ct))
+            dispatched++;
 
-        while (!stoppingToken.IsCancellationRequested)
-        {
-            try
-            {
-                // Drain everything currently due, one job per transaction, before going back to sleep.
-                while (await TryDispatchNextDue(stoppingToken))
-                {
-                }
-            }
-            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
-            {
-                break;
-            }
-            catch (Exception ex)
-            {
-                logger.LogError(ex, "Scheduler sweep failed; next sweep continues");
-            }
-
-            try
-            {
-                await Task.Delay(schedulerOptions.Value.SweepInterval, stoppingToken);
-            }
-            catch (OperationCanceledException)
-            {
-                break;
-            }
-        }
-
-        logger.LogInformation("Scheduler sweep stopped");
+        return SweepResult.Dispatched(dispatched);
     }
 
     /// <summary>Claims and dispatches at most one due job; false means nothing (more) is due.</summary>

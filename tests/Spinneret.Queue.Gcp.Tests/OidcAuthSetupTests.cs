@@ -65,8 +65,7 @@ public sealed class OidcAuthSetupTests
     [Test]
     public async Task AddGcpQueue_with_emulator_allows_http_metadata()
     {
-        var config = TestSetup.Config(values => values["Queue:Gcp:EmulatorEndpoint"] = "localhost:8123");
-        var provider = TestSetup.BuildProvider(config);
+        var provider = TestSetup.BuildProvider(TestSetup.EmulatorConfig());
 
         var jwt = ResolveJwtOptions(provider);
 

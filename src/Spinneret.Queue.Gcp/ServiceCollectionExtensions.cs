@@ -81,6 +81,11 @@ public static class GcpQueueServiceCollectionExtensions
 
         services.AddQueueOidcAuth(eagerlyBound);
 
+        // No-ops unless an emulator endpoint is configured, so it is safe to always register:
+        // production queues stay owned by infrastructure-as-code, and the initializer resolves the
+        // Cloud Tasks client only after that check so no host builds one just to start up.
+        services.AddHostedService<EmulatorQueueInitializer>();
+
         return services;
     }
 }

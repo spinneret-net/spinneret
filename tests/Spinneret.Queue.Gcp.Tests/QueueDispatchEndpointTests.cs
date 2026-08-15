@@ -53,18 +53,32 @@ public sealed class QueueDispatchEndpointTests
     private static (RouteEndpoint Endpoint, IServiceProvider Provider) BuildEndpoint(
         FakeProcessor? processor = null, FakeDeadLetterWriter? deadLetters = null)
     {
-        var services = new ServiceCollection();
-        services.AddLogging();
-        services.AddRouting();
-        services.AddSingleton<IQueueDeliveryProcessor>(processor ?? new FakeProcessor());
-        services.AddSingleton<IDeadLetterWriter>(deadLetters ?? new FakeDeadLetterWriter());
-        var provider = services.BuildServiceProvider();
-
-        var builder = new TestEndpointRouteBuilder(provider);
+        var builder = RouteBuilder(services =>
+        {
+            services.AddSingleton<IQueueDeliveryProcessor>(processor ?? new FakeProcessor());
+            services.AddSingleton<IDeadLetterWriter>(deadLetters ?? new FakeDeadLetterWriter());
+        });
         builder.MapGcpQueueDispatch();
 
         var endpoint = (RouteEndpoint)builder.DataSources.Single().Endpoints.Single();
-        return (endpoint, provider);
+        return (endpoint, builder.ServiceProvider);
+    }
+
+    /// <summary>
+    /// A route builder whose container carries the dispatcher URL the endpoint derives its route
+    /// from. <see cref="TestSetup.DispatcherUrl"/>'s path is the conventional dispatch route, so
+    /// tests asserting that route also confirm the derivation lines up with the configured URL.
+    /// </summary>
+    private static TestEndpointRouteBuilder RouteBuilder(
+        Action<ServiceCollection>? configure = null, string? dispatcherUrl = null)
+    {
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddRouting();
+        services.Configure<GcpQueueOptions>(
+            o => o.DispatcherUrl = dispatcherUrl ?? TestSetup.DispatcherUrl);
+        configure?.Invoke(services);
+        return new TestEndpointRouteBuilder(services.BuildServiceProvider());
     }
 
     private static async Task<DefaultHttpContext> Invoke(
@@ -115,11 +129,7 @@ public sealed class QueueDispatchEndpointTests
     [Test]
     public async Task MapGcpQueueDispatch_returns_builder_for_chaining()
     {
-        var services = new ServiceCollection();
-        services.AddLogging();
-        services.AddRouting();
-        services.AddSingleton<IDeadLetterWriter, FakeDeadLetterWriter>();
-        var builder = new TestEndpointRouteBuilder(services.BuildServiceProvider());
+        var builder = RouteBuilder(s => s.AddSingleton<IDeadLetterWriter, FakeDeadLetterWriter>());
 
         var returned = builder.MapGcpQueueDispatch();
 
@@ -129,10 +139,7 @@ public sealed class QueueDispatchEndpointTests
     [Test]
     public async Task MapGcpQueueDispatch_without_dead_letter_writer_fails_at_map_time()
     {
-        var services = new ServiceCollection();
-        services.AddLogging();
-        services.AddRouting();
-        var builder = new TestEndpointRouteBuilder(services.BuildServiceProvider());
+        var builder = RouteBuilder();
 
         var ex = Assert.Throws<InvalidOperationException>(() => builder.MapGcpQueueDispatch());
 
@@ -140,21 +147,70 @@ public sealed class QueueDispatchEndpointTests
     }
 
     [Test]
-    public async Task MapGcpQueueDispatch_maps_a_custom_route_pattern()
+    public async Task MapGcpQueueDispatch_routes_on_the_path_of_the_dispatcher_url()
     {
-        var services = new ServiceCollection();
-        services.AddLogging();
-        services.AddRouting();
-        services.AddSingleton<IDeadLetterWriter, FakeDeadLetterWriter>();
-        var builder = new TestEndpointRouteBuilder(services.BuildServiceProvider());
+        var builder = RouteBuilder(
+            s => s.AddSingleton<IDeadLetterWriter, FakeDeadLetterWriter>(),
+            dispatcherUrl: "https://worker.example.com/hooks/queue");
+
+        builder.MapGcpQueueDispatch();
+
+        var endpoint = builder.DataSources.SelectMany(s => s.Endpoints).OfType<RouteEndpoint>().Single();
+        await Assert.That(endpoint.RoutePattern.RawText).IsEqualTo("/hooks/queue");
+    }
+
+    [Test]
+    public async Task MapGcpQueueDispatch_accepts_a_pattern_matching_the_dispatcher_url()
+    {
+        var builder = RouteBuilder(
+            s => s.AddSingleton<IDeadLetterWriter, FakeDeadLetterWriter>(),
+            dispatcherUrl: "https://worker.example.com/hooks/queue");
 
         builder.MapGcpQueueDispatch("/hooks/queue");
 
-        var endpoint = builder.DataSources
-            .SelectMany(s => s.Endpoints)
-            .OfType<RouteEndpoint>()
-            .Single();
+        var endpoint = builder.DataSources.SelectMany(s => s.Endpoints).OfType<RouteEndpoint>().Single();
         await Assert.That(endpoint.RoutePattern.RawText).IsEqualTo("/hooks/queue");
+    }
+
+    [Test]
+    public async Task MapGcpQueueDispatch_with_a_pattern_disagreeing_with_the_dispatcher_url_fails_at_map_time()
+    {
+        // Left to run, every task would 404 and — against the queue's unlimited retry backstop —
+        // retry until it expired, with nothing in the app to show for it.
+        var builder = RouteBuilder(
+            s => s.AddSingleton<IDeadLetterWriter, FakeDeadLetterWriter>(),
+            dispatcherUrl: "https://worker.example.com/internal/queue/dispatch");
+
+        var ex = Assert.Throws<InvalidOperationException>(() => builder.MapGcpQueueDispatch("/hooks/queue"));
+
+        await Assert.That(ex.Message).Contains("/hooks/queue");
+        await Assert.That(ex.Message).Contains("/internal/queue/dispatch");
+    }
+
+    [Test]
+    public async Task MapGcpQueueDispatch_without_a_configured_dispatcher_url_fails_at_map_time()
+    {
+        // IOptions<T> is an open generic, so this resolves a default-constructed options object
+        // rather than null — the blank URL has to be caught explicitly.
+        var builder = RouteBuilder(
+            s => s.AddSingleton<IDeadLetterWriter, FakeDeadLetterWriter>(),
+            dispatcherUrl: "");
+
+        var ex = Assert.Throws<InvalidOperationException>(() => builder.MapGcpQueueDispatch());
+
+        await Assert.That(ex.Message).Contains("DispatcherUrl");
+    }
+
+    [Test]
+    public async Task MapGcpQueueDispatch_with_a_relative_dispatcher_url_fails_at_map_time()
+    {
+        var builder = RouteBuilder(
+            s => s.AddSingleton<IDeadLetterWriter, FakeDeadLetterWriter>(),
+            dispatcherUrl: "/internal/queue/dispatch");
+
+        var ex = Assert.Throws<InvalidOperationException>(() => builder.MapGcpQueueDispatch());
+
+        await Assert.That(ex.Message).Contains("absolute");
     }
 
     [Test]
