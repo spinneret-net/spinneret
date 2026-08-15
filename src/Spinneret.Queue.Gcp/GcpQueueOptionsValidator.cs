@@ -59,9 +59,9 @@ internal sealed class GcpQueueOptionsValidator(QueueTypeRegistry registry) : IVa
     /// </summary>
     private static void ValidateDispatcherUrl(GcpQueueOptions o)
     {
-        if (!Uri.TryCreate(o.DispatcherUrl, UriKind.Absolute, out var uri))
+        if (!IsHttpUrl(o.DispatcherUrl, out var uri))
             throw new InvalidOperationException(
-                $"Queue:Gcp:DispatcherUrl must be an absolute URL; got '{o.DispatcherUrl}'.");
+                $"Queue:Gcp:DispatcherUrl must be an absolute http(s) URL; got '{o.DispatcherUrl}'.");
 
         if (!o.UsesEmulator && uri.Scheme != Uri.UriSchemeHttps)
             throw new InvalidOperationException(
@@ -87,10 +87,24 @@ internal sealed class GcpQueueOptionsValidator(QueueTypeRegistry registry) : IVa
 
         // Deliberately not validating OidcAudience: a JWT 'aud' is an opaque string, and Cloud Tasks
         // sends whatever is configured verbatim. Only the issuer must be a URL — it is fetched.
-        if (!string.IsNullOrWhiteSpace(o.OidcIssuer)
-            && !Uri.TryCreate(o.OidcIssuer, UriKind.Absolute, out _))
+        if (!string.IsNullOrWhiteSpace(o.OidcIssuer) && !IsHttpUrl(o.OidcIssuer, out _))
             throw new InvalidOperationException(
-                $"Queue:Gcp:OidcIssuer must be an absolute URL; got '{o.OidcIssuer}'. " +
+                $"Queue:Gcp:OidcIssuer must be an absolute http(s) URL; got '{o.OidcIssuer}'. " +
                 "It is the authority the dispatch endpoint fetches OpenID metadata from.");
     }
+
+    /// <summary>
+    /// An absolute URL that is actually addressable over HTTP.
+    /// </summary>
+    /// <remarks>
+    /// The scheme check is what makes this platform-independent, and it is not optional: on Unix,
+    /// <see cref="Uri.TryCreate(string, UriKind, out Uri)"/> reads a leading slash as a file path and
+    /// happily produces an absolute <c>file://</c> URI, so a relative value like
+    /// <c>/internal/queue/dispatch</c> passes an absoluteness check on Linux while failing it on
+    /// Windows. Requiring http or https rejects it the same way everywhere.
+    /// </remarks>
+    internal static bool IsHttpUrl(string value, out Uri uri) =>
+        Uri.TryCreate(value, UriKind.Absolute, out uri!)
+        && uri.Scheme is var scheme
+        && (scheme == Uri.UriSchemeHttp || scheme == Uri.UriSchemeHttps);
 }

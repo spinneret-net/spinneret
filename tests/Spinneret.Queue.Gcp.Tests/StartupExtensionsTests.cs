@@ -162,6 +162,11 @@ public sealed class StartupExtensionsTests
     [Test]
     [Arguments("worker.example.com/dispatch", "absolute")]
     [Arguments("/internal/queue/dispatch", "absolute")]
+    // A leading slash is a *file path* to Uri on Unix, so it yields an absolute file:// URI there
+    // while failing outright on Windows. These two pin the scheme requirement that makes the
+    // outcome identical on both — without them the relative case above only fails on Windows.
+    [Arguments("file:///internal/queue/dispatch", "http(s)")]
+    [Arguments("ftp://worker.example.com/dispatch", "http(s)")]
     [Arguments("http://worker.example.com/dispatch", "https")]
     public async Task AddGcpQueue_malformed_dispatcher_url_fails_at_startup(string url, string expectedMessagePart)
     {
@@ -204,9 +209,12 @@ public sealed class StartupExtensionsTests
     }
 
     [Test]
-    public async Task AddGcpQueue_malformed_oidc_issuer_fails_at_startup()
+    [Arguments("not-a-url")]
+    [Arguments("/issuer")]
+    [Arguments("file:///issuer")]
+    public async Task AddGcpQueue_malformed_oidc_issuer_fails_at_startup(string issuer)
     {
-        var config = TestSetup.Config(values => values["Queue:Gcp:OidcIssuer"] = "not-a-url");
+        var config = TestSetup.Config(values => values["Queue:Gcp:OidcIssuer"] = issuer);
         var services = new ServiceCollection();
 
         var ex = Assert.Throws<InvalidOperationException>(

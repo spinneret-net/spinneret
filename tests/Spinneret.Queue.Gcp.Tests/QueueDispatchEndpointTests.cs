@@ -202,15 +202,21 @@ public sealed class QueueDispatchEndpointTests
     }
 
     [Test]
-    public async Task MapGcpQueueDispatch_with_a_relative_dispatcher_url_fails_at_map_time()
+    [Arguments("/internal/queue/dispatch")]
+    // Uri treats a leading slash as a file path on Unix, so the relative case above resolves to an
+    // absolute file:// URI there and only the scheme check rejects it. This spells that out so the
+    // guard is exercised identically on every platform.
+    [Arguments("file:///internal/queue/dispatch")]
+    [Arguments("ftp://worker.example.com/dispatch")]
+    public async Task MapGcpQueueDispatch_with_a_non_http_dispatcher_url_fails_at_map_time(string dispatcherUrl)
     {
         var builder = RouteBuilder(
             s => s.AddSingleton<IDeadLetterWriter, FakeDeadLetterWriter>(),
-            dispatcherUrl: "/internal/queue/dispatch");
+            dispatcherUrl: dispatcherUrl);
 
         var ex = Assert.Throws<InvalidOperationException>(() => builder.MapGcpQueueDispatch());
 
-        await Assert.That(ex.Message).Contains("absolute");
+        await Assert.That(ex.Message).Contains("http(s)");
     }
 
     [Test]

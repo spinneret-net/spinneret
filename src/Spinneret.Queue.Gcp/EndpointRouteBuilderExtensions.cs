@@ -54,9 +54,9 @@ public static class GcpQueueEndpointRouteBuilderExtensions
                 "MapGcpQueueDispatch requires Queue:Gcp:DispatcherUrl to be configured. " +
                 "Call AddGcpQueue before building the app.");
 
-        if (!Uri.TryCreate(dispatcherUrl, UriKind.Absolute, out var uri))
+        if (!GcpQueueOptionsValidator.IsHttpUrl(dispatcherUrl, out var uri))
             throw new InvalidOperationException(
-                $"Queue:Gcp:DispatcherUrl must be an absolute URL; got '{dispatcherUrl}'.");
+                $"Queue:Gcp:DispatcherUrl must be an absolute http(s) URL; got '{dispatcherUrl}'.");
 
         var routeFromUrl = uri.AbsolutePath;
         if (pattern is null)
