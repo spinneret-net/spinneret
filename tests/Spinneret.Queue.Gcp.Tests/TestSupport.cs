@@ -2,6 +2,7 @@ using Spinneret.Functional;
 using System.Reflection;
 using Google.Api.Gax.Grpc;
 using Google.Cloud.Tasks.V2;
+using Grpc.Core;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Spinneret.Mediator;
@@ -29,6 +30,15 @@ public sealed class FakeCloudTasksClient : CloudTasksClient
     /// <summary>Queue resources created through <c>CreateQueueAsync</c>, in call order.</summary>
     public List<CreateQueueRequest> CreatedQueues { get; } = [];
 
+    /// <summary>Every <c>CreateQueueAsync</c> call, including the ones made to fail.</summary>
+    public int CreateQueueAttempts { get; private set; }
+
+    /// <summary>
+    /// Leading <c>CreateQueueAsync</c> calls that fail as an emulator that is not listening yet
+    /// does, after which creation succeeds — an emulator container starting alongside the host.
+    /// </summary>
+    public int TransientCreateQueueFailures { get; set; }
+
     public Exception? ThrowOnCreateTask { get; set; }
     public Exception? ThrowOnCreateQueue { get; set; }
 
@@ -46,8 +56,16 @@ public sealed class FakeCloudTasksClient : CloudTasksClient
     public override Task<Google.Cloud.Tasks.V2.Queue> CreateQueueAsync(
         CreateQueueRequest request, CallSettings? callSettings = null)
     {
+        CreateQueueAttempts++;
+
         if (ThrowOnCreateQueue is not null)
             throw ThrowOnCreateQueue;
+
+        if (TransientCreateQueueFailures > 0)
+        {
+            TransientCreateQueueFailures--;
+            throw new RpcException(new Status(StatusCode.Unavailable, "the emulator is not up yet"));
+        }
 
         CreatedQueues.Add(request);
         return Task.FromResult(request.Queue);

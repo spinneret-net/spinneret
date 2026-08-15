@@ -47,7 +47,7 @@ public static class SchedulerSweepEndpointRouteBuilderExtensions
                 + "(AddFirestoreScheduler, AddMssqlScheduler, or another): this package only exposes "
                 + "the trigger, and something has to tell it what is due.");
 
-        return SchedulerSweepEndpoint.MapSchedulerSweep(
+        return SchedulerSweepEndpoint.Map(
             endpoints, authorizationPolicy, pattern ?? SchedulerSweepEndpoint.DefaultRoutePattern);
     }
 }

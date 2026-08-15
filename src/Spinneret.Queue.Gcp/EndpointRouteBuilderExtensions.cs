@@ -33,7 +33,7 @@ public static class GcpQueueEndpointRouteBuilderExtensions
                 "Register one before building the app — AddFirestoreDeadLetters() provides the " +
                 "Firestore-backed default.");
 
-        return QueueDispatchEndpoint.MapGcpQueueDispatch(endpoints, ResolvePattern(endpoints, pattern));
+        return QueueDispatchEndpoint.Map(endpoints, ResolvePattern(endpoints, pattern));
     }
 
     /// <summary>

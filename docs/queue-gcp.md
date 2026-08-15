@@ -219,9 +219,17 @@ Four couplings decide whether this works:
    401s, so this now fails at startup rather than at run time.
 3. **`DispatcherUrl` must be reachable from inside the container** — `host.docker.internal`, not
    `localhost`, because the emulator calls back into your app.
-4. **Queues are created for you.** Each channel's queue is created on the emulator at startup, so
-   `Channels` is the only place they are declared. (Emulator builds without queue-creation support
-   log a warning; declare those with `-queue` flags instead.)
+4. **Queues are created for you.** Each channel's queue is created on the emulator as the host
+   starts, so `Channels` is the only place they are declared. (Emulator builds without
+   queue-creation support log a warning; declare those with `-queue` flags instead.)
+
+That creation runs in the background and retries with capped, jittered backoff, so an emulator
+coming up alongside the host — or started minutes later — still gets its queues. **It never fails
+the host.** An emulator that stays unreachable is logged, at Error once it stops looking like a
+container still starting, and the first enqueue names the queue it could not find. Hosts boot with
+`EmulatorEndpoint` set long before anything is listening — a `WebApplicationFactory` suite running
+against your development configuration is the common case — and taking those down over a queue that
+exists only on a developer's machine would be absurd.
 
 ## Gotchas
 
@@ -232,3 +240,4 @@ Four couplings decide whether this works:
 | `PermissionDenied` on enqueue | Missing `cloudtasks.enqueuer`, or missing `iam.serviceAccountUser` on the invoker SA. |
 | Tasks stop retrying earlier than the policy says | The queue's `retry_config` is overriding the application's `[QueuePolicy]`. |
 | A channel works locally but not in production | The channel is mapped in `Channels` but no queue exists for it in that project/location. |
+| `NotFound` on every local enqueue | The emulator was unreachable when the host started, so its queues do not exist yet. The log says so; starting the emulator is enough — the host keeps retrying and picks it up within a minute. |
