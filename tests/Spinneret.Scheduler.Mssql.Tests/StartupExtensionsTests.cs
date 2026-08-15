@@ -24,7 +24,7 @@ public sealed class StartupExtensionsTests
         var services = new ServiceCollection();
         services.AddSingleton(typeof(Microsoft.Extensions.Logging.ILogger<>),
             typeof(Microsoft.Extensions.Logging.Abstractions.NullLogger<>));
-        services.AddMssqlQueue(configuration, typeof(StartupExtensionsTests).Assembly);
+        services.AddMssqlQueue(configuration, o => o.RequestAssemblies = [typeof(StartupExtensionsTests).Assembly]);
         return services;
     }
 
@@ -39,7 +39,7 @@ public sealed class StartupExtensionsTests
         after.AddSingleton(typeof(Microsoft.Extensions.Logging.ILogger<>),
             typeof(Microsoft.Extensions.Logging.Abstractions.NullLogger<>));
         after.AddMssqlScheduler(configuration);
-        after.AddMssqlQueue(configuration, typeof(StartupExtensionsTests).Assembly);
+        after.AddMssqlQueue(configuration, o => o.RequestAssemblies = [typeof(StartupExtensionsTests).Assembly]);
 
         var provider = after.BuildServiceProvider();
         await Assert.That(provider.GetRequiredService<IRecurringJobScheduler>()).IsTypeOf<MssqlScheduler>();

@@ -6,13 +6,14 @@ Spinneret.Mediator.CacheAttribute.Duration.get -> System.TimeSpan
 Spinneret.Mediator.CacheAttribute.Tags.get -> System.Collections.Generic.IReadOnlyList<System.Enum!>!
 Spinneret.Mediator.IMediatorCache
 Spinneret.Mediator.IMediatorCache.Clear() -> void
-Spinneret.Mediator.InvalidateCacheAttribute
-Spinneret.Mediator.InvalidateCacheAttribute.InvalidateCacheAttribute(params object![]! tags) -> void
-Spinneret.Mediator.InvalidateCacheAttribute.Tags.get -> System.Collections.Generic.IReadOnlyList<System.Enum!>!
 Spinneret.Mediator.IRequest<TResponse>
 Spinneret.Mediator.IRequestHandler<TRequest, TResponse>
 Spinneret.Mediator.IRequestHandler<TRequest, TResponse>.Handle(TRequest request, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<TResponse>!
 Spinneret.Mediator.ISpinneretMediator
 Spinneret.Mediator.ISpinneretMediator.Send(Spinneret.Mediator.IRequest<Spinneret.Functional.Unit>! request, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
 Spinneret.Mediator.ISpinneretMediator.Send<TResponse>(Spinneret.Mediator.IRequest<TResponse>! request, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<TResponse>!
-static Microsoft.Extensions.DependencyInjection.MediatorServiceCollectionExtensions.AddMediator(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, params System.Reflection.Assembly![]! mediatorAssemblies) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+Spinneret.Mediator.InvalidateCacheAttribute
+Spinneret.Mediator.InvalidateCacheAttribute.InvalidateCacheAttribute(params object![]! tags) -> void
+Spinneret.Mediator.InvalidateCacheAttribute.Tags.get -> System.Collections.Generic.IReadOnlyList<System.Enum!>!
+static Microsoft.Extensions.DependencyInjection.MediatorServiceCollectionExtensions.AddMediator(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static Microsoft.Extensions.DependencyInjection.MediatorServiceCollectionExtensions.AddMediator(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Collections.Generic.IReadOnlyCollection<System.Reflection.Assembly!>! mediatorAssemblies) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!

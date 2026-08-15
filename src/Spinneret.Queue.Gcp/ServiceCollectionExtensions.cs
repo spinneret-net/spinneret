@@ -16,25 +16,37 @@ public static class GcpQueueServiceCollectionExtensions
     /// registry built from the supplied assemblies.
     /// </summary>
     /// <remarks>
-    /// Call <c>endpoints.MapGcpQueueDispatch()</c> in the request pipeline to expose
-    /// the worker endpoint. Configuration is read from the <c>Queue:Gcp</c> section.
-    /// Invalid configuration fails here when bindable, and again at host start via
-    /// options validation for values changed by later Configure/PostConfigure calls.
+    /// <paramref name="configure"/> runs after the section is bound, and is where
+    /// <see cref="GcpQueueOptions.RequestAssemblies"/> is set — assemblies cannot come from
+    /// configuration. Call <c>endpoints.MapGcpQueueDispatch()</c> in the request pipeline to expose
+    /// the worker endpoint. Configuration is read from the <c>Queue:Gcp</c> section. Invalid
+    /// configuration fails here when bindable, and again at host start via options validation for
+    /// values changed by later Configure/PostConfigure calls.
     /// </remarks>
+    /// <example>
+    /// <code>
+    /// services.AddGcpQueue(configuration, o => o.RequestAssemblies = [typeof(SyncCustomer).Assembly]);
+    /// </code>
+    /// </example>
     public static IServiceCollection AddGcpQueue(
         this IServiceCollection services,
         IConfiguration configuration,
-        params Assembly[] requestAssemblies)
+        Action<GcpQueueOptions> configure)
     {
+        ArgumentNullException.ThrowIfNull(configuration);
+        ArgumentNullException.ThrowIfNull(configure);
+
         var section = configuration.GetSection(GcpQueueOptions.SectionName);
+        void Apply(GcpQueueOptions options)
+        {
+            section.Bind(options);
+            configure(options);
+        }
 
         var bound = new GcpQueueOptions();
-        section.Bind(bound);
+        Apply(bound);
 
-        return services.AddGcpQueueCore(
-            options => section.Bind(options),
-            bound,
-            requestAssemblies);
+        return services.AddGcpQueueCore(Apply, bound);
     }
 
     /// <summary>
@@ -43,22 +55,22 @@ public static class GcpQueueServiceCollectionExtensions
     /// </summary>
     public static IServiceCollection AddGcpQueue(
         this IServiceCollection services,
-        Action<GcpQueueOptions> configure,
-        params Assembly[] requestAssemblies)
+        Action<GcpQueueOptions> configure)
     {
+        ArgumentNullException.ThrowIfNull(configure);
+
         var bound = new GcpQueueOptions();
         configure(bound);
 
-        return services.AddGcpQueueCore(configure, bound, requestAssemblies);
+        return services.AddGcpQueueCore(configure, bound);
     }
 
     private static IServiceCollection AddGcpQueueCore(
         this IServiceCollection services,
         Action<GcpQueueOptions> configure,
-        GcpQueueOptions eagerlyBound,
-        Assembly[] requestAssemblies)
+        GcpQueueOptions eagerlyBound)
     {
-        var registry = new QueueTypeRegistry(requestAssemblies);
+        var registry = new QueueTypeRegistry(eagerlyBound.RequestAssemblies);
 
         // Fail as early as possible on broken configuration; the options-pipeline validation
         // below re-validates at host start to also cover later Configure/PostConfigure changes.

@@ -103,7 +103,7 @@ internal static class TestSetup
         var services = new ServiceCollection();
         services.AddLogging();
         configure?.Invoke(services);
-        services.AddGcpQueue(config ?? Config(), requestAssembly ?? typeof(PlainCommand).Assembly);
+        services.AddGcpQueue(config ?? Config(), o => o.RequestAssemblies = [requestAssembly ?? typeof(PlainCommand).Assembly]);
 
         // Last registration wins for constructor injection, so this replaces the real
         // client factory registration without touching the library's wiring.

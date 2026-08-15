@@ -1,27 +1,5 @@
 #nullable enable
-const Spinneret.Queue.QueuePolicy.DefaultChannel = "default" -> string!
 Microsoft.Extensions.DependencyInjection.QueueCoreServiceCollectionExtensions
-override Spinneret.Queue.DeadLetterEntry.Equals(object? obj) -> bool
-override Spinneret.Queue.DeadLetterEntry.GetHashCode() -> int
-override Spinneret.Queue.DeadLetterEntry.ToString() -> string!
-override Spinneret.Queue.QueueDeliveryContext.Equals(object? obj) -> bool
-override Spinneret.Queue.QueueDeliveryContext.GetHashCode() -> int
-override Spinneret.Queue.QueueDeliveryContext.ToString() -> string!
-override Spinneret.Queue.QueueDeliveryOutcome.Equals(object? obj) -> bool
-override Spinneret.Queue.QueueDeliveryOutcome.GetHashCode() -> int
-override Spinneret.Queue.QueueDeliveryOutcome.ToString() -> string!
-override Spinneret.Queue.QueueEnvelope.Equals(object? obj) -> bool
-override Spinneret.Queue.QueueEnvelope.GetHashCode() -> int
-override Spinneret.Queue.QueueEnvelope.ToString() -> string!
-override Spinneret.Queue.QueueOptions.Equals(object? obj) -> bool
-override Spinneret.Queue.QueueOptions.GetHashCode() -> int
-override Spinneret.Queue.QueueOptions.ToString() -> string!
-override Spinneret.Queue.QueuePolicy.Equals(object? obj) -> bool
-override Spinneret.Queue.QueuePolicy.GetHashCode() -> int
-override Spinneret.Queue.QueuePolicy.ToString() -> string!
-override Spinneret.Queue.QueueTypeRegistry.RegisteredRequest.Equals(object? obj) -> bool
-override Spinneret.Queue.QueueTypeRegistry.RegisteredRequest.GetHashCode() -> int
-override Spinneret.Queue.QueueTypeRegistry.RegisteredRequest.ToString() -> string!
 Spinneret.Queue.DeadLetterEntry
 Spinneret.Queue.DeadLetterEntry.<Clone>$() -> Spinneret.Queue.DeadLetterEntry!
 Spinneret.Queue.DeadLetterEntry.Attempts.get -> int
@@ -174,20 +152,38 @@ Spinneret.Queue.QueueTypeRegistry.Resolve(string! typeName) -> Spinneret.Queue.Q
 Spinneret.Queue.UnknownRequestTypeException
 Spinneret.Queue.UnknownRequestTypeException.TypeName.get -> string!
 Spinneret.Queue.UnknownRequestTypeException.UnknownRequestTypeException(string! typeName) -> void
-static Microsoft.Extensions.DependencyInjection.QueueCoreServiceCollectionExtensions.AddQueueCore(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, params System.Reflection.Assembly![]! requestAssemblies) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+const Spinneret.Queue.QueuePolicy.DefaultChannel = "default" -> string!
+override Spinneret.Queue.DeadLetterEntry.Equals(object? obj) -> bool
+override Spinneret.Queue.DeadLetterEntry.GetHashCode() -> int
+override Spinneret.Queue.DeadLetterEntry.ToString() -> string!
+override Spinneret.Queue.QueueDeliveryContext.Equals(object? obj) -> bool
+override Spinneret.Queue.QueueDeliveryContext.GetHashCode() -> int
+override Spinneret.Queue.QueueDeliveryContext.ToString() -> string!
+override Spinneret.Queue.QueueDeliveryOutcome.Equals(object? obj) -> bool
+override Spinneret.Queue.QueueDeliveryOutcome.GetHashCode() -> int
+override Spinneret.Queue.QueueDeliveryOutcome.ToString() -> string!
+override Spinneret.Queue.QueueEnvelope.Equals(object? obj) -> bool
+override Spinneret.Queue.QueueEnvelope.GetHashCode() -> int
+override Spinneret.Queue.QueueEnvelope.ToString() -> string!
+override Spinneret.Queue.QueueOptions.Equals(object? obj) -> bool
+override Spinneret.Queue.QueueOptions.GetHashCode() -> int
+override Spinneret.Queue.QueueOptions.ToString() -> string!
+override Spinneret.Queue.QueuePolicy.Equals(object? obj) -> bool
+override Spinneret.Queue.QueuePolicy.GetHashCode() -> int
+override Spinneret.Queue.QueuePolicy.ToString() -> string!
+override Spinneret.Queue.QueueTypeRegistry.RegisteredRequest.Equals(object? obj) -> bool
+override Spinneret.Queue.QueueTypeRegistry.RegisteredRequest.GetHashCode() -> int
+override Spinneret.Queue.QueueTypeRegistry.RegisteredRequest.ToString() -> string!
 static Microsoft.Extensions.DependencyInjection.QueueCoreServiceCollectionExtensions.AddQueueCore(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, Spinneret.Queue.QueueTypeRegistry! registry) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
-static readonly Spinneret.Queue.QueuePolicy.DefaultMaxAge -> string!
-static readonly Spinneret.Queue.QueuePolicy.DefaultMaxAttempts -> int
-static readonly Spinneret.Queue.QueuePolicy.DefaultMaxBackoff -> string!
-static readonly Spinneret.Queue.QueuePolicy.DefaultMinBackoff -> string!
+static Microsoft.Extensions.DependencyInjection.QueueCoreServiceCollectionExtensions.AddQueueCore(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Collections.Generic.IReadOnlyCollection<System.Reflection.Assembly!>! requestAssemblies) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
 static Spinneret.Queue.DeadLetterEntry.operator !=(Spinneret.Queue.DeadLetterEntry? left, Spinneret.Queue.DeadLetterEntry? right) -> bool
 static Spinneret.Queue.DeadLetterEntry.operator ==(Spinneret.Queue.DeadLetterEntry? left, Spinneret.Queue.DeadLetterEntry? right) -> bool
 static Spinneret.Queue.QueueDeliveryContext.operator !=(Spinneret.Queue.QueueDeliveryContext? left, Spinneret.Queue.QueueDeliveryContext? right) -> bool
 static Spinneret.Queue.QueueDeliveryContext.operator ==(Spinneret.Queue.QueueDeliveryContext? left, Spinneret.Queue.QueueDeliveryContext? right) -> bool
 static Spinneret.Queue.QueueDeliveryOutcome.Acked.get -> Spinneret.Queue.QueueDeliveryOutcome!
+static Spinneret.Queue.QueueDeliveryOutcome.RetryIn(System.TimeSpan after) -> Spinneret.Queue.QueueDeliveryOutcome!
 static Spinneret.Queue.QueueDeliveryOutcome.operator !=(Spinneret.Queue.QueueDeliveryOutcome? left, Spinneret.Queue.QueueDeliveryOutcome? right) -> bool
 static Spinneret.Queue.QueueDeliveryOutcome.operator ==(Spinneret.Queue.QueueDeliveryOutcome? left, Spinneret.Queue.QueueDeliveryOutcome? right) -> bool
-static Spinneret.Queue.QueueDeliveryOutcome.RetryIn(System.TimeSpan after) -> Spinneret.Queue.QueueDeliveryOutcome!
 static Spinneret.Queue.QueueEnvelope.operator !=(Spinneret.Queue.QueueEnvelope? left, Spinneret.Queue.QueueEnvelope? right) -> bool
 static Spinneret.Queue.QueueEnvelope.operator ==(Spinneret.Queue.QueueEnvelope? left, Spinneret.Queue.QueueEnvelope? right) -> bool
 static Spinneret.Queue.QueueOptions.operator !=(Spinneret.Queue.QueueOptions? left, Spinneret.Queue.QueueOptions? right) -> bool
@@ -197,3 +193,7 @@ static Spinneret.Queue.QueuePolicy.operator !=(Spinneret.Queue.QueuePolicy? left
 static Spinneret.Queue.QueuePolicy.operator ==(Spinneret.Queue.QueuePolicy? left, Spinneret.Queue.QueuePolicy? right) -> bool
 static Spinneret.Queue.QueueTypeRegistry.RegisteredRequest.operator !=(Spinneret.Queue.QueueTypeRegistry.RegisteredRequest? left, Spinneret.Queue.QueueTypeRegistry.RegisteredRequest? right) -> bool
 static Spinneret.Queue.QueueTypeRegistry.RegisteredRequest.operator ==(Spinneret.Queue.QueueTypeRegistry.RegisteredRequest? left, Spinneret.Queue.QueueTypeRegistry.RegisteredRequest? right) -> bool
+static readonly Spinneret.Queue.QueuePolicy.DefaultMaxAge -> string!
+static readonly Spinneret.Queue.QueuePolicy.DefaultMaxAttempts -> int
+static readonly Spinneret.Queue.QueuePolicy.DefaultMaxBackoff -> string!
+static readonly Spinneret.Queue.QueuePolicy.DefaultMinBackoff -> string!

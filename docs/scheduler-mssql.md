@@ -15,7 +15,7 @@ dotnet add package Spinneret.Scheduler.Mssql
 ```
 
 ```csharp
-services.AddMssqlQueue(configuration, typeof(SyncCustomer).Assembly);
+services.AddMssqlQueue(configuration, o => o.RequestAssemblies = [typeof(SyncCustomer).Assembly]);
 services.AddMssqlQueueWorker();
 services.AddMssqlScheduler(configuration);
 services.AddSchedulerSweeper();

@@ -24,6 +24,11 @@ internal sealed class GcpQueueOptionsValidator(QueueTypeRegistry registry) : IVa
 
     public static void ValidateOrThrow(GcpQueueOptions o, QueueTypeRegistry registry)
     {
+        if (o.RequestAssemblies.Count == 0)
+            throw new InvalidOperationException(
+                "At least one assembly containing IRequest<> command types must be supplied: "
+                + "AddGcpQueue(configuration, o => o.RequestAssemblies = [typeof(MyCommand).Assembly]).");
+
         if (string.IsNullOrWhiteSpace(o.ProjectId))
             throw new InvalidOperationException("Queue:Gcp:ProjectId must be set.");
         if (string.IsNullOrWhiteSpace(o.LocationId))

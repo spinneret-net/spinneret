@@ -246,8 +246,8 @@ public sealed class QueueTestHost : IAsyncDisposable
         var services = new ServiceCollection();
         services.AddSingleton(typeof(ILogger<>), typeof(NullLogger<>));
         services.AddSingleton<DeliveryLog>();
-        services.AddMediator(typeof(QueueTestHost).Assembly);
-        services.AddMssqlQueue(configuration, typeof(QueueTestHost).Assembly);
+        services.AddMediator([typeof(QueueTestHost).Assembly]);
+        services.AddMssqlQueue(configuration, o => o.RequestAssemblies = [typeof(QueueTestHost).Assembly]);
         if (worker)
             services.AddMssqlQueueWorker();
         configure?.Invoke(services);

@@ -1,8 +1,21 @@
+using System.Reflection;
+
 namespace Spinneret.Queue.Gcp;
 
 public sealed class GcpQueueOptions
 {
     public static readonly string SectionName = "Queue:Gcp";
+
+    /// <summary>
+    /// Assemblies scanned for the <c>IRequest&lt;&gt;</c> command types this queue can carry. Set in
+    /// code — assemblies cannot come from configuration — and required: a queue with nothing to
+    /// enqueue fails at registration rather than at the first <c>Enqueue</c>.
+    /// </summary>
+    /// <remarks>
+    /// Types are registered by <see cref="Type.FullName"/>, which is the name on the wire, so
+    /// renaming or moving a queued command type breaks messages already in flight.
+    /// </remarks>
+    public IReadOnlyCollection<Assembly> RequestAssemblies { get; set; } = [];
 
     public string ProjectId { get; set; } = string.Empty;
     public string LocationId { get; set; } = string.Empty;

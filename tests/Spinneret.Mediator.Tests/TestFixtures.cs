@@ -212,7 +212,7 @@ internal static class TestServices
     public static ServiceProvider BuildProvider(Action<IServiceCollection>? configure = null)
     {
         var services = new ServiceCollection();
-        services.AddMediator(typeof(TestServices).Assembly);
+        services.AddMediator([typeof(TestServices).Assembly]);
         configure?.Invoke(services);
         return services.BuildServiceProvider();
     }

@@ -16,7 +16,7 @@ dotnet add package Spinneret.Queue.Mssql
 ```
 
 ```csharp
-services.AddMssqlQueue(configuration, typeof(SyncCustomer).Assembly);
+services.AddMssqlQueue(configuration, o => o.RequestAssemblies = [typeof(SyncCustomer).Assembly]);
 services.AddMssqlQueueWorker();   // only on hosts that should consume
 ```
 
@@ -28,7 +28,7 @@ consumes messages.
 | | |
 |---|---|
 | **A connection string** | To the app's own database — see the same-database gotcha below. |
-| **Mediator + handlers** | `services.AddMediator(...)`. |
+| **Mediator + handlers** | `services.AddMediator([...])`. |
 | **DDL rights**, if `CreateSchema` is left on. |
 
 A dead-letter writer and a payload serializer are supplied by the package.

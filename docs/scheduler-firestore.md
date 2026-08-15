@@ -16,7 +16,7 @@ dotnet add package Spinneret.Scheduler.Firestore
 ```
 
 ```csharp
-services.AddGcpQueue(configuration, typeof(SyncCustomer).Assembly);
+services.AddGcpQueue(configuration, o => o.RequestAssemblies = [typeof(SyncCustomer).Assembly]);
 services.AddFirestoreScheduler(configuration);
 
 // then pick a trigger — one of:

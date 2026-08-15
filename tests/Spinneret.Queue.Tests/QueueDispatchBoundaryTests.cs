@@ -79,7 +79,7 @@ public class QueueDispatchBoundaryTests
     {
         var services = new ServiceCollection();
 
-        services.AddQueueCore(typeof(QueueDispatchBoundaryTests).Assembly);
+        services.AddQueueCore([typeof(QueueDispatchBoundaryTests).Assembly]);
         var descriptor = services.Single(d => d.ServiceType == typeof(IQueueDispatchBoundary));
 
         await Assert.That(descriptor.Lifetime).IsEqualTo(ServiceLifetime.Scoped);
@@ -92,7 +92,7 @@ public class QueueDispatchBoundaryTests
         var services = new ServiceCollection();
         services.AddSingleton<IQueueDispatchBoundary>(_boundary);
 
-        services.AddQueueCore(typeof(QueueDispatchBoundaryTests).Assembly);
+        services.AddQueueCore([typeof(QueueDispatchBoundaryTests).Assembly]);
         var provider = services.BuildServiceProvider();
 
         await Assert.That(provider.GetRequiredService<IQueueDispatchBoundary>())

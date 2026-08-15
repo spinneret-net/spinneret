@@ -22,11 +22,13 @@ Spinneret.Queue.Mssql.MssqlQueueOptions.PollInterval.get -> System.TimeSpan
 Spinneret.Queue.Mssql.MssqlQueueOptions.PollInterval.set -> void
 Spinneret.Queue.Mssql.MssqlQueueOptions.QueueTableName.get -> string!
 Spinneret.Queue.Mssql.MssqlQueueOptions.QueueTableName.set -> void
+Spinneret.Queue.Mssql.MssqlQueueOptions.RequestAssemblies.get -> System.Collections.Generic.IReadOnlyCollection<System.Reflection.Assembly!>!
+Spinneret.Queue.Mssql.MssqlQueueOptions.RequestAssemblies.set -> void
 Spinneret.Queue.Mssql.MssqlQueueOptions.SchemaName.get -> string!
 Spinneret.Queue.Mssql.MssqlQueueOptions.SchemaName.set -> void
 Spinneret.Queue.Mssql.MssqlQueueSchema
-static Microsoft.Extensions.DependencyInjection.MssqlQueueServiceCollectionExtensions.AddMssqlQueue(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, Microsoft.Extensions.Configuration.IConfiguration! configuration, params System.Reflection.Assembly![]! requestAssemblies) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
-static Microsoft.Extensions.DependencyInjection.MssqlQueueServiceCollectionExtensions.AddMssqlQueue(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Spinneret.Queue.Mssql.MssqlQueueOptions!>! configure, params System.Reflection.Assembly![]! requestAssemblies) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static Microsoft.Extensions.DependencyInjection.MssqlQueueServiceCollectionExtensions.AddMssqlQueue(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, Microsoft.Extensions.Configuration.IConfiguration! configuration, System.Action<Spinneret.Queue.Mssql.MssqlQueueOptions!>! configure) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static Microsoft.Extensions.DependencyInjection.MssqlQueueServiceCollectionExtensions.AddMssqlQueue(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Spinneret.Queue.Mssql.MssqlQueueOptions!>! configure) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
 static Microsoft.Extensions.DependencyInjection.MssqlQueueServiceCollectionExtensions.AddMssqlQueueWorker(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
 static Spinneret.Queue.Mssql.MssqlQueueSchema.CreateScript(Spinneret.Queue.Mssql.MssqlQueueOptions! options) -> string!
 static readonly Spinneret.Queue.Mssql.MssqlQueueOptions.SectionName -> string!

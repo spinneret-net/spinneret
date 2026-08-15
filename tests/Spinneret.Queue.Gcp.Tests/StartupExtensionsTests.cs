@@ -131,9 +131,32 @@ public sealed class StartupExtensionsTests
         var services = new ServiceCollection();
 
         var ex = Assert.Throws<InvalidOperationException>(
-            () => services.AddGcpQueue(config, typeof(PlainCommand).Assembly));
+            () => services.AddGcpQueue(config, o => o.RequestAssemblies = [typeof(PlainCommand).Assembly]));
 
         await Assert.That(ex.Message).Contains(expectedMessagePart);
+    }
+
+    [Test]
+    public async Task AddGcpQueue_without_request_assemblies_fails_at_registration()
+    {
+        // A queue that knows no command types accepts no enqueue, so it is a configuration error
+        // rather than an empty-but-valid state.
+        var services = new ServiceCollection();
+
+        var ex = Assert.Throws<InvalidOperationException>(
+            () => services.AddGcpQueue(TestSetup.Config(), _ => { }));
+
+        await Assert.That(ex.Message).Contains("RequestAssemblies");
+    }
+
+    [Test]
+    public async Task AddGcpQueue_reads_request_assemblies_from_options()
+    {
+        var provider = TestSetup.BuildProvider();
+
+        var options = provider.GetRequiredService<IOptions<GcpQueueOptions>>().Value;
+
+        await Assert.That(options.RequestAssemblies).Contains(typeof(PlainCommand).Assembly);
     }
 
     [Test]
@@ -146,7 +169,7 @@ public sealed class StartupExtensionsTests
         var services = new ServiceCollection();
 
         var ex = Assert.Throws<InvalidOperationException>(
-            () => services.AddGcpQueue(config, typeof(PlainCommand).Assembly));
+            () => services.AddGcpQueue(config, o => o.RequestAssemblies = [typeof(PlainCommand).Assembly]));
 
         await Assert.That(ex.Message).Contains(expectedMessagePart);
     }
@@ -174,7 +197,7 @@ public sealed class StartupExtensionsTests
         var services = new ServiceCollection();
 
         var ex = Assert.Throws<InvalidOperationException>(
-            () => services.AddGcpQueue(config, typeof(PlainCommand).Assembly));
+            () => services.AddGcpQueue(config, o => o.RequestAssemblies = [typeof(PlainCommand).Assembly]));
 
         await Assert.That(ex.Message).Contains("OidcIssuer");
         await Assert.That(ex.Message).Contains("EmulatorEndpoint");
@@ -187,7 +210,7 @@ public sealed class StartupExtensionsTests
         var services = new ServiceCollection();
 
         var ex = Assert.Throws<InvalidOperationException>(
-            () => services.AddGcpQueue(config, typeof(PlainCommand).Assembly));
+            () => services.AddGcpQueue(config, o => o.RequestAssemblies = [typeof(PlainCommand).Assembly]));
 
         await Assert.That(ex.Message).Contains("OidcIssuer");
     }

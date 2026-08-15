@@ -15,7 +15,7 @@ dotnet add package Spinneret.Queue.Gcp
 ```
 
 ```csharp
-builder.Services.AddGcpQueue(builder.Configuration, typeof(SyncCustomer).Assembly);
+builder.Services.AddGcpQueue(builder.Configuration, o => o.RequestAssemblies = [typeof(SyncCustomer).Assembly]);
 builder.Services.AddFirestoreDeadLetters(builder.Configuration);
 
 app.UseAuthentication();
@@ -28,7 +28,7 @@ app.MapGcpQueueDispatch();   // consumer hosts only
 | | |
 |---|---|
 | **Dead-letter store** | `AddFirestoreDeadLetters()` or your own `IDeadLetterWriter`. `MapGcpQueueDispatch` refuses to map without one. |
-| **Mediator + handlers** | `services.AddMediator(...)`. |
+| **Mediator + handlers** | `services.AddMediator([...])`. |
 | **`Http.Json.JsonOptions`** | Payloads serialize with ASP.NET Core's **HTTP** JSON options. Producer and consumer must agree on converters or payloads will not round-trip. |
 | **Auth middleware** | `UseAuthentication()` / `UseAuthorization()` before endpoints. |
 | **Credentials** | Application Default Credentials. No key file is ever read; on Cloud Run that is the service identity. |

@@ -25,7 +25,7 @@ public sealed class StartupExtensionsTests
         services ??= new ServiceCollection();
         services.AddSingleton(typeof(Microsoft.Extensions.Logging.ILogger<>),
             typeof(Microsoft.Extensions.Logging.Abstractions.NullLogger<>));
-        return services.AddMssqlQueue(configuration, typeof(StartupExtensionsTests).Assembly);
+        return services.AddMssqlQueue(configuration, o => o.RequestAssemblies = [typeof(StartupExtensionsTests).Assembly]);
     }
 
     // -------------------------------------------------------------------- registrations ---
@@ -57,7 +57,7 @@ public sealed class StartupExtensionsTests
         // An earlier AddQueueCore (another transport, a direct call) must not silently win with
         // the pass-through boundary — that would drop the savepoint semantics without any error.
         var services = new ServiceCollection();
-        services.AddQueueCore(typeof(StartupExtensionsTests).Assembly);
+        services.AddQueueCore([typeof(StartupExtensionsTests).Assembly]);
 
         AddQueue(Configuration(), services);
         var descriptor = services.Single(d => d.ServiceType == typeof(IQueueDispatchBoundary));

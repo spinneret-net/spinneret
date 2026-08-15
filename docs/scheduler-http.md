@@ -15,7 +15,7 @@ dotnet add package Spinneret.Scheduler.Http
 ```
 
 ```csharp
-services.AddGcpQueue(configuration, typeof(SyncCustomer).Assembly);
+services.AddGcpQueue(configuration, o => o.RequestAssemblies = [typeof(SyncCustomer).Assembly]);
 services.AddFirestoreScheduler(configuration);
 
 app.UseAuthentication();

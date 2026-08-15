@@ -9,16 +9,31 @@ public static class MediatorServiceCollectionExtensions
 {
     /// <summary>
     /// Registers the mediator, its response cache, and every <see cref="IRequestHandler{TRequest, TResponse}"/>
-    /// found in <paramref name="mediatorAssemblies"/> (the entry assembly when none are given).
-    /// Fails at startup on duplicate handlers or invalid <see cref="CacheAttribute"/> /
-    /// <see cref="InvalidateCacheAttribute"/> declarations.
+    /// found in the entry assembly. Fails at startup on duplicate handlers or invalid
+    /// <see cref="CacheAttribute"/> / <see cref="InvalidateCacheAttribute"/> declarations.
     /// </summary>
-    public static IServiceCollection AddMediator(this IServiceCollection services, params Assembly[] mediatorAssemblies)
+    public static IServiceCollection AddMediator(this IServiceCollection services) =>
+        services.AddMediator([
+            Assembly.GetEntryAssembly() ?? throw new InvalidOperationException(
+                "Entry assembly could not be determined. Specify mediator assemblies explicitly: "
+                + "AddMediator([typeof(Program).Assembly]).")]);
+
+    /// <summary>
+    /// Registers the mediator, its response cache, and every <see cref="IRequestHandler{TRequest, TResponse}"/>
+    /// found in <paramref name="mediatorAssemblies"/>. Fails at startup on duplicate handlers or
+    /// invalid <see cref="CacheAttribute"/> / <see cref="InvalidateCacheAttribute"/> declarations.
+    /// </summary>
+    /// <remarks>
+    /// Takes a collection rather than a <c>params</c> array deliberately: a <c>params</c> parameter
+    /// must come last, which would permanently block adding anything to this signature.
+    /// </remarks>
+    public static IServiceCollection AddMediator(
+        this IServiceCollection services, IReadOnlyCollection<Assembly> mediatorAssemblies)
     {
-        mediatorAssemblies = mediatorAssemblies.Length > 0
-            ? mediatorAssemblies
-            : [Assembly.GetEntryAssembly() ?? throw new InvalidOperationException(
-                "Entry assembly could not be determined. Specify mediator assemblies explicitly: AddMediator(typeof(Program).Assembly).")];
+        ArgumentNullException.ThrowIfNull(mediatorAssemblies);
+        if (mediatorAssemblies.Count == 0)
+            throw new ArgumentException(
+                "At least one assembly containing handlers must be provided.", nameof(mediatorAssemblies));
 
         var handlersByRequest = new Dictionary<Type, Type>();
         foreach (var assembly in mediatorAssemblies)

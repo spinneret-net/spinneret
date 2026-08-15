@@ -105,8 +105,8 @@ public sealed class SchedulerTestHost : IAsyncDisposable
         var services = new ServiceCollection();
         services.AddSingleton(typeof(ILogger<>), typeof(NullLogger<>));
         services.AddSingleton<DeliveryLog>();
-        services.AddMediator(typeof(SchedulerTestHost).Assembly);
-        services.AddMssqlQueue(configuration, typeof(SchedulerTestHost).Assembly);
+        services.AddMediator([typeof(SchedulerTestHost).Assembly]);
+        services.AddMssqlQueue(configuration, o => o.RequestAssemblies = [typeof(SchedulerTestHost).Assembly]);
         services.AddMssqlQueueWorker();
         services.AddMssqlScheduler(configuration);
         if (sweeper)

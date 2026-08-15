@@ -25,9 +25,9 @@ transport.
 **Cloud Run, all GCP.** Scales to zero, so the trigger is an external cron rather than a timer.
 
 ```csharp
-services.AddMediator(typeof(SomeCommand).Assembly);           // handlers
+services.AddMediator([typeof(SomeCommand).Assembly]);           // handlers
 services.AddSingleton(_ => new FirestoreDbBuilder { ProjectId = "…" }.Build());
-services.AddGcpQueue(config, typeof(SomeCommand).Assembly);   // Cloud Tasks
+services.AddGcpQueue(config, o => o.RequestAssemblies = [typeof(SomeCommand).Assembly]);   // Cloud Tasks
 services.AddFirestoreDeadLetters(config);                     // dead letters
 services.AddFirestoreScheduler(config);                       // schedules
 
@@ -44,8 +44,8 @@ Read: [queue.md](queue.md) · [queue-gcp.md](queue-gcp.md) · [queue-firestore.m
 **A single always-on service, all SQL Server.** One database, one process, a timer inside it.
 
 ```csharp
-services.AddMediator(typeof(SomeCommand).Assembly);   // handlers
-services.AddMssqlQueue(config, typeof(SomeCommand).Assembly);
+services.AddMediator([typeof(SomeCommand).Assembly]);   // handlers
+services.AddMssqlQueue(config, o => o.RequestAssemblies = [typeof(SomeCommand).Assembly]);
 services.AddMssqlQueueWorker();                       // this host consumes
 services.AddMssqlScheduler(config);
 services.AddSchedulerSweeper();                       // timer
@@ -60,7 +60,7 @@ queue rather than on any transport:
 
 ```csharp
 services.AddSingleton(_ => new FirestoreDbBuilder { ProjectId = "…" }.Build());
-services.AddMssqlQueue(config, typeof(SomeCommand).Assembly);
+services.AddMssqlQueue(config, o => o.RequestAssemblies = [typeof(SomeCommand).Assembly]);
 services.AddMssqlQueueWorker();
 services.AddFirestoreScheduler(config);
 services.AddSchedulerSweeper();

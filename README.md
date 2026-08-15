@@ -55,7 +55,7 @@ dotnet add package Spinneret.Mediator
 ```
 
 ```csharp
-services.AddMediator(typeof(Program).Assembly);
+services.AddMediator([typeof(Program).Assembly]);
 ```
 
 Packages that need wiring expose an `Add*` call; discovery happens once at startup, never at runtime.
@@ -225,7 +225,7 @@ Each thread stands alone; together they make a web. The core packages remain pro
 Transport, storage and trigger are separate axes, chosen one call at a time and in any order:
 
 ```csharp
-services.AddMssqlQueue(config, assemblies);   // transport
+services.AddMssqlQueue(config, o => o.RequestAssemblies = [typeof(SyncCustomer).Assembly]);
 services.AddFirestoreScheduler(config);       // where schedules live
 services.AddSchedulerSweeper();               // what drives them
 ```

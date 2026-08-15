@@ -1,8 +1,21 @@
+using System.Reflection;
+
 namespace Spinneret.Queue.Mssql;
 
 public sealed class MssqlQueueOptions
 {
     public static readonly string SectionName = "Queue:Mssql";
+
+    /// <summary>
+    /// Assemblies scanned for the <c>IRequest&lt;&gt;</c> command types this queue can carry. Set in
+    /// code — assemblies cannot come from configuration — and required: a queue with nothing to
+    /// enqueue fails at registration rather than at the first <c>Enqueue</c>.
+    /// </summary>
+    /// <remarks>
+    /// Types are registered by <see cref="Type.FullName"/>, which is the name on the wire, so
+    /// renaming or moving a queued command type breaks messages already in flight.
+    /// </remarks>
+    public IReadOnlyCollection<Assembly> RequestAssemblies { get; set; } = [];
 
     /// <summary>
     /// SQL Server connection string for the queue tables. The queue must live in the same database

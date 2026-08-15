@@ -25,6 +25,11 @@ internal sealed class MssqlQueueOptionsValidator(QueueTypeRegistry registry) : I
 
     public static void ValidateOrThrow(MssqlQueueOptions o, QueueTypeRegistry registry)
     {
+        if (o.RequestAssemblies.Count == 0)
+            throw new InvalidOperationException(
+                "At least one assembly containing IRequest<> command types must be supplied: "
+                + "AddMssqlQueue(configuration, o => o.RequestAssemblies = [typeof(MyCommand).Assembly]).");
+
         if (string.IsNullOrWhiteSpace(o.ConnectionString))
             throw new InvalidOperationException(
                 "Queue:Mssql:ConnectionString must be set — directly, or as a ConnectionStrings entry named by Queue:Mssql:ConnectionStringName.");

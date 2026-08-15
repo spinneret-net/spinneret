@@ -117,10 +117,17 @@ critical path.
 
 Whichever transport you choose, the host supplies:
 
-- **`ISpinneretMediator` and the handlers** — `services.AddMediator(assemblies)`.
-- **The assemblies containing your `IRequest<>` command types**, passed to the transport's `Add*`
-  call. They are indexed by `Type.FullName`, which is the name on the wire — so renaming or moving a
-  queued command type is a breaking change for messages already in flight.
+- **`ISpinneretMediator` and the handlers** — `services.AddMediator([typeof(Program).Assembly])`.
+- **The assemblies containing your `IRequest<>` command types**, set on the transport's options as
+  `RequestAssemblies`:
+
+  ```csharp
+  services.AddGcpQueue(configuration, o => o.RequestAssemblies = [typeof(SyncCustomer).Assembly]);
+  ```
+
+  They live on the options object rather than as a parameter so the registration signature never
+  has to grow again. Types are indexed by `Type.FullName`, which is the name on the wire — so
+  renaming or moving a queued command type breaks messages already in flight.
 - **`IDeadLetterWriter`**, unless your transport ships one.
 
 Two commands implementing `IRequest<>` twice, or two types with the same full name across the scanned

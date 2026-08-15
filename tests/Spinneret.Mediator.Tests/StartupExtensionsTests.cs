@@ -8,7 +8,7 @@ public class StartupExtensionsTests
     public async Task AddMediator_with_assembly_registers_handlers_from_that_assembly()
     {
         var services = new ServiceCollection();
-        services.AddMediator(typeof(StartupExtensionsTests).Assembly);
+        services.AddMediator([typeof(StartupExtensionsTests).Assembly]);
         await using var provider = services.BuildServiceProvider();
 
         var handler = provider.GetService<IRequestHandler<EchoQuery, int>>();
@@ -21,7 +21,7 @@ public class StartupExtensionsTests
     public async Task AddMediator_registers_mediator_and_resolves_it()
     {
         var services = new ServiceCollection();
-        services.AddMediator(typeof(StartupExtensionsTests).Assembly);
+        services.AddMediator([typeof(StartupExtensionsTests).Assembly]);
         await using var provider = services.BuildServiceProvider();
 
         var mediator = provider.GetService<ISpinneretMediator>();
@@ -33,7 +33,7 @@ public class StartupExtensionsTests
     public async Task AddMediator_does_not_register_abstract_handler_types()
     {
         var services = new ServiceCollection();
-        services.AddMediator(typeof(StartupExtensionsTests).Assembly);
+        services.AddMediator([typeof(StartupExtensionsTests).Assembly]);
         await using var provider = services.BuildServiceProvider();
 
         var handlers = provider.GetServices<IRequestHandler<EchoQuery, int>>().ToList();
@@ -48,7 +48,7 @@ public class StartupExtensionsTests
         // OpenGenericEchoHandler<T> lives in this assembly; scanning must skip it,
         // both to avoid a registration error and to keep it out of the container.
         var services = new ServiceCollection();
-        services.AddMediator(typeof(StartupExtensionsTests).Assembly);
+        services.AddMediator([typeof(StartupExtensionsTests).Assembly]);
         await using var provider = services.BuildServiceProvider();
 
         var handlers = provider.GetServices<IRequestHandler<EchoQuery, int>>().ToList();
@@ -61,7 +61,7 @@ public class StartupExtensionsTests
     public async Task AddMediator_registers_every_handler_interface_of_a_multi_interface_handler()
     {
         var services = new ServiceCollection();
-        services.AddMediator(typeof(StartupExtensionsTests).Assembly);
+        services.AddMediator([typeof(StartupExtensionsTests).Assembly]);
         await using var provider = services.BuildServiceProvider();
 
         var cachedQueryHandler = provider.GetService<IRequestHandler<CachedQuery, int>>();
@@ -75,7 +75,7 @@ public class StartupExtensionsTests
     public async Task AddMediator_registers_handlers_as_transient()
     {
         var services = new ServiceCollection();
-        services.AddMediator(typeof(StartupExtensionsTests).Assembly);
+        services.AddMediator([typeof(StartupExtensionsTests).Assembly]);
         await using var provider = services.BuildServiceProvider();
 
         var first = provider.GetRequiredService<IRequestHandler<EchoQuery, int>>();
@@ -88,7 +88,7 @@ public class StartupExtensionsTests
     public async Task AddMediator_registers_mediator_as_scoped()
     {
         var services = new ServiceCollection();
-        services.AddMediator(typeof(StartupExtensionsTests).Assembly);
+        services.AddMediator([typeof(StartupExtensionsTests).Assembly]);
         await using var provider = services.BuildServiceProvider();
 
         using var scope1 = provider.CreateScope();
@@ -107,7 +107,7 @@ public class StartupExtensionsTests
     {
         var handler = new CountingHandler();
         var services = new ServiceCollection();
-        services.AddMediator(typeof(StartupExtensionsTests).Assembly);
+        services.AddMediator([typeof(StartupExtensionsTests).Assembly]);
         services.AddSingleton<IRequestHandler<CachedQuery, int>>(handler);
         await using var provider = services.BuildServiceProvider();
 
@@ -132,7 +132,7 @@ public class StartupExtensionsTests
     {
         var services = new ServiceCollection();
 
-        var returned = services.AddMediator(typeof(StartupExtensionsTests).Assembly);
+        var returned = services.AddMediator([typeof(StartupExtensionsTests).Assembly]);
 
         await Assert.That(ReferenceEquals(services, returned)).IsTrue();
     }
@@ -141,7 +141,7 @@ public class StartupExtensionsTests
     public async Task AddMediator_registers_the_mediator_cache()
     {
         var services = new ServiceCollection();
-        services.AddMediator(typeof(StartupExtensionsTests).Assembly);
+        services.AddMediator([typeof(StartupExtensionsTests).Assembly]);
         await using var provider = services.BuildServiceProvider();
 
         var cache = provider.GetService<IMediatorCache>();

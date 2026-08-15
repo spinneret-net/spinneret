@@ -67,7 +67,7 @@ public sealed class EmulatorQueueInitializerTests
         // first. A factory that throws stands in for "no credentials available".
         var services = new ServiceCollection();
         services.AddLogging();
-        services.AddGcpQueue(TestSetup.Config(), typeof(PlainCommand).Assembly);
+        services.AddGcpQueue(TestSetup.Config(), o => o.RequestAssemblies = [typeof(PlainCommand).Assembly]);
         // Registered last so it wins over the library's own factory.
         services.AddSingleton<CloudTasksClient>(
             _ => throw new InvalidOperationException("credentials would be resolved here"));

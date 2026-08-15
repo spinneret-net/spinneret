@@ -18,9 +18,15 @@ public static class QueueCoreServiceCollectionExtensions
     /// <see cref="IEnvelopeQueue"/> or <see cref="IDeadLetterWriter"/> — every one of those is a
     /// transport or host decision, and each transport supplies its own default.
     /// </remarks>
-    public static IServiceCollection AddQueueCore(this IServiceCollection services, params Assembly[] requestAssemblies)
+    /// <remarks>
+    /// Takes a collection rather than a <c>params</c> array deliberately: a <c>params</c> parameter
+    /// must come last, which would permanently block adding anything to this signature.
+    /// </remarks>
+    public static IServiceCollection AddQueueCore(
+        this IServiceCollection services, IReadOnlyCollection<Assembly> requestAssemblies)
     {
-        if (requestAssemblies.Length == 0)
+        ArgumentNullException.ThrowIfNull(requestAssemblies);
+        if (requestAssemblies.Count == 0)
             throw new ArgumentException("At least one assembly containing IRequest<> types must be provided.", nameof(requestAssemblies));
 
         return services.AddQueueCore(new QueueTypeRegistry(requestAssemblies));

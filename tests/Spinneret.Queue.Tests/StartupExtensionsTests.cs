@@ -21,7 +21,7 @@ public class StartupExtensionsTests
     {
         var services = new ServiceCollection();
 
-        var ex = Assert.Throws<ArgumentException>(() => services.AddQueueCore());
+        var ex = Assert.Throws<ArgumentException>(() => services.AddQueueCore([]));
 
         await Assert.That(ex.Message).Contains("At least one assembly");
     }
@@ -31,7 +31,7 @@ public class StartupExtensionsTests
     {
         var services = new ServiceCollection();
 
-        services.AddQueueCore(typeof(StartupExtensionsTests).Assembly);
+        services.AddQueueCore([typeof(StartupExtensionsTests).Assembly]);
         var registry = services.BuildServiceProvider().GetRequiredService<QueueTypeRegistry>();
 
         await Assert.That(registry.GetPolicy(typeof(UnannotatedCommand))).IsEqualTo(QueuePolicy.Default);
@@ -53,7 +53,7 @@ public class StartupExtensionsTests
     public async Task AddQueueCore_registers_resolvable_dispatcher_and_delivery_processor()
     {
         var services = ServicesWithAllDependencies();
-        services.AddQueueCore(typeof(StartupExtensionsTests).Assembly);
+        services.AddQueueCore([typeof(StartupExtensionsTests).Assembly]);
 
         using var scope = services.BuildServiceProvider().CreateScope();
         var dispatcher = scope.ServiceProvider.GetRequiredService<IQueueDispatcher>();
@@ -70,7 +70,7 @@ public class StartupExtensionsTests
         var services = ServicesWithAllDependencies();
         services.AddSingleton<IQueueDispatcher>(fake);
 
-        services.AddQueueCore(typeof(StartupExtensionsTests).Assembly);
+        services.AddQueueCore([typeof(StartupExtensionsTests).Assembly]);
         var resolved = services.BuildServiceProvider().GetRequiredService<IQueueDispatcher>();
 
         await Assert.That(ReferenceEquals(resolved, fake)).IsTrue();
@@ -81,7 +81,7 @@ public class StartupExtensionsTests
     {
         var services = new ServiceCollection();
 
-        services.AddQueueCore(typeof(StartupExtensionsTests).Assembly);
+        services.AddQueueCore([typeof(StartupExtensionsTests).Assembly]);
         var provider = services.BuildServiceProvider();
 
         await Assert.That(ReferenceEquals(provider.GetRequiredService<TimeProvider>(), TimeProvider.System)).IsTrue();
@@ -94,7 +94,7 @@ public class StartupExtensionsTests
         var services = new ServiceCollection();
         services.AddSingleton<TimeProvider>(fixedTime);
 
-        services.AddQueueCore(typeof(StartupExtensionsTests).Assembly);
+        services.AddQueueCore([typeof(StartupExtensionsTests).Assembly]);
         var resolved = services.BuildServiceProvider().GetRequiredService<TimeProvider>();
 
         await Assert.That(ReferenceEquals(resolved, fixedTime)).IsTrue();

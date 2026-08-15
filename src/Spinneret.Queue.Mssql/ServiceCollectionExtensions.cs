@@ -17,32 +17,40 @@ public static class MssqlQueueServiceCollectionExtensions
     /// initializer, and the type registry built from the supplied assemblies.
     /// </summary>
     /// <remarks>
-    /// Call <c>AddMssqlQueueWorker()</c> on the host that should consume messages — producers-only
-    /// hosts skip it. Configuration is read from the <c>Queue:Mssql</c> section.
+    /// <paramref name="configure"/> runs after the section is bound, and is where
+    /// <see cref="MssqlQueueOptions.RequestAssemblies"/> is set — assemblies cannot come from
+    /// configuration. Call <c>AddMssqlQueueWorker()</c> on the host that should consume messages —
+    /// producers-only hosts skip it. Configuration is read from the <c>Queue:Mssql</c> section.
     /// Invalid configuration fails here when bindable, and again at host start via options
     /// validation for values changed by later Configure/PostConfigure calls.
     /// </remarks>
+    /// <example>
+    /// <code>
+    /// services.AddMssqlQueue(configuration, o => o.RequestAssemblies = [typeof(SyncCustomer).Assembly]);
+    /// </code>
+    /// </example>
     public static IServiceCollection AddMssqlQueue(
         this IServiceCollection services,
         IConfiguration configuration,
-        params Assembly[] requestAssemblies)
+        Action<MssqlQueueOptions> configure)
     {
+        ArgumentNullException.ThrowIfNull(configuration);
+        ArgumentNullException.ThrowIfNull(configure);
+
         var section = configuration.GetSection(MssqlQueueOptions.SectionName);
+        void Apply(MssqlQueueOptions options)
+        {
+            section.Bind(options);
+            // The section carries only the name when ConnectionStringName is used; resolve it
+            // into ConnectionString for runtime consumers.
+            ResolveConnectionString(options, configuration);
+            configure(options);
+        }
 
         var bound = new MssqlQueueOptions();
-        section.Bind(bound);
-        ResolveConnectionString(bound, configuration);
+        Apply(bound);
 
-        return services.AddMssqlQueueCore(
-            options =>
-            {
-                section.Bind(options);
-                // The section carries only the name when ConnectionStringName is used; resolve it
-                // into ConnectionString for runtime consumers.
-                ResolveConnectionString(options, configuration);
-            },
-            bound,
-            requestAssemblies);
+        return services.AddMssqlQueueCore(Apply, bound);
     }
 
     /// <summary>
@@ -51,22 +59,22 @@ public static class MssqlQueueServiceCollectionExtensions
     /// </summary>
     public static IServiceCollection AddMssqlQueue(
         this IServiceCollection services,
-        Action<MssqlQueueOptions> configure,
-        params Assembly[] requestAssemblies)
+        Action<MssqlQueueOptions> configure)
     {
+        ArgumentNullException.ThrowIfNull(configure);
+
         var bound = new MssqlQueueOptions();
         configure(bound);
 
-        return services.AddMssqlQueueCore(configure, bound, requestAssemblies);
+        return services.AddMssqlQueueCore(configure, bound);
     }
 
     private static IServiceCollection AddMssqlQueueCore(
         this IServiceCollection services,
         Action<MssqlQueueOptions> configure,
-        MssqlQueueOptions eagerlyBound,
-        Assembly[] requestAssemblies)
+        MssqlQueueOptions eagerlyBound)
     {
-        var registry = new QueueTypeRegistry(requestAssemblies);
+        var registry = new QueueTypeRegistry(eagerlyBound.RequestAssemblies);
 
         // Fail as early as possible on broken configuration; the options-pipeline validation
         // below re-validates at host start to also cover later Configure/PostConfigure changes.
