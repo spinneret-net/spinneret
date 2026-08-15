@@ -2,7 +2,7 @@
 Microsoft.Extensions.DependencyInjection.MssqlSchedulerServiceCollectionExtensions
 Spinneret.Scheduler.Mssql.IMssqlTransactionalScheduler
 Spinneret.Scheduler.Mssql.IMssqlTransactionalScheduler.CancelJobAsync(System.Data.Common.DbTransaction! transaction, string! handle, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
-Spinneret.Scheduler.Mssql.IMssqlTransactionalScheduler.ScheduleJobAsync(System.Data.Common.DbTransaction! transaction, Spinneret.Mediator.IRequest<Spinneret.Functional.Unit>! request, System.DateTimeOffset executeAt, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<string!>!
+Spinneret.Scheduler.Mssql.IMssqlTransactionalScheduler.ScheduleJobAsync<TResponse>(System.Data.Common.DbTransaction! transaction, Spinneret.Mediator.IRequest<TResponse>! request, System.DateTimeOffset executeAt, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<string!>!
 Spinneret.Scheduler.Mssql.MssqlSchedulerOptions
 Spinneret.Scheduler.Mssql.MssqlSchedulerOptions.MssqlSchedulerOptions() -> void
 Spinneret.Scheduler.Mssql.MssqlSchedulerOptions.TableName.get -> string!

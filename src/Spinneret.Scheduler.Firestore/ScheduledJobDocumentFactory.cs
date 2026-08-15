@@ -1,4 +1,3 @@
-using Spinneret.Functional;
 using Google.Cloud.Firestore;
 using Spinneret.Mediator;
 using Spinneret.Queue;
@@ -14,7 +13,7 @@ internal sealed class ScheduledJobDocumentFactory(
     QueueTypeRegistry typeRegistry, IQueuePayloadSerializer serializer, TimeProvider timeProvider)
 {
     /// <summary>Fields for a one-shot job that runs once at <paramref name="executeAt"/>.</summary>
-    public Dictionary<string, object> OneShot(IRequest<Unit> request, DateTimeOffset executeAt)
+    public Dictionary<string, object> OneShot<TResponse>(IRequest<TResponse> request, DateTimeOffset executeAt)
     {
         var ts = Timestamp.FromDateTimeOffset(executeAt);
         return new Dictionary<string, object>(Payload(request))
@@ -30,7 +29,7 @@ internal sealed class ScheduledJobDocumentFactory(
     /// The recurrence-defining fields (type, payload, schedule) for a recurring job. The status and
     /// run timestamps are owned by the caller's idempotent register-or-refresh, not by this builder.
     /// </summary>
-    public Dictionary<string, object> RecurringDefinition(IRequest<Unit> request, Schedule schedule)
+    public Dictionary<string, object> RecurringDefinition<TResponse>(IRequest<TResponse> request, Schedule schedule)
     {
         ArgumentNullException.ThrowIfNull(schedule);
 
@@ -40,7 +39,7 @@ internal sealed class ScheduledJobDocumentFactory(
         };
     }
 
-    private Dictionary<string, object> Payload(IRequest<Unit> request)
+    private Dictionary<string, object> Payload<TResponse>(IRequest<TResponse> request)
     {
         var requestType = request.GetType();
         return new Dictionary<string, object>

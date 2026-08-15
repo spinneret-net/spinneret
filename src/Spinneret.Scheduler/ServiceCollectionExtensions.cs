@@ -1,4 +1,3 @@
-using Spinneret.Functional;
 using Spinneret.Mediator;
 using Spinneret.Scheduler;
 
@@ -74,14 +73,14 @@ namespace Microsoft.Extensions.DependencyInjection
         /// environment — <c>Schedule.Parse(configuration["Jobs:MonthClose"]!)</c>.
         /// </param>
         /// <param name="requestFactory">Builds the request to enqueue on each run.</param>
-        public static IServiceCollection AddRecurringJob(
-            this IServiceCollection services, string key, Schedule schedule, Func<IRequest<Unit>> requestFactory)
+        public static IServiceCollection AddRecurringJob<TResponse>(
+            this IServiceCollection services, string key, Schedule schedule, Func<IRequest<TResponse>> requestFactory)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(key);
             ArgumentNullException.ThrowIfNull(schedule);
             ArgumentNullException.ThrowIfNull(requestFactory);
 
-            return services.AddSingleton<IRecurringJob>(new DelegateRecurringJob(key, schedule, requestFactory));
+            return services.AddSingleton<IRecurringJob>(new DelegateRecurringJob<TResponse>(key, schedule, requestFactory));
         }
 
         /// <summary>
@@ -106,12 +105,13 @@ namespace Spinneret.Scheduler
     using Spinneret.Functional;
     using Spinneret.Mediator;
 
-    internal sealed class DelegateRecurringJob(string key, Schedule schedule, Func<IRequest<Unit>> requestFactory)
-        : IRecurringJob
+    internal sealed class DelegateRecurringJob<TResponse>(
+        string key, Schedule schedule, Func<IRequest<TResponse>> requestFactory)
+        : IRecurringJob<TResponse>
     {
         public string Key => key;
         public Schedule Schedule => schedule;
-        public IRequest<Unit> CreateRequest() => requestFactory();
+        public IRequest<TResponse> CreateRequest() => requestFactory();
     }
 
     internal sealed class RetiredRecurringJob(string key) : IRetiredRecurringJob

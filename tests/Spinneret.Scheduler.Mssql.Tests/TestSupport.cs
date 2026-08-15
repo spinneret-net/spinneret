@@ -29,6 +29,22 @@ public sealed class TickHandler(DeliveryLog log) : IRequestHandler<TickCommand, 
     }
 }
 
+/// <summary>
+/// A request whose handler returns a value. A scheduled run discards it — the response type is here
+/// to prove a job is not restricted to <c>IRequest&lt;Unit&gt;</c>, and that the sweep can enqueue a
+/// stored job whose response type it only learns at runtime.
+/// </summary>
+public sealed record ReportCommand(string Name) : IRequest<string>;
+
+public sealed class ReportHandler(DeliveryLog log) : IRequestHandler<ReportCommand, string>
+{
+    public Task<string> Handle(ReportCommand request, CancellationToken cancellationToken)
+    {
+        log.RecordDelivery($"report:{request.Name}");
+        return Task.FromResult($"report for {request.Name}");
+    }
+}
+
 public sealed class DeliveryLog
 {
     private readonly ConcurrentQueue<string> _deliveries = new();

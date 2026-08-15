@@ -11,9 +11,11 @@ public sealed record TestRequest(string Name) : IRequest<Unit>;
 
 public sealed record OtherTestRequest(int Number) : IRequest<Unit>;
 
+public sealed record StringResponseRequest(string Name) : IRequest<string>;
+
 public sealed class RecordingRecurringJobScheduler : IRecurringJobScheduler
 {
-    public List<(string Key, IRequest<Unit> Request, Schedule Schedule, CancellationToken Ct)> Registrations { get; } = [];
+    public List<(string Key, object Request, Schedule Schedule, CancellationToken Ct)> Registrations { get; } = [];
     public List<(string Key, CancellationToken Ct)> Unregistrations { get; } = [];
 
     /// <summary>Keys that fail every time — a permanently broken job.</summary>
@@ -25,7 +27,8 @@ public sealed class RecordingRecurringJobScheduler : IRecurringJobScheduler
     /// <summary>Attempts made per key, successful or not.</summary>
     public Dictionary<string, int> Attempts { get; } = [];
 
-    public Task RegisterAsync(string key, IRequest<Unit> request, Schedule schedule, CancellationToken ct = default)
+    public Task RegisterAsync<TResponse>(
+        string key, IRequest<TResponse> request, Schedule schedule, CancellationToken ct = default)
     {
         RecordAttempt(key, "Registration");
         Registrations.Add((key, request, schedule, ct));
@@ -56,21 +59,30 @@ public sealed class RecordingRecurringJobScheduler : IRecurringJobScheduler
 
 public sealed record RetiredJob(string Key) : IRetiredRecurringJob;
 
-public sealed class FakeRecurringJob(string key, Schedule schedule, IRequest<Unit> request) : IRecurringJob
+public sealed class FakeRecurringJob(string key, Schedule schedule, IRequest<Unit> request) : IRecurringJob<Unit>
 {
     public string Key => key;
     public Schedule Schedule => schedule;
     public IRequest<Unit> CreateRequest() => request;
 }
 
-public sealed class ThrowingScheduleJob(string key) : IRecurringJob
+/// <summary>A job whose request returns something other than <see cref="Unit"/>.</summary>
+public sealed class FakeStringResponseJob(string key, Schedule schedule, IRequest<string> request)
+    : IRecurringJob<string>
+{
+    public string Key => key;
+    public Schedule Schedule => schedule;
+    public IRequest<string> CreateRequest() => request;
+}
+
+public sealed class ThrowingScheduleJob(string key) : IRecurringJob<Unit>
 {
     public string Key => key;
     public Schedule Schedule => throw new FormatException($"Schedule unreadable for '{key}'.");
     public IRequest<Unit> CreateRequest() => new TestRequest(key);
 }
 
-public sealed class ThrowingCreateRequestJob(string key) : IRecurringJob
+public sealed class ThrowingCreateRequestJob(string key) : IRecurringJob<Unit>
 {
     public string Key => key;
     public Schedule Schedule => Schedule.Cron("* * * * *", "Europe/Stockholm");

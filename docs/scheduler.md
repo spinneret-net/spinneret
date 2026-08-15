@@ -32,7 +32,7 @@ services.AddRecurringJob(
 Or as a class, when the schedule comes from configuration or the request needs building:
 
 ```csharp
-public sealed class MonthCloseJob(IConfiguration config) : IRecurringJob
+public sealed class MonthCloseJob(IConfiguration config) : IRecurringJob<Unit>
 {
     public string Key => "month-close";
     public Schedule Schedule => Schedule.Parse(config["Jobs:MonthClose"]!);
@@ -41,6 +41,11 @@ public sealed class MonthCloseJob(IConfiguration config) : IRecurringJob
 
 services.AddSingleton<IRecurringJob, MonthCloseJob>();
 ```
+
+The type parameter is the request's response type, and any of them may be scheduled — a run is
+enqueued and executed on a worker, which discards whatever the handler returns. Use `Unit` when the
+handler returns nothing. Register the job in DI as the non-generic `IRecurringJob`: that is what the
+installer collects, so jobs whose requests return different types still install together.
 
 `Key` is the stable identity and the storage key, so re-installing upserts rather than duplicating.
 Registration is idempotent: every instance asserting the same job on every deploy converges on one

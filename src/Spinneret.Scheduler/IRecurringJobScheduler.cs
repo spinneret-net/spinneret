@@ -1,4 +1,3 @@
-using Spinneret.Functional;
 using Spinneret.Mediator;
 
 namespace Spinneret.Scheduler;
@@ -17,7 +16,14 @@ public interface IRecurringJobScheduler
     /// changed, so it is safe to call on every startup. Recurrence is owned by the persisted job —
     /// an individual failed run is dead-lettered but never stops the schedule.
     /// </summary>
-    Task RegisterAsync(string key, IRequest<Unit> request, Schedule schedule, CancellationToken ct = default);
+    /// <remarks>
+    /// Any request may be registered, whatever its response type: each run is enqueued and executed
+    /// on a worker, which discards the response. <typeparamref name="TResponse"/> is inferred from
+    /// <paramref name="request"/> and never observed — it is named only so the compiler can hold the
+    /// caller to a request the queue is able to dispatch.
+    /// </remarks>
+    Task RegisterAsync<TResponse>(
+        string key, IRequest<TResponse> request, Schedule schedule, CancellationToken ct = default);
 
     /// <summary>
     /// Removes the recurring job identified by <paramref name="key"/>, so it stops being dispatched.

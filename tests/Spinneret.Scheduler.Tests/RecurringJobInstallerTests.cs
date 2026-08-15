@@ -66,6 +66,28 @@ public class RecurringJobInstallerTests
     }
 
     [Test]
+    public async Task Installs_jobs_of_differing_response_types_together()
+    {
+        // The installer holds jobs as the non-generic IRecurringJob, so it cannot name any one
+        // response type — each job registers itself, which is what lets the scheduler take a typed
+        // IRequest<TResponse> while a single collection carries jobs that disagree about TResponse.
+        var scheduler = new RecordingRecurringJobScheduler();
+        var unitRequest = new TestRequest("a");
+        var stringRequest = new StringResponseRequest("b");
+        var (installer, _) = CreateInstaller(scheduler, [
+            new FakeRecurringJob("job-unit", EveryFiveMinutes, unitRequest),
+            new FakeStringResponseJob("job-string", Hourly, stringRequest),
+        ]);
+
+        await RunAsync(installer);
+
+        await Assert.That(scheduler.Registrations.Count).IsEqualTo(2);
+        await Assert.That(scheduler.Registrations[0].Request).IsSameReferenceAs(unitRequest);
+        await Assert.That(scheduler.Registrations[1].Key).IsEqualTo("job-string");
+        await Assert.That(scheduler.Registrations[1].Request).IsSameReferenceAs(stringRequest);
+    }
+
+    [Test]
     public async Task With_no_jobs_registers_nothing_and_completes()
     {
         var scheduler = new RecordingRecurringJobScheduler();

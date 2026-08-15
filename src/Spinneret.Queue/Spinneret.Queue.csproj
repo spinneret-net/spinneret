@@ -20,6 +20,10 @@
 
     <ItemGroup>
         <InternalsVisibleTo Include="Spinneret.Queue.Tests" />
+        <!-- ResolvedRequestEnqueuer: the scheduler sweeps enqueue requests they read back from a
+             store, so their response type is only known at runtime. -->
+        <InternalsVisibleTo Include="Spinneret.Scheduler.Firestore" />
+        <InternalsVisibleTo Include="Spinneret.Scheduler.Mssql" />
     </ItemGroup>
 
     <PropertyGroup>

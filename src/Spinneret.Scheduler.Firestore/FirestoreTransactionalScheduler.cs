@@ -1,4 +1,3 @@
-using Spinneret.Functional;
 using Google.Cloud.Firestore;
 using Microsoft.Extensions.Options;
 using Spinneret.Mediator;
@@ -17,7 +16,7 @@ public interface IFirestoreTransactionalScheduler
     /// Queues a one-shot job — to run once at <paramref name="executeAt"/> — onto the given
     /// <paramref name="transaction"/>. Returns the handle to pass to <see cref="CancelJob"/>.
     /// </summary>
-    string ScheduleJob(Transaction transaction, IRequest<Unit> request, DateTimeOffset executeAt);
+    string ScheduleJob<TResponse>(Transaction transaction, IRequest<TResponse> request, DateTimeOffset executeAt);
 
     /// <summary>
     /// Cancels the job identified by <paramref name="handle"/> within the transaction.
@@ -42,7 +41,7 @@ internal sealed class FirestoreTransactionalScheduler(
 {
     private CollectionReference Collection => db.Collection(options.Value.Collection);
 
-    public string ScheduleJob(Transaction transaction, IRequest<Unit> request, DateTimeOffset executeAt)
+    public string ScheduleJob<TResponse>(Transaction transaction, IRequest<TResponse> request, DateTimeOffset executeAt)
     {
         var docRef = Collection.Document();
         transaction.Set(docRef, factory.OneShot(request, executeAt));

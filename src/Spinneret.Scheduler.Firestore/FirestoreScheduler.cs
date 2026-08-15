@@ -1,4 +1,3 @@
-using Spinneret.Functional;
 using Google.Cloud.Firestore;
 using Microsoft.Extensions.Options;
 using Spinneret.Mediator;
@@ -12,7 +11,8 @@ internal sealed class FirestoreScheduler(
     TimeProvider timeProvider)
     : IRecurringJobScheduler
 {
-    public Task RegisterAsync(string key, IRequest<Unit> request, Schedule schedule, CancellationToken ct = default)
+    public Task RegisterAsync<TResponse>(
+        string key, IRequest<TResponse> request, Schedule schedule, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(key))
             throw new ArgumentException("A recurring job requires a stable key.", nameof(key));

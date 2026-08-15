@@ -1,9 +1,6 @@
-using Spinneret.Functional;
 using Microsoft.Data.SqlClient;
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Spinneret.Mediator;
 using Spinneret.Queue;
 using Spinneret.Queue.Mssql;
 
@@ -209,11 +206,11 @@ internal sealed class MssqlSchedulerSweeper(
 
     private async Task Enqueue(ScheduledJobRow job, CancellationToken ct)
     {
-        var requestType = registry.Resolve(job.RequestTypeName).RequestType;
-        var request = (IRequest<Unit>)(serializer.Deserialize(job.PayloadJson, requestType)
-            ?? throw new InvalidOperationException($"Deserialized null for '{job.RequestTypeName}'."));
+        var registered = registry.Resolve(job.RequestTypeName);
+        var request = serializer.Deserialize(job.PayloadJson, registered.RequestType)
+            ?? throw new InvalidOperationException($"Deserialized null for '{job.RequestTypeName}'.");
 
-        await queue.Enqueue(request, ct: ct);
+        await ResolvedRequestEnqueuer.Enqueue(queue, request, registered.ResponseType, ct);
     }
 
     /// <summary>

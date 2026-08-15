@@ -1,4 +1,3 @@
-using Spinneret.Functional;
 using System.Diagnostics;
 using System.Text.Json;
 using Google.Cloud.Tasks.V2;
@@ -21,9 +20,6 @@ internal sealed class CloudTasksQueue(
     ILogger<CloudTasksQueue> logger)
     : IQueue, IEnvelopeQueue
 {
-    public System.Threading.Tasks.Task Enqueue(IRequest<Unit> request, QueueOptions? options = null, CancellationToken ct = default)
-        => Enqueue<Unit>(request, options, ct);
-
     public async System.Threading.Tasks.Task Enqueue<TResponse>(IRequest<TResponse> request, QueueOptions? queueOptions = null, CancellationToken ct = default)
     {
         var requestType = request.GetType();

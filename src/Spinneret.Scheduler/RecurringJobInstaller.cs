@@ -132,7 +132,9 @@ internal sealed class RecurringJobInstaller : BackgroundService
             // Inside the try: a job is free to build its schedule from configuration, so reading
             // the property is as capable of throwing as registering is.
             var schedule = job.Schedule;
-            await _scheduler.RegisterAsync(job.Key, job.CreateRequest(), schedule, ct);
+            // The job registers itself: it is the only thing that still knows its request's response
+            // type, which is what keeps the scheduler's signature typed rather than untyped.
+            await job.Register(_scheduler, schedule, ct);
             LogInstalled("Installed recurring job '{Key}' ({Schedule})", job.Key, attempt, schedule);
             return true;
         }

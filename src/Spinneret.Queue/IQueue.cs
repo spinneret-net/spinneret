@@ -1,4 +1,3 @@
-using Spinneret.Functional;
 using Spinneret.Mediator;
 
 namespace Spinneret.Queue;
@@ -12,5 +11,4 @@ namespace Spinneret.Queue;
 public interface IQueue
 {
     Task Enqueue<TResponse>(IRequest<TResponse> request, QueueOptions? options = null, CancellationToken ct = default);
-    Task Enqueue(IRequest<Unit> request, QueueOptions? options = null, CancellationToken ct = default);
 }

@@ -1,8 +1,6 @@
-using Spinneret.Functional;
 using Google.Cloud.Firestore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Spinneret.Mediator;
 using Spinneret.Queue;
 
 namespace Spinneret.Scheduler.Firestore;
@@ -169,11 +167,11 @@ internal sealed class FirestoreSchedulerDispatcher(
 
     private async Task EnqueueAsync(string requestTypeName, string payloadJson, CancellationToken ct)
     {
-        var requestType = typeRegistry.Resolve(requestTypeName).RequestType;
-        var request = (IRequest<Unit>)(serializer.Deserialize(payloadJson, requestType)
-            ?? throw new InvalidOperationException($"Deserialized null for '{requestTypeName}'."));
+        var registered = typeRegistry.Resolve(requestTypeName);
+        var request = serializer.Deserialize(payloadJson, registered.RequestType)
+            ?? throw new InvalidOperationException($"Deserialized null for '{requestTypeName}'.");
 
-        await queue.Enqueue(request, ct: ct);
+        await ResolvedRequestEnqueuer.Enqueue(queue, request, registered.ResponseType, ct);
     }
 
     /// <summary>

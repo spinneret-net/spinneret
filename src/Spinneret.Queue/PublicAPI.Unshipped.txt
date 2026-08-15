@@ -36,7 +36,6 @@ Spinneret.Queue.IDeadLetterWriter.WriteAsync(Spinneret.Queue.DeadLetterEntry! en
 Spinneret.Queue.IEnvelopeQueue
 Spinneret.Queue.IEnvelopeQueue.Enqueue(Spinneret.Queue.QueueEnvelope! envelope, System.TimeSpan? delay = null, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
 Spinneret.Queue.IQueue
-Spinneret.Queue.IQueue.Enqueue(Spinneret.Mediator.IRequest<Spinneret.Functional.Unit>! request, Spinneret.Queue.QueueOptions? options = null, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
 Spinneret.Queue.IQueue.Enqueue<TResponse>(Spinneret.Mediator.IRequest<TResponse>! request, Spinneret.Queue.QueueOptions? options = null, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
 Spinneret.Queue.IQueueDeliveryProcessor
 Spinneret.Queue.IQueueDeliveryProcessor.ProcessAsync(Spinneret.Queue.QueueDeliveryContext! context, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<Spinneret.Queue.QueueDeliveryOutcome!>!

@@ -6,7 +6,7 @@ namespace Spinneret.Parsing;
 
 /// <summary>
 /// Selects and parses properties of <typeparamref name="TModel"/> inside a
-/// <see cref="IModelParser{TError}.Parse"/> call, recording an error per failing property
+/// <see cref="IModelParser{TError}.Parse{TModel,TParsed}"/> call, recording an error per failing property
 /// instead of stopping at the first one. Created by the library and handed to the parse
 /// lambda — not constructible by consumers.
 /// <para>
@@ -15,7 +15,7 @@ namespace Spinneret.Parsing;
 /// </para>
 /// <para>
 /// When a property fails, its error is recorded and <c>default</c> is returned so the
-/// remaining properties still parse; the enclosing <see cref="IModelParser{TError}.Parse"/>
+/// remaining properties still parse; the enclosing <see cref="IModelParser{TError}.Parse{TModel,TParsed}"/>
 /// returns the full error list instead of a model.
 /// </para>
 /// </summary>

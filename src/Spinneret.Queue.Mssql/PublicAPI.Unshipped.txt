@@ -4,7 +4,6 @@ Spinneret.Queue.Mssql.IMssqlTransactionProvider
 Spinneret.Queue.Mssql.IMssqlTransactionProvider.Current.get -> System.Data.Common.DbTransaction?
 Spinneret.Queue.Mssql.IMssqlTransactionProvider.Use(System.Data.Common.DbTransaction? transaction) -> void
 Spinneret.Queue.Mssql.IMssqlTransactionalQueue
-Spinneret.Queue.Mssql.IMssqlTransactionalQueue.Enqueue(Spinneret.Mediator.IRequest<Spinneret.Functional.Unit>! request, System.Data.Common.DbTransaction! transaction, Spinneret.Queue.QueueOptions? options = null, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
 Spinneret.Queue.Mssql.IMssqlTransactionalQueue.Enqueue<TResponse>(Spinneret.Mediator.IRequest<TResponse>! request, System.Data.Common.DbTransaction! transaction, Spinneret.Queue.QueueOptions? options = null, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
 Spinneret.Queue.Mssql.MssqlQueueOptions
 Spinneret.Queue.Mssql.MssqlQueueOptions.ChannelParallelism.get -> System.Collections.Generic.Dictionary<string!, int>!

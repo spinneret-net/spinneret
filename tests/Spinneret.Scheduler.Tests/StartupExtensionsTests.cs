@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Configuration;
+using Spinneret.Functional;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Spinneret.Scheduler.Tests;
@@ -17,7 +18,9 @@ public class StartupExtensionsTests
         var services = new ServiceCollection();
 
         services.AddRecurringJob("update-projections", EveryFiveMinutes, () => new TestRequest("x"));
-        var job = services.BuildServiceProvider().GetRequiredService<IRecurringJob>();
+        // Registered under the non-generic IRecurringJob the installer collects; the typed
+        // interface is what carries CreateRequest.
+        var job = (IRecurringJob<Unit>)services.BuildServiceProvider().GetRequiredService<IRecurringJob>();
 
         await Assert.That(job.Key).IsEqualTo("update-projections");
         await Assert.That(job.Schedule).IsEqualTo(EveryFiveMinutes);
@@ -35,7 +38,7 @@ public class StartupExtensionsTests
             calls++;
             return new TestRequest("x");
         });
-        var job = services.BuildServiceProvider().GetRequiredService<IRecurringJob>();
+        var job = (IRecurringJob<Unit>)services.BuildServiceProvider().GetRequiredService<IRecurringJob>();
 
         job.CreateRequest();
         job.CreateRequest();
@@ -81,7 +84,7 @@ public class StartupExtensionsTests
     {
         var services = new ServiceCollection();
 
-        await Assert.That(() => services.AddRecurringJob("job", EveryFiveMinutes, null!))
+        await Assert.That(() => services.AddRecurringJob<Unit>("job", EveryFiveMinutes, null!))
             .Throws<ArgumentNullException>();
     }
 

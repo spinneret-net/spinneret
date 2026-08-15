@@ -1,11 +1,12 @@
 #nullable enable
 Microsoft.Extensions.DependencyInjection.SchedulerServiceCollectionExtensions
 Spinneret.Scheduler.IRecurringJob
-Spinneret.Scheduler.IRecurringJob.CreateRequest() -> Spinneret.Mediator.IRequest<Spinneret.Functional.Unit>!
 Spinneret.Scheduler.IRecurringJob.Key.get -> string!
 Spinneret.Scheduler.IRecurringJob.Schedule.get -> Spinneret.Scheduler.Schedule!
+Spinneret.Scheduler.IRecurringJob<TResponse>
+Spinneret.Scheduler.IRecurringJob<TResponse>.CreateRequest() -> Spinneret.Mediator.IRequest<TResponse>!
 Spinneret.Scheduler.IRecurringJobScheduler
-Spinneret.Scheduler.IRecurringJobScheduler.RegisterAsync(string! key, Spinneret.Mediator.IRequest<Spinneret.Functional.Unit>! request, Spinneret.Scheduler.Schedule! schedule, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Spinneret.Scheduler.IRecurringJobScheduler.RegisterAsync<TResponse>(string! key, Spinneret.Mediator.IRequest<TResponse>! request, Spinneret.Scheduler.Schedule! schedule, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
 Spinneret.Scheduler.IRecurringJobScheduler.UnregisterAsync(string! key, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
 Spinneret.Scheduler.IRetiredRecurringJob
 Spinneret.Scheduler.IRetiredRecurringJob.Key.get -> string!
@@ -33,7 +34,7 @@ override Spinneret.Scheduler.Schedule.ToString() -> string!
 override Spinneret.Scheduler.SweepResult.Equals(object? obj) -> bool
 override Spinneret.Scheduler.SweepResult.GetHashCode() -> int
 override Spinneret.Scheduler.SweepResult.ToString() -> string!
-static Microsoft.Extensions.DependencyInjection.SchedulerServiceCollectionExtensions.AddRecurringJob(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, string! key, Spinneret.Scheduler.Schedule! schedule, System.Func<Spinneret.Mediator.IRequest<Spinneret.Functional.Unit>!>! requestFactory) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static Microsoft.Extensions.DependencyInjection.SchedulerServiceCollectionExtensions.AddRecurringJob<TResponse>(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, string! key, Spinneret.Scheduler.Schedule! schedule, System.Func<Spinneret.Mediator.IRequest<TResponse>!>! requestFactory) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
 static Microsoft.Extensions.DependencyInjection.SchedulerServiceCollectionExtensions.AddRecurringJobInstaller(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
 static Microsoft.Extensions.DependencyInjection.SchedulerServiceCollectionExtensions.AddSchedulerSweeper(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
 static Microsoft.Extensions.DependencyInjection.SchedulerServiceCollectionExtensions.AddSchedulerSweeper(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Spinneret.Scheduler.SchedulerOptions!>! configure) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!

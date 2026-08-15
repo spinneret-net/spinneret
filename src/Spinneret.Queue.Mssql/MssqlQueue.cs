@@ -1,4 +1,3 @@
-using Spinneret.Functional;
 using System.Data.Common;
 using System.Diagnostics;
 using System.Globalization;
@@ -20,7 +19,6 @@ namespace Spinneret.Queue.Mssql;
 public interface IMssqlTransactionalQueue
 {
     Task Enqueue<TResponse>(IRequest<TResponse> request, DbTransaction transaction, QueueOptions? options = null, CancellationToken ct = default);
-    Task Enqueue(IRequest<Unit> request, DbTransaction transaction, QueueOptions? options = null, CancellationToken ct = default);
 }
 
 internal sealed class MssqlQueue(
@@ -33,14 +31,8 @@ internal sealed class MssqlQueue(
     ILogger<MssqlQueue> logger)
     : IQueue, IEnvelopeQueue, IMssqlTransactionalQueue
 {
-    public Task Enqueue(IRequest<Unit> request, QueueOptions? options = null, CancellationToken ct = default)
-        => Enqueue<Unit>(request, options, ct);
-
     public Task Enqueue<TResponse>(IRequest<TResponse> request, QueueOptions? queueOptions = null, CancellationToken ct = default)
         => EnqueueCore(BuildEnvelope(request, queueOptions), queueOptions?.Delay, queueOptions?.DedupeKey, transactions.Current, ct);
-
-    public Task Enqueue(IRequest<Unit> request, DbTransaction transaction, QueueOptions? options = null, CancellationToken ct = default)
-        => Enqueue<Unit>(request, transaction, options, ct);
 
     public Task Enqueue<TResponse>(IRequest<TResponse> request, DbTransaction transaction, QueueOptions? queueOptions = null, CancellationToken ct = default)
     {

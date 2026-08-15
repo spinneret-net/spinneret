@@ -1,4 +1,3 @@
-using Spinneret.Functional;
 using System.Data.Common;
 using Spinneret.Mediator;
 using Spinneret.Queue;
@@ -18,8 +17,8 @@ public interface IMssqlTransactionalScheduler
     /// Inserts a one-shot job — to run once at <paramref name="executeAt"/> — on the given
     /// <paramref name="transaction"/>. Returns the handle to pass to <see cref="CancelJobAsync"/>.
     /// </summary>
-    Task<string> ScheduleJobAsync(
-        DbTransaction transaction, IRequest<Unit> request, DateTimeOffset executeAt, CancellationToken ct = default);
+    Task<string> ScheduleJobAsync<TResponse>(
+        DbTransaction transaction, IRequest<TResponse> request, DateTimeOffset executeAt, CancellationToken ct = default);
 
     /// <summary>Cancels the job identified by <paramref name="handle"/> within the transaction.</summary>
     Task CancelJobAsync(DbTransaction transaction, string handle, CancellationToken ct = default);
@@ -32,8 +31,8 @@ internal sealed class MssqlTransactionalScheduler(
     TimeProvider timeProvider)
     : IMssqlTransactionalScheduler
 {
-    public async Task<string> ScheduleJobAsync(
-        DbTransaction transaction, IRequest<Unit> request, DateTimeOffset executeAt, CancellationToken ct = default)
+    public async Task<string> ScheduleJobAsync<TResponse>(
+        DbTransaction transaction, IRequest<TResponse> request, DateTimeOffset executeAt, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(transaction);
         var connection = transaction.Connection

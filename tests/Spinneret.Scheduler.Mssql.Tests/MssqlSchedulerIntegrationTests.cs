@@ -244,6 +244,21 @@ public sealed class MssqlSchedulerIntegrationTests(MssqlContainerFixture fixture
     }
 
     [Test]
+    public async Task Due_recurring_job_with_a_non_unit_response_is_enqueued_and_delivered()
+    {
+        await using var host = await SchedulerTestHost.StartAsync(fixture.ConnectionString);
+
+        // By the time the sweep enqueues this job it has only the stored type name, so the response
+        // type comes from the registry rather than the call site — the path that has to reach the
+        // typed IQueue.Enqueue<TResponse> without the caller ever naming string.
+        await host.Scheduler.RegisterAsync("reporter", new ReportCommand("r"), EverySecond);
+
+        await Wait.Until(() => host.Log.DeliveryCount("report:r") >= 1, "the non-Unit recurring job to run");
+        await Assert.That(await host.JobStatus("reporter")).IsEqualTo("pending");
+        await Assert.That(await host.DeadLetterCount()).IsEqualTo(0);
+    }
+
+    [Test]
     public async Task Daily_schedule_far_in_the_future_is_not_dispatched()
     {
         await using var host = await SchedulerTestHost.StartAsync(fixture.ConnectionString);
