@@ -12,7 +12,6 @@ internal static class ScheduledJob
         public const string RequestTypeName = "requestTypeName";
         public const string PayloadJson = "payloadJson";
         public const string Status = "status";
-        public const string ExecuteAt = "executeAt";
         public const string NextExecuteAt = "nextExecuteAt";
         public const string CreatedAt = "createdAt";
         // Canonical Schedule string (Schedule.ToString/Parse); present only on recurring jobs —

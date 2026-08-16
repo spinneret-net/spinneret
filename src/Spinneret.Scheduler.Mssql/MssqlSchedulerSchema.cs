@@ -26,7 +26,6 @@ public static class MssqlSchedulerSchema
                     PayloadJson NVARCHAR(MAX) NOT NULL,
                     Status NVARCHAR(20) NOT NULL,
                     Schedule NVARCHAR(500) NULL,
-                    ExecuteAt DATETIME2(3) NOT NULL,
                     NextExecuteAt DATETIME2(3) NOT NULL,
                     CreatedAt DATETIME2(3) NOT NULL,
                     LastRunAt DATETIME2(3) NULL

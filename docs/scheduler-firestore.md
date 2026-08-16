@@ -83,7 +83,7 @@ One document per job, keyed by the job's `Key` (or an auto-id for one-shots).
 | `requestTypeName`, `payloadJson` | The request to enqueue. |
 | `status` | `pending`, `enqueued`, `failed`, `cancelled`. |
 | `schedule` | Canonical `cron:<zone>:<expression>`. **Absent on one-shot jobs** — that absence is what distinguishes them. |
-| `executeAt`, `nextExecuteAt` | `nextExecuteAt` doubles as the lease. |
+| `nextExecuteAt` | When the job is next due. Doubles as the lease. |
 | `createdAt`, `lastRunAt` | |
 
 ## Transactional one-shot jobs

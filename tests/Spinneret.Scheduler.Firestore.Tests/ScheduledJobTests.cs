@@ -12,7 +12,6 @@ public class ScheduledJobTests
         await Assert.That(ScheduledJob.Fields.RequestTypeName).IsEqualTo("requestTypeName");
         await Assert.That(ScheduledJob.Fields.PayloadJson).IsEqualTo("payloadJson");
         await Assert.That(ScheduledJob.Fields.Status).IsEqualTo("status");
-        await Assert.That(ScheduledJob.Fields.ExecuteAt).IsEqualTo("executeAt");
         await Assert.That(ScheduledJob.Fields.NextExecuteAt).IsEqualTo("nextExecuteAt");
         await Assert.That(ScheduledJob.Fields.CreatedAt).IsEqualTo("createdAt");
         await Assert.That(ScheduledJob.Fields.Schedule).IsEqualTo("schedule");

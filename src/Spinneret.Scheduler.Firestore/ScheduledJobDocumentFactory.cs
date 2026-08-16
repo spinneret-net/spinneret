@@ -15,12 +15,10 @@ internal sealed class ScheduledJobDocumentFactory(
     /// <summary>Fields for a one-shot job that runs once at <paramref name="executeAt"/>.</summary>
     public Dictionary<string, object> OneShot<TResponse>(IRequest<TResponse> request, DateTimeOffset executeAt)
     {
-        var ts = Timestamp.FromDateTimeOffset(executeAt);
         return new Dictionary<string, object>(Payload(request))
         {
             [ScheduledJob.Fields.Status] = ScheduledJob.StatusValues.Pending,
-            [ScheduledJob.Fields.ExecuteAt] = ts,
-            [ScheduledJob.Fields.NextExecuteAt] = ts,
+            [ScheduledJob.Fields.NextExecuteAt] = Timestamp.FromDateTimeOffset(executeAt),
             [ScheduledJob.Fields.CreatedAt] = Timestamp.FromDateTimeOffset(timeProvider.GetUtcNow()),
         };
     }

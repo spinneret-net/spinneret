@@ -57,7 +57,7 @@ public class ScheduledJobDocumentFactoryTests
     }
 
     [Test]
-    public async Task OneShot_sets_execute_at_and_next_execute_at_to_the_given_instant()
+    public async Task OneShot_sets_next_execute_at_to_the_given_instant()
     {
         var factory = CreateFactory();
         var executeAt = new DateTimeOffset(2030, 6, 15, 12, 30, 45, TimeSpan.Zero);
@@ -65,7 +65,6 @@ public class ScheduledJobDocumentFactoryTests
         var doc = factory.OneShot(new TestRequest("x"), executeAt);
 
         var expected = Timestamp.FromDateTimeOffset(executeAt);
-        await Assert.That((Timestamp)doc[ScheduledJob.Fields.ExecuteAt]).IsEqualTo(expected);
         await Assert.That((Timestamp)doc[ScheduledJob.Fields.NextExecuteAt]).IsEqualTo(expected);
     }
 
@@ -78,7 +77,7 @@ public class ScheduledJobDocumentFactoryTests
         var doc = factory.OneShot(new TestRequest("x"), executeAt);
 
         var expected = Timestamp.FromDateTimeOffset(executeAt);
-        await Assert.That((Timestamp)doc[ScheduledJob.Fields.ExecuteAt]).IsEqualTo(expected);
+        await Assert.That((Timestamp)doc[ScheduledJob.Fields.NextExecuteAt]).IsEqualTo(expected);
     }
 
     [Test]

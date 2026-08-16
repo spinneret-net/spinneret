@@ -40,7 +40,6 @@ internal sealed class MssqlTransactionalScheduler(
 
         var requestType = request.GetType();
         var handle = $"oneshot-{Guid.NewGuid():N}";
-        var executeAtUtc = executeAt.UtcDateTime;
 
         await using var command = connection.CreateCommand();
         command.Transaction = transaction;
@@ -50,8 +49,7 @@ internal sealed class MssqlTransactionalScheduler(
         command.AddParameter("@PayloadJson", serializer.Serialize(request, requestType));
         command.AddParameter("@Status", ScheduledJobStatus.Pending);
         command.AddParameter("@Schedule", null);
-        command.AddParameter("@ExecuteAt", executeAtUtc);
-        command.AddParameter("@NextExecuteAt", executeAtUtc);
+        command.AddParameter("@NextExecuteAt", executeAt.UtcDateTime);
         command.AddParameter("@CreatedAt", timeProvider.GetUtcNow().UtcDateTime);
         await command.ExecuteNonQueryAsync(ct);
 

@@ -28,8 +28,8 @@ internal sealed class ScheduledJobSql(MssqlQueueOptions queueOptions, MssqlSched
 
     public string Insert { get; } = $"""
         INSERT INTO {Identifier.Qualify(queueOptions.SchemaName, schedulerOptions.TableName)}
-            (JobKey, RequestTypeName, PayloadJson, Status, Schedule, ExecuteAt, NextExecuteAt, CreatedAt)
-        VALUES (@JobKey, @RequestTypeName, @PayloadJson, @Status, @Schedule, @ExecuteAt, @NextExecuteAt, @CreatedAt);
+            (JobKey, RequestTypeName, PayloadJson, Status, Schedule, NextExecuteAt, CreatedAt)
+        VALUES (@JobKey, @RequestTypeName, @PayloadJson, @Status, @Schedule, @NextExecuteAt, @CreatedAt);
         """;
 
     /// <summary>Refreshes the definition of an existing pending job without touching its cadence.</summary>
@@ -43,7 +43,7 @@ internal sealed class ScheduledJobSql(MssqlQueueOptions queueOptions, MssqlSched
     public string UpdateDefinitionAndRearm { get; } = $"""
         UPDATE {Identifier.Qualify(queueOptions.SchemaName, schedulerOptions.TableName)}
         SET RequestTypeName = @RequestTypeName, PayloadJson = @PayloadJson, Schedule = @Schedule,
-            Status = @Status, ExecuteAt = @NextExecuteAt, NextExecuteAt = @NextExecuteAt
+            Status = @Status, NextExecuteAt = @NextExecuteAt
         WHERE JobKey = @JobKey;
         """;
 

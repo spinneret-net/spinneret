@@ -34,7 +34,6 @@ internal sealed class MssqlScheduler(
 
         if (existing is not var (status, storedSchedule))
         {
-            var firstRun = NextRunFromNow(schedule);
             await using var insert = connection.CreateCommand();
             insert.Transaction = transaction;
             insert.CommandText = sql.Insert;
@@ -43,8 +42,7 @@ internal sealed class MssqlScheduler(
             insert.AddParameter("@PayloadJson", payloadJson);
             insert.AddParameter("@Status", ScheduledJobStatus.Pending);
             insert.AddParameter("@Schedule", scheduleText);
-            insert.AddParameter("@ExecuteAt", firstRun);
-            insert.AddParameter("@NextExecuteAt", firstRun);
+            insert.AddParameter("@NextExecuteAt", NextRunFromNow(schedule));
             insert.AddParameter("@CreatedAt", timeProvider.GetUtcNow().UtcDateTime);
             await insert.ExecuteNonQueryAsync(ct);
         }

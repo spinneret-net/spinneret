@@ -75,7 +75,6 @@ retry-while-the-database-warms-up behaviour as the queue's initializer:
     PayloadJson     NVARCHAR(MAX)  NOT NULL
     Status          NVARCHAR(20)   NOT NULL   -- pending | enqueued | failed | cancelled
     Schedule        NVARCHAR(500)  NULL       -- NULL marks a one-shot job
-    ExecuteAt       DATETIME2(3)   NOT NULL
     NextExecuteAt   DATETIME2(3)   NOT NULL
     CreatedAt       DATETIME2(3)   NOT NULL
     LastRunAt       DATETIME2(3)   NULL

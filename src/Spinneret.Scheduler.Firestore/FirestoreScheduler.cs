@@ -28,12 +28,10 @@ internal sealed class FirestoreScheduler(
 
             if (!snapshot.Exists)
             {
-                var firstRun = NextRunFromNow(schedule);
                 transaction.Set(docRef, new Dictionary<string, object>(definition)
                 {
                     [ScheduledJob.Fields.Status] = ScheduledJob.StatusValues.Pending,
-                    [ScheduledJob.Fields.ExecuteAt] = firstRun,
-                    [ScheduledJob.Fields.NextExecuteAt] = firstRun,
+                    [ScheduledJob.Fields.NextExecuteAt] = NextRunFromNow(schedule),
                     [ScheduledJob.Fields.CreatedAt] = Timestamp.FromDateTimeOffset(timeProvider.GetUtcNow()),
                 });
                 return;
@@ -45,10 +43,8 @@ internal sealed class FirestoreScheduler(
             if (snapshot.GetValue<string>(ScheduledJob.Fields.Status) != ScheduledJob.StatusValues.Pending
                 || StoredSchedule(snapshot) != scheduleText)
             {
-                var nextRun = NextRunFromNow(schedule);
                 definition[ScheduledJob.Fields.Status] = ScheduledJob.StatusValues.Pending;
-                definition[ScheduledJob.Fields.ExecuteAt] = nextRun;
-                definition[ScheduledJob.Fields.NextExecuteAt] = nextRun;
+                definition[ScheduledJob.Fields.NextExecuteAt] = NextRunFromNow(schedule);
             }
 
             transaction.Update(docRef, definition);
