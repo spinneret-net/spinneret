@@ -1,4 +1,4 @@
-using Microsoft.Data.SqlClient;
+﻿using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Spinneret.Scheduler.Mssql.Tests;
@@ -25,13 +25,13 @@ public sealed class MssqlSchedulerIntegrationTests(MssqlContainerFixture fixture
     // ---------------------------------------------------------------------- registration ---
 
     [Test]
-    public async Task RegisterAsync_creates_a_pending_job_with_the_first_run_armed()
+    public async Task RegisterAsync_creates_a_job_with_the_first_run_armed()
     {
         await using var host = await SchedulerTestHost.StartAsync(fixture.ConnectionString, sweeper: false);
 
         await host.Scheduler.RegisterAsync("hourly", new TickCommand("h"), Hourly);
 
-        await Assert.That(await host.JobStatus("hourly")).IsEqualTo("pending");
+        await Assert.That(await host.JobExists("hourly")).IsTrue();
         // An hourly slot lands somewhere in the next hour rather than a fixed distance out.
         var next = await host.JobNextExecuteAt("hourly");
         await Assert.That(next > DateTime.UtcNow).IsTrue();
@@ -83,15 +83,18 @@ public sealed class MssqlSchedulerIntegrationTests(MssqlContainerFixture fixture
     }
 
     [Test]
-    public async Task RegisterAsync_rearms_a_terminal_job()
+    public async Task RegisterAsync_recreates_a_job_that_is_gone()
     {
+        // A job that ran, was cancelled, or had its failure dead-lettered no longer exists, so the
+        // next registration has to re-create it rather than assume a row is there to refresh.
         await using var host = await SchedulerTestHost.StartAsync(fixture.ConnectionString, sweeper: false);
         await host.Scheduler.RegisterAsync("revived", new TickCommand("r"), Hourly);
-        await host.ExecuteAsync($"UPDATE [{host.JobsTable}] SET Status = N'cancelled' WHERE JobKey = N'revived'");
+        await host.ExecuteAsync($"DELETE FROM [{host.JobsTable}] WHERE JobKey = N'revived'");
 
         await host.Scheduler.RegisterAsync("revived", new TickCommand("r"), Hourly);
 
-        await Assert.That(await host.JobStatus("revived")).IsEqualTo("pending");
+        await Assert.That(await host.JobExists("revived")).IsTrue();
+        await Assert.That(await host.JobNextExecuteAt("revived") > DateTime.UtcNow).IsTrue();
     }
 
     [Test]
@@ -107,7 +110,7 @@ public sealed class MssqlSchedulerIntegrationTests(MssqlContainerFixture fixture
             async () => await host.ScalarAsync<int>(
                 $"SELECT COUNT(*) FROM [{host.JobsTable}] WHERE JobKey = N'declared-job'") == 1,
             "the declared job to be installed");
-        await Assert.That(await host.JobStatus("declared-job")).IsEqualTo("pending");
+        await Assert.That(await host.JobExists("declared-job")).IsTrue();
     }
 
     [Test]
@@ -124,7 +127,7 @@ public sealed class MssqlSchedulerIntegrationTests(MssqlContainerFixture fixture
         await Assert.That(await host.ScalarAsync<int>(
                 $"SELECT COUNT(*) FROM [{host.JobsTable}] WHERE JobKey = N'contested-parallel'"))
             .IsEqualTo(1);
-        await Assert.That(await host.JobStatus("contested-parallel")).IsEqualTo("pending");
+        await Assert.That(await host.JobExists("contested-parallel")).IsTrue();
     }
 
     [Test]
@@ -239,7 +242,7 @@ public sealed class MssqlSchedulerIntegrationTests(MssqlContainerFixture fixture
         await host.Scheduler.RegisterAsync("ticker", new TickCommand("t"), EverySecond);
 
         await Wait.Until(() => host.Log.DeliveryCount("tick:t") >= 2, "the recurring job to run at least twice");
-        await Assert.That(await host.JobStatus("ticker")).IsEqualTo("pending");
+        await Assert.That(await host.JobExists("ticker")).IsTrue();
         await Assert.That(await host.DeadLetterCount()).IsEqualTo(0);
     }
 
@@ -254,7 +257,7 @@ public sealed class MssqlSchedulerIntegrationTests(MssqlContainerFixture fixture
         await host.Scheduler.RegisterAsync("reporter", new ReportCommand("r"), EverySecond);
 
         await Wait.Until(() => host.Log.DeliveryCount("report:r") >= 1, "the non-Unit recurring job to run");
-        await Assert.That(await host.JobStatus("reporter")).IsEqualTo("pending");
+        await Assert.That(await host.JobExists("reporter")).IsTrue();
         await Assert.That(await host.DeadLetterCount()).IsEqualTo(0);
     }
 
@@ -267,7 +270,7 @@ public sealed class MssqlSchedulerIntegrationTests(MssqlContainerFixture fixture
 
         await Task.Delay(700);
         await Assert.That(host.Log.DeliveryCount("tick:n")).IsEqualTo(0);
-        await Assert.That(await host.JobStatus("nightly")).IsEqualTo("pending");
+        await Assert.That(await host.JobExists("nightly")).IsTrue();
     }
 
     [Test]
@@ -294,7 +297,7 @@ public sealed class MssqlSchedulerIntegrationTests(MssqlContainerFixture fixture
     // ------------------------------------------------------------- transactional one-shot ---
 
     [Test]
-    public async Task One_shot_in_a_committed_transaction_runs_once_and_goes_terminal()
+    public async Task One_shot_in_a_committed_transaction_runs_once_and_is_removed()
     {
         await using var host = await SchedulerTestHost.StartAsync(fixture.ConnectionString);
         string handle;
@@ -308,7 +311,7 @@ public sealed class MssqlSchedulerIntegrationTests(MssqlContainerFixture fixture
         }
 
         await Wait.Until(() => host.Log.DeliveryCount("tick:once") == 1, "the one-shot to run");
-        await Wait.Until(async () => await host.JobStatus(handle) == "enqueued", "the one-shot to go terminal");
+        await Wait.Until(async () => !await host.JobExists(handle), "the one-shot row to be removed");
         await Task.Delay(500);
         await Assert.That(host.Log.DeliveryCount("tick:once")).IsEqualTo(1);
     }
@@ -349,7 +352,40 @@ public sealed class MssqlSchedulerIntegrationTests(MssqlContainerFixture fixture
 
         await Task.Delay(3000);
         await Assert.That(host.Log.DeliveryCount("tick:cancelled")).IsEqualTo(0);
-        await Assert.That(await host.JobStatus(handle)).IsEqualTo("cancelled");
+        await Assert.That(await host.JobExists(handle)).IsFalse();
+    }
+
+    [Test]
+    public async Task One_shot_handles_are_prefixed_so_they_cannot_be_mistaken_for_a_recurring_key()
+    {
+        await using var host = await SchedulerTestHost.StartAsync(fixture.ConnectionString, sweeper: false);
+
+        await using var connection = await host.OpenConnectionAsync();
+        await using var transaction = (SqlTransaction)await connection.BeginTransactionAsync();
+        var handle = await host.TransactionalScheduler.ScheduleJobAsync(
+            transaction, new TickCommand("prefixed"), DateTimeOffset.UtcNow.AddHours(1));
+        await transaction.RollbackAsync();
+
+        await Assert.That(handle).StartsWith("oneshot-");
+    }
+
+    [Test]
+    public async Task Cancelling_with_a_recurring_key_is_rejected_and_leaves_the_schedule_intact()
+    {
+        // Cancel deletes, so without the guard a caller reaching for the wrong retirement method
+        // would silently destroy a live schedule. UnregisterAsync is the one that retires these.
+        await using var host = await SchedulerTestHost.StartAsync(fixture.ConnectionString, sweeper: false);
+        await host.Scheduler.RegisterAsync("nightly-cleanup", new TickCommand("n"), FarOff());
+
+        await using var connection = await host.OpenConnectionAsync();
+        await using var transaction = (SqlTransaction)await connection.BeginTransactionAsync();
+
+        await Assert.That(async () =>
+                await host.TransactionalScheduler.CancelJobAsync(transaction, "nightly-cleanup"))
+            .Throws<ArgumentException>();
+        await transaction.RollbackAsync();
+
+        await Assert.That(await host.JobExists("nightly-cleanup")).IsTrue();
     }
 
     // ------------------------------------------------------------------- failure paths ---
@@ -368,7 +404,7 @@ public sealed class MssqlSchedulerIntegrationTests(MssqlContainerFixture fixture
             fixture.ConnectionString, reuseSuffix: host.Suffix);
 
         await Wait.Until(async () => await host.DeadLetterCount() >= 1, "the occurrence to be dead-lettered");
-        await Assert.That(await host.JobStatus("broken")).IsEqualTo("pending");
+        await Assert.That(await host.JobExists("broken")).IsTrue();
         var source = await host.ScalarAsync<string>(
             $"SELECT TOP(1) Source FROM [{host.QueueOptions.DeadLetterTableName}]");
         await Assert.That(source).IsEqualTo("Scheduler");
@@ -393,16 +429,16 @@ public sealed class MssqlSchedulerIntegrationTests(MssqlContainerFixture fixture
             configure: services => services.AddSingleton(host.Log));
 
         // The healthy job must still dispatch, and the poison one is quarantined: dead-lettered,
-        // still pending, and pushed out of the sweep's way.
+        // kept, and pushed out of the sweep's way.
         await Wait.Until(() => host.Log.DeliveryCount("tick:h") >= 1, "the healthy job to dispatch");
         await Wait.Until(async () => await host.DeadLetterCount() >= 1, "the poison job to be dead-lettered");
-        await Assert.That(await host.JobStatus("poison")).IsEqualTo("pending");
+        await Assert.That(await host.JobExists("poison")).IsTrue();
         var next = await host.JobNextExecuteAt("poison");
         await Assert.That(next > DateTime.UtcNow.AddMinutes(3)).IsTrue();
     }
 
     [Test]
-    public async Task Failed_one_shot_dispatch_goes_terminal_failed_with_a_dead_letter()
+    public async Task Failed_one_shot_dispatch_is_removed_with_a_dead_letter()
     {
         await using var host = await SchedulerTestHost.StartAsync(fixture.ConnectionString, sweeper: false);
         string handle;
@@ -419,7 +455,7 @@ public sealed class MssqlSchedulerIntegrationTests(MssqlContainerFixture fixture
         await using var sweeping = await SchedulerTestHost.StartAsync(
             fixture.ConnectionString, reuseSuffix: host.Suffix);
 
-        await Wait.Until(async () => await host.JobStatus(handle) == "failed", "the one-shot to go terminal-failed");
+        await Wait.Until(async () => !await host.JobExists(handle), "the failed one-shot row to be removed");
         await Assert.That(await host.DeadLetterCount()).IsEqualTo(1);
     }
 }

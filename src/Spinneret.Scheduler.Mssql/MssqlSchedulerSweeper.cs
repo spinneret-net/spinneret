@@ -8,12 +8,12 @@ namespace Spinneret.Scheduler.Mssql;
 
 /// <summary>
 /// Sweeps for due scheduled jobs and enqueues them. Each job dispatches in its own SQL
-/// transaction: the claim (an UPDLOCK read plus the booking update) and the queue insert commit
-/// together, so a run can neither be lost nor double-enqueued — competing hosts' sweeps skip
-/// locked rows via READPAST and dispatch other due jobs in parallel. A dispatch failure
-/// compensates on a fresh transaction, mirroring the GCP dispatcher: a one-shot job goes
-/// terminal-failed with a dead letter; a recurring job dead-letters the occurrence but keeps the
-/// schedule armed, because recurrence is owned by the job, not by any single run.
+/// transaction: the claim (an UPDLOCK read plus the booking) and the queue insert commit together,
+/// so a run can neither be lost nor double-enqueued — competing hosts' sweeps skip locked rows via
+/// READPAST and dispatch other due jobs in parallel. A dispatch failure compensates on a fresh
+/// transaction, mirroring the GCP dispatcher: a one-shot job is deleted in the same transaction that
+/// records its dead letter; a recurring job dead-letters the occurrence but keeps the schedule armed,
+/// because recurrence is owned by the job, not by any single run.
 /// </summary>
 internal sealed class MssqlSchedulerSweeper(
     IOptions<MssqlQueueOptions> queueOptions,
@@ -65,7 +65,7 @@ internal sealed class MssqlSchedulerSweeper(
         // newer version before a rollback, or corrupted) must not fail the sweep — that would
         // starve every other due job forever, since the oldest-due poison row is re-selected on
         // each pass. Instead, quarantine it: push its run out and dead-letter the occurrence,
-        // leaving it pending so a host version that understands it can still pick it up.
+        // leaving the row in place so a host version that understands it can still pick it up.
         Schedule? schedule = null;
         if (claimed.ScheduleText is not null)
         {
@@ -86,17 +86,17 @@ internal sealed class MssqlSchedulerSweeper(
         try
         {
             // Book the outcome on the claim's transaction: a recurring job's next run advances, a
-            // one-shot goes terminal. The booking and the enqueue below commit atomically.
+            // one-shot is deleted. The booking and the enqueue below commit atomically.
             await using (var book = connection.CreateCommand())
             {
                 book.Transaction = transaction;
                 book.CommandText = schedule is null ? sql.CompleteOneShot : sql.AdvanceRecurring;
                 book.AddParameter("@JobKey", claimed.JobKey);
-                book.AddParameter("@Now", now.UtcDateTime);
-                if (schedule is null)
-                    book.AddParameter("@Status", ScheduledJobStatus.Enqueued);
-                else
+                if (schedule is not null)
+                {
+                    book.AddParameter("@Now", now.UtcDateTime);
                     book.AddParameter("@NextExecuteAt", NextRun(schedule, now));
+                }
                 await book.ExecuteNonQueryAsync(ct);
             }
 
@@ -130,7 +130,7 @@ internal sealed class MssqlSchedulerSweeper(
 
     /// <summary>
     /// Books an unreadable job out of the sweep's way on the claim's transaction: run pushed
-    /// forward, occurrence dead-lettered, status left pending so it recovers by itself once a
+    /// forward, occurrence dead-lettered, row left in place so it recovers by itself once a
     /// host that can parse it runs (or the row is repaired).
     /// </summary>
     private async Task QuarantineUnreadable(
@@ -190,7 +190,6 @@ internal sealed class MssqlSchedulerSweeper(
         await using var command = connection.CreateCommand();
         command.Transaction = transaction;
         command.CommandText = sql.ClaimNextDue;
-        command.AddParameter("@Status", ScheduledJobStatus.Pending);
         command.AddParameter("@Now", now.UtcDateTime);
 
         await using var reader = await command.ExecuteReaderAsync(ct);
@@ -220,6 +219,11 @@ internal sealed class MssqlSchedulerSweeper(
     /// record. Returns false when even the compensation failed — the job is then still due, and
     /// the caller must stop draining so the sweep interval provides the backoff.
     /// </summary>
+    /// <remarks>
+    /// For a one-shot job the re-booking is a delete, and it shares this transaction with the
+    /// dead-letter write — so the row is only ever removed together with the record that replaces
+    /// it. A failure to write the dead letter rolls both back, leaving the job due to be retried.
+    /// </remarks>
     private async Task<bool> Compensate(
         ScheduledJobRow job, Schedule? schedule, Exception failure, CancellationToken ct)
     {
@@ -240,13 +244,10 @@ internal sealed class MssqlSchedulerSweeper(
                 if (schedule is null)
                 {
                     command.CommandText = sql.CompensateOneShot;
-                    command.AddParameter("@FailedStatus", ScheduledJobStatus.Failed);
-                    command.AddParameter("@PendingStatus", ScheduledJobStatus.Pending);
                 }
                 else
                 {
                     command.CommandText = sql.CompensateRecurring;
-                    command.AddParameter("@Status", ScheduledJobStatus.Pending);
                     command.AddParameter("@NextExecuteAt", NextRun(schedule, now));
                 }
                 booked = await command.ExecuteNonQueryAsync(ct);

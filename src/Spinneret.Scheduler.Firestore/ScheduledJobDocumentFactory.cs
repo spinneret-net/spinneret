@@ -17,15 +17,14 @@ internal sealed class ScheduledJobDocumentFactory(
     {
         return new Dictionary<string, object>(Payload(request))
         {
-            [ScheduledJob.Fields.Status] = ScheduledJob.StatusValues.Pending,
             [ScheduledJob.Fields.NextExecuteAt] = Timestamp.FromDateTimeOffset(executeAt),
             [ScheduledJob.Fields.CreatedAt] = Timestamp.FromDateTimeOffset(timeProvider.GetUtcNow()),
         };
     }
 
     /// <summary>
-    /// The recurrence-defining fields (type, payload, schedule) for a recurring job. The status and
-    /// run timestamps are owned by the caller's idempotent register-or-refresh, not by this builder.
+    /// The recurrence-defining fields (type, payload, schedule) for a recurring job. The run
+    /// timestamps are owned by the caller's idempotent register-or-refresh, not by this builder.
     /// </summary>
     public Dictionary<string, object> RecurringDefinition<TResponse>(IRequest<TResponse> request, Schedule schedule)
     {

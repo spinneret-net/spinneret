@@ -11,7 +11,6 @@ public class ScheduledJobTests
     {
         await Assert.That(ScheduledJob.Fields.RequestTypeName).IsEqualTo("requestTypeName");
         await Assert.That(ScheduledJob.Fields.PayloadJson).IsEqualTo("payloadJson");
-        await Assert.That(ScheduledJob.Fields.Status).IsEqualTo("status");
         await Assert.That(ScheduledJob.Fields.NextExecuteAt).IsEqualTo("nextExecuteAt");
         await Assert.That(ScheduledJob.Fields.CreatedAt).IsEqualTo("createdAt");
         await Assert.That(ScheduledJob.Fields.Schedule).IsEqualTo("schedule");
@@ -19,11 +18,19 @@ public class ScheduledJobTests
     }
 
     [Test]
-    public async Task StatusValues_match_the_persisted_status_strings()
+    public async Task One_shot_handles_carry_the_prefix_that_distinguishes_them_from_recurring_keys()
     {
-        await Assert.That(ScheduledJob.StatusValues.Pending).IsEqualTo("pending");
-        await Assert.That(ScheduledJob.StatusValues.Cancelled).IsEqualTo("cancelled");
-        await Assert.That(ScheduledJob.StatusValues.Enqueued).IsEqualTo("enqueued");
-        await Assert.That(ScheduledJob.StatusValues.Failed).IsEqualTo("failed");
+        // The prefix is what lets CancelJob reject a recurring key without reading the document,
+        // which is what keeps the transactional API write-only.
+        await Assert.That(ScheduledJob.OneShotHandlePrefix).IsEqualTo("oneshot-");
+        await Assert.That(ScheduledJob.NewOneShotHandle()).StartsWith("oneshot-");
+        await Assert.That(ScheduledJob.IsOneShotHandle(ScheduledJob.NewOneShotHandle())).IsTrue();
+        await Assert.That(ScheduledJob.IsOneShotHandle("nightly-cleanup")).IsFalse();
+    }
+
+    [Test]
+    public async Task One_shot_handles_are_unique()
+    {
+        await Assert.That(ScheduledJob.NewOneShotHandle()).IsNotEqualTo(ScheduledJob.NewOneShotHandle());
     }
 }

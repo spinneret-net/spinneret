@@ -150,6 +150,8 @@ public sealed class StartupExtensionsTests
 
         await Assert.That(script).Contains("[jobs].[MyJobs]");
         await Assert.That(script).Contains("IF OBJECT_ID(N'[jobs].[MyJobs]', N'U') IS NULL");
-        await Assert.That(script).Contains("(Status, NextExecuteAt)");
+        await Assert.That(script).Contains("[IX_MyJobs_NextExecuteAt]");
+        // Existence is the state, so there is no status column to index on.
+        await Assert.That(script).DoesNotContain("Status");
     }
 }

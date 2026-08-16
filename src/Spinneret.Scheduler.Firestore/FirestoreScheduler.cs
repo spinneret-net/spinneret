@@ -30,22 +30,18 @@ internal sealed class FirestoreScheduler(
             {
                 transaction.Set(docRef, new Dictionary<string, object>(definition)
                 {
-                    [ScheduledJob.Fields.Status] = ScheduledJob.StatusValues.Pending,
                     [ScheduledJob.Fields.NextExecuteAt] = NextRunFromNow(schedule),
                     [ScheduledJob.Fields.CreatedAt] = Timestamp.FromDateTimeOffset(timeProvider.GetUtcNow()),
                 });
                 return;
             }
 
-            // Idempotent refresh: update the definition in place. Re-arm only if a previous
-            // incarnation went terminal (e.g. cancelled) or the schedule itself changed; a pending
-            // job with an unchanged schedule keeps its cadence so frequent restarts never reset it.
-            if (snapshot.GetValue<string>(ScheduledJob.Fields.Status) != ScheduledJob.StatusValues.Pending
-                || StoredSchedule(snapshot) != scheduleText)
-            {
-                definition[ScheduledJob.Fields.Status] = ScheduledJob.StatusValues.Pending;
+            // Idempotent refresh: update the definition in place. Re-arm only if the schedule itself
+            // changed; an unchanged schedule keeps its cadence so frequent restarts never reset it.
+            // A job that went terminal doesn't reach here at all — it was deleted, so the branch
+            // above re-creates it.
+            if (StoredSchedule(snapshot) != scheduleText)
                 definition[ScheduledJob.Fields.NextExecuteAt] = NextRunFromNow(schedule);
-            }
 
             transaction.Update(docRef, definition);
         }, cancellationToken: ct);
@@ -62,7 +58,7 @@ internal sealed class FirestoreScheduler(
         {
             var snapshot = await transaction.GetSnapshotAsync(docRef, ct);
 
-            // Absent is a no-op, and so is a one-shot: one-shot handles are auto-ids in this same
+            // Absent is a no-op, and so is a one-shot: one-shot handles live in this same
             // collection, and only a recurring job carries a schedule field.
             if (snapshot.Exists && StoredSchedule(snapshot) is not null)
                 transaction.Delete(docRef);

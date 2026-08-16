@@ -2,34 +2,45 @@ using Spinneret.Queue.Mssql;
 
 namespace Spinneret.Scheduler.Mssql;
 
-/// <summary>Status values for scheduled-job rows, mirroring the GCP scheduler's document states.</summary>
-internal static class ScheduledJobStatus
+/// <summary>
+/// One-shot job handles, mirroring the GCP scheduler's document ids. One-shot handles and
+/// caller-chosen recurring keys share the JobKey namespace, so the prefix is what tells them apart
+/// without a read — it keeps a cancel from destroying a recurring job's schedule.
+/// </summary>
+internal static class ScheduledJobHandle
 {
-    public const string Pending = "pending";
-    public const string Cancelled = "cancelled";
-    public const string Enqueued = "enqueued";
-    public const string Failed = "failed";
+    public const string OneShotPrefix = "oneshot-";
+
+    public static string New() => $"{OneShotPrefix}{Guid.NewGuid():N}";
+
+    public static bool IsOneShot(string handle) => handle.StartsWith(OneShotPrefix, StringComparison.Ordinal);
 }
 
 /// <summary>
 /// The single source of truth for the scheduler's SQL — every statement the scheduler executes is
 /// built here from the configured names, so the schema and the statements can never drift apart.
 /// </summary>
+/// <remarks>
+/// There is no status column: a row's existence *is* its status. A job is deleted the moment it
+/// stops being work to do — a one-shot that ran, one whose failure reached the dead-letter table, or
+/// one that was cancelled — so every row is due or waiting to be. That keeps the table from growing
+/// without bound and reduces every predicate below to a key and a due time.
+/// </remarks>
 internal sealed class ScheduledJobSql(MssqlQueueOptions queueOptions, MssqlSchedulerOptions schedulerOptions)
 {
     public string Table { get; } = Identifier.Qualify(queueOptions.SchemaName, schedulerOptions.TableName);
 
     /// <summary>Locks a job row for the register-or-refresh upsert; HOLDLOCK covers the not-yet-existing key.</summary>
     public string SelectForRegister { get; } = $"""
-        SELECT Status, Schedule
+        SELECT Schedule
         FROM {Identifier.Qualify(queueOptions.SchemaName, schedulerOptions.TableName)} WITH (UPDLOCK, HOLDLOCK)
         WHERE JobKey = @JobKey;
         """;
 
     public string Insert { get; } = $"""
         INSERT INTO {Identifier.Qualify(queueOptions.SchemaName, schedulerOptions.TableName)}
-            (JobKey, RequestTypeName, PayloadJson, Status, Schedule, NextExecuteAt, CreatedAt)
-        VALUES (@JobKey, @RequestTypeName, @PayloadJson, @Status, @Schedule, @NextExecuteAt, @CreatedAt);
+            (JobKey, RequestTypeName, PayloadJson, Schedule, NextExecuteAt, CreatedAt)
+        VALUES (@JobKey, @RequestTypeName, @PayloadJson, @Schedule, @NextExecuteAt, @CreatedAt);
         """;
 
     /// <summary>Refreshes the definition of an existing pending job without touching its cadence.</summary>
@@ -39,11 +50,11 @@ internal sealed class ScheduledJobSql(MssqlQueueOptions queueOptions, MssqlSched
         WHERE JobKey = @JobKey;
         """;
 
-    /// <summary>Refreshes the definition and re-arms the job (terminal status or changed schedule).</summary>
+    /// <summary>Refreshes the definition and re-arms the job, for a changed schedule.</summary>
     public string UpdateDefinitionAndRearm { get; } = $"""
         UPDATE {Identifier.Qualify(queueOptions.SchemaName, schedulerOptions.TableName)}
         SET RequestTypeName = @RequestTypeName, PayloadJson = @PayloadJson, Schedule = @Schedule,
-            Status = @Status, NextExecuteAt = @NextExecuteAt
+            NextExecuteAt = @NextExecuteAt
         WHERE JobKey = @JobKey;
         """;
 
@@ -55,7 +66,7 @@ internal sealed class ScheduledJobSql(MssqlQueueOptions queueOptions, MssqlSched
     public string ClaimNextDue { get; } = $"""
         SELECT TOP(1) JobKey, RequestTypeName, PayloadJson, Schedule
         FROM {Identifier.Qualify(queueOptions.SchemaName, schedulerOptions.TableName)} WITH (UPDLOCK, READPAST, ROWLOCK)
-        WHERE Status = @Status AND NextExecuteAt <= @Now
+        WHERE NextExecuteAt <= @Now
         ORDER BY NextExecuteAt;
         """;
 
@@ -66,28 +77,33 @@ internal sealed class ScheduledJobSql(MssqlQueueOptions queueOptions, MssqlSched
         WHERE JobKey = @JobKey;
         """;
 
-    /// <summary>Marks a claimed one-shot job terminal.</summary>
+    /// <summary>
+    /// Retires a claimed one-shot job. Runs on the claim's transaction, so the row disappears in the
+    /// same commit that makes the queue message durable — the message is the record from then on.
+    /// </summary>
     public string CompleteOneShot { get; } = $"""
-        UPDATE {Identifier.Qualify(queueOptions.SchemaName, schedulerOptions.TableName)}
-        SET Status = @Status, LastRunAt = @Now
+        DELETE FROM {Identifier.Qualify(queueOptions.SchemaName, schedulerOptions.TableName)}
         WHERE JobKey = @JobKey;
         """;
 
     /// <summary>
     /// Compensation after a failed dispatch, on a fresh transaction: applies only if the job is
-    /// still pending and due — a competing sweep that claimed it meanwhile wins, and this becomes
-    /// a no-op (checked via rows affected).
+    /// still due — a competing sweep that claimed it meanwhile either advanced it past now or
+    /// deleted it outright, so this becomes a no-op (checked via rows affected).
     /// </summary>
     public string CompensateRecurring { get; } = $"""
         UPDATE {Identifier.Qualify(queueOptions.SchemaName, schedulerOptions.TableName)}
         SET NextExecuteAt = @NextExecuteAt, LastRunAt = @Now
-        WHERE JobKey = @JobKey AND Status = @Status AND NextExecuteAt <= @Now;
+        WHERE JobKey = @JobKey AND NextExecuteAt <= @Now;
         """;
 
+    /// <summary>
+    /// Retires a one-shot job whose dispatch failed. The dead-letter write shares this transaction,
+    /// so the row is only ever removed together with the record that replaces it.
+    /// </summary>
     public string CompensateOneShot { get; } = $"""
-        UPDATE {Identifier.Qualify(queueOptions.SchemaName, schedulerOptions.TableName)}
-        SET Status = @FailedStatus, LastRunAt = @Now
-        WHERE JobKey = @JobKey AND Status = @PendingStatus AND NextExecuteAt <= @Now;
+        DELETE FROM {Identifier.Qualify(queueOptions.SchemaName, schedulerOptions.TableName)}
+        WHERE JobKey = @JobKey AND NextExecuteAt <= @Now;
         """;
 
     /// <summary>
@@ -99,9 +115,14 @@ internal sealed class ScheduledJobSql(MssqlQueueOptions queueOptions, MssqlSched
         WHERE JobKey = @JobKey AND Schedule IS NOT NULL;
         """;
 
+    /// <summary>
+    /// Cancels a one-shot job by removing it. The Schedule IS NULL guard mirrors
+    /// <see cref="DeleteRecurring"/>'s: it is a backstop behind the handle-prefix check, so a cancel
+    /// can never delete a recurring job's schedule. A job that already ran is simply gone, which
+    /// makes this a no-op — the same outcome the old pending-status guard produced.
+    /// </summary>
     public string Cancel { get; } = $"""
-        UPDATE {Identifier.Qualify(queueOptions.SchemaName, schedulerOptions.TableName)}
-        SET Status = @CancelledStatus
-        WHERE JobKey = @JobKey AND Status = @PendingStatus;
+        DELETE FROM {Identifier.Qualify(queueOptions.SchemaName, schedulerOptions.TableName)}
+        WHERE JobKey = @JobKey AND Schedule IS NULL;
         """;
 }

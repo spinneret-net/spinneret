@@ -166,8 +166,12 @@ public sealed class SchedulerTestHost : IAsyncDisposable
         await command.ExecuteNonQueryAsync();
     }
 
-    public Task<string> JobStatus(string jobKey) =>
-        ScalarAsync<string>($"SELECT Status FROM [{JobsTable}] WHERE JobKey = N'{jobKey}'");
+    /// <summary>
+    /// Whether the job is still outstanding work. There is no status column — a job is deleted once
+    /// it has run, been cancelled, or had its failure dead-lettered — so existence is the state.
+    /// </summary>
+    public async Task<bool> JobExists(string jobKey) =>
+        await ScalarAsync<int>($"SELECT COUNT(*) FROM [{JobsTable}] WHERE JobKey = N'{jobKey}'") == 1;
 
     public Task<DateTime> JobNextExecuteAt(string jobKey) =>
         ScalarAsync<DateTime>($"SELECT NextExecuteAt FROM [{JobsTable}] WHERE JobKey = N'{jobKey}'");

@@ -73,13 +73,19 @@ retry-while-the-database-warms-up behaviour as the queue's initializer:
     JobKey          NVARCHAR(200) PRIMARY KEY
     RequestTypeName NVARCHAR(500)  NOT NULL
     PayloadJson     NVARCHAR(MAX)  NOT NULL
-    Status          NVARCHAR(20)   NOT NULL   -- pending | enqueued | failed | cancelled
     Schedule        NVARCHAR(500)  NULL       -- NULL marks a one-shot job
     NextExecuteAt   DATETIME2(3)   NOT NULL
     CreatedAt       DATETIME2(3)   NOT NULL
-    LastRunAt       DATETIME2(3)   NULL
-  + IX_SpinneretScheduledJobs_Status_NextExecuteAt (Status, NextExecuteAt)
+    LastRunAt       DATETIME2(3)   NULL       -- recurring only; a one-shot is deleted by that run
+  + IX_SpinneretScheduledJobs_NextExecuteAt (NextExecuteAt)
 ```
+
+### There is no status column
+
+A row exists only while it is still work to do. A one-shot is deleted by the same transaction that
+enqueues it, or — if the dispatch failed — by the one that writes its dead letter; cancelling deletes
+it outright. So the table stays proportional to what is scheduled rather than to everything ever
+scheduled, and needs no retention job. The record of a run lives in the logs and the queue, not here.
 
 Owning the schema yourself means setting `Queue:Mssql:CreateSchema = false` — which turns off the
 queue's tables too — and emitting both scripts from your migrations:
@@ -105,8 +111,11 @@ var handle = await scheduler.ScheduleJobAsync(tx, new RemoveEmployee(id), employ
 await tx.CommitAsync();
 ```
 
-`ScheduleJobAsync` returns the handle for `CancelJobAsync`. Cancelling is guarded — a job that already
-dispatched is left alone rather than resurrected, and cancelling an unknown handle is a silent no-op.
+`ScheduleJobAsync` returns the handle for `CancelJobAsync`, prefixed `oneshot-`. Cancelling deletes
+the row: a job that already dispatched is gone, so cancelling it — or an unknown handle — is a silent
+no-op. Passing a *recurring* key throws `ArgumentException`; those share this table, and cancelling
+deletes, so the prefix is what stops a mixed-up call from destroying a live schedule. Retire those
+with `UnregisterAsync`.
 
 The row is identical to the ones the recurring scheduler writes, so the same sweep picks it up.
 
@@ -123,8 +132,10 @@ tolerated.
 A sweep **drains** — it keeps going until nothing is due — so a backlog clears at full speed rather
 than one job per tick. (The Firestore sweep processes one snapshot instead.)
 
-A dispatch failure compensates on a fresh transaction: a one-shot goes terminal-failed with a dead
-letter, a recurring job dead-letters that occurrence but keeps its schedule armed.
+A dispatch failure compensates on a fresh transaction: a one-shot is deleted in the same transaction
+that records its dead letter — so the row is only ever removed together with the record that replaces
+it, and a failure to write that record rolls both back and leaves the job due. A recurring job
+dead-letters that occurrence but keeps its schedule armed.
 
 ## Gotchas
 
@@ -136,8 +147,10 @@ letter, a recurring job dead-letters that occurrence but keeps its schedule arme
   re-enable them.
 - **A slow enqueue holds a row lock** for the length of the claim transaction.
 - **Compensation can be a no-op** if a competing sweep re-claimed the job; the dead letter is only
-  written when the compensating update actually applied.
+  written when the compensating statement actually applied.
 - **Never hand-delete rows without a `Schedule IS NOT NULL` guard.** One-shot handles live in the same
   `JobKey` namespace and are exactly the rows with no schedule.
+- **A missing row is not an error.** Since a finished job leaves nothing behind, "the job is gone" and
+  "the job never existed" are the same observation. `RegisterAsync` treats both as "create it".
 - **`Scheduler:Mssql:SweepInterval` no longer exists.** The cadence moved to `Scheduler:Sweeper:SweepInterval`
   along with the trigger. A leftover key binds to nothing and silently does nothing.

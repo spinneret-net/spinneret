@@ -19,17 +19,18 @@ public interface IFirestoreTransactionalScheduler
     string ScheduleJob<TResponse>(Transaction transaction, IRequest<TResponse> request, DateTimeOffset executeAt);
 
     /// <summary>
-    /// Cancels the job identified by <paramref name="handle"/> within the transaction.
+    /// Cancels the job identified by <paramref name="handle"/> within the transaction, by deleting
+    /// its document. Cancelling a job that already ran, or an unknown handle, is a silent no-op —
+    /// a delete needs no read and does not care whether the document exists.
     /// </summary>
-    /// <remarks>
-    /// Unconditional, and deliberately so — it differs from the MSSQL scheduler, which cancels only a
-    /// still-pending job and silently ignores anything else. Matching that here would require reading
-    /// the document first, and Firestore requires every read in a transaction to precede every write;
-    /// since this method enlists in a transaction the caller owns and may already have written to,
-    /// a read here could invalidate it. Two consequences follow: cancelling a job that already ran
-    /// moves it to <c>cancelled</c> rather than being ignored, and cancelling an unknown handle
-    /// throws when the transaction commits rather than passing silently.
-    /// </remarks>
+    /// <exception cref="ArgumentException">
+    /// <paramref name="handle"/> was not issued by <see cref="ScheduleJob{TResponse}"/>. Recurring keys live in
+    /// the same collection, so this guards against a cancel silently destroying a schedule; use
+    /// <c>IRecurringJobScheduler.UnregisterAsync</c> for those. The check is on the handle itself
+    /// rather than on the stored document because Firestore requires every read in a transaction to
+    /// precede every write, and this method enlists in a transaction the caller may already have
+    /// written to — so it must stay write-only.
+    /// </exception>
     void CancelJob(Transaction transaction, string handle);
 }
 
@@ -43,13 +44,19 @@ internal sealed class FirestoreTransactionalScheduler(
 
     public string ScheduleJob<TResponse>(Transaction transaction, IRequest<TResponse> request, DateTimeOffset executeAt)
     {
-        var docRef = Collection.Document();
+        var docRef = Collection.Document(ScheduledJob.NewOneShotHandle());
         transaction.Set(docRef, factory.OneShot(request, executeAt));
         return docRef.Id;
     }
 
-    public void CancelJob(Transaction transaction, string handle) =>
-        transaction.Update(
-            Collection.Document(handle),
-            new Dictionary<string, object> { [ScheduledJob.Fields.Status] = ScheduledJob.StatusValues.Cancelled });
+    public void CancelJob(Transaction transaction, string handle)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(handle);
+        if (!ScheduledJob.IsOneShotHandle(handle))
+            throw new ArgumentException(
+                $"'{handle}' is not a one-shot job handle. Recurring jobs are retired with UnregisterAsync.",
+                nameof(handle));
+
+        transaction.Delete(Collection.Document(handle));
+    }
 }

@@ -46,14 +46,14 @@ public class ScheduledJobDocumentFactoryTests
     }
 
     [Test]
-    public async Task OneShot_sets_status_pending()
+    public async Task OneShot_writes_no_status_field()
     {
+        // Existence is the status: a job is deleted once it has run, so there is nothing to record.
         var factory = CreateFactory();
 
         var doc = factory.OneShot(new TestRequest("x"), new DateTimeOffset(2030, 1, 2, 3, 4, 5, TimeSpan.Zero));
 
-        await Assert.That((string)doc[ScheduledJob.Fields.Status])
-            .IsEqualTo(ScheduledJob.StatusValues.Pending);
+        await Assert.That(doc.Keys).DoesNotContain("status");
     }
 
     [Test]
