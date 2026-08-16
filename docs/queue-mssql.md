@@ -97,9 +97,16 @@ Two tables, using the defaults:
 ```
 
 `IX_SpinneretDeadLetters_DeadLetteredAt` serves the [dead-letter page's](queue.md#the-dead-letter-page)
-keyset paging. It is guarded separately from the table it sits on, so a database created before the
-index existed picks it up on the next startup rather than being skipped because the table was already
-there. If you own your schema, re-run the script — see below.
+keyset paging.
+
+Every index is guarded on its own existence rather than on its table's, so a database that is missing
+one picks it up on the next startup instead of being skipped because the table was already there.
+That covers a database created before an index was added to the script, and it repairs one whose
+table was created without its indexes. If you own your schema, re-run the script — see below.
+
+`UX_SpinneretQueue_DedupeKey` is load-bearing rather than an optimisation: an enqueue detects a
+duplicate `DedupeKey` by catching that index's unique violation, so a queue table missing it accepts
+the duplicate and reports success. Re-running the script restores it.
 
 ### Owning the schema yourself
 
@@ -117,6 +124,12 @@ var ddl = MssqlQueueSchema.CreateScript(new MssqlQueueOptions
 The script is idempotent — safe to re-run, and each object is guarded on its own, so re-running it
 after upgrading the package adds anything new without touching what is already there. Note this one
 switch also gates the [scheduler's](scheduler-mssql.md) table.
+
+It is also safe to run concurrently: it opens its own transaction and takes an
+[application lock](https://learn.microsoft.com/sql/relational-databases/system-stored-procedures/sp-getapplock-transact-sql)
+for the duration, so a fleet of replicas all running it at startup serialize instead of racing to
+create the same table. Embedding it in a migration that already has a transaction open is fine —
+the nested pair balances — but a migration runner that forbids transactional DDL will object.
 
 ### Permissions
 

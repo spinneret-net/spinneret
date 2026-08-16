@@ -66,7 +66,9 @@ See [scheduler.md](scheduler.md#driving-the-sweep).
 ## Infrastructure
 
 One table, created idempotently at startup when the queue's `CreateSchema` is on, with the same
-retry-while-the-database-warms-up behaviour as the queue's initializer:
+retry-while-the-database-warms-up behaviour as the queue's initializer, and the same
+[concurrency safety](queue-mssql.md#owning-the-schema-yourself) — its own transaction and
+application lock, so a fleet starting together serializes rather than racing:
 
 ```sql
 [dbo].[SpinneretScheduledJobs]
