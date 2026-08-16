@@ -6,9 +6,9 @@ namespace Spinneret.Scheduler.Firestore.Tests;
 /// <summary>
 /// Covers the argument validation of <see cref="FirestoreScheduler.RegisterAsync"/>, which runs
 /// before any Firestore access — proven by constructing the scheduler with a null FirestoreDb.
-/// The transactional register-or-refresh behaviour itself requires a Firestore emulator and is
-/// intentionally out of scope. Schedule construction rules (cron validity, zone) are covered by the
-/// Spinneret.Scheduler test suite.
+/// The transactional register-or-refresh behaviour itself is covered against the Firestore emulator
+/// by <see cref="FirestoreSchedulerIntegrationTests"/>. Schedule construction rules (cron validity,
+/// zone) are covered by the Spinneret.Scheduler test suite.
 /// </summary>
 public class FirestoreSchedulerTests
 {

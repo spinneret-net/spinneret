@@ -1,6 +1,15 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
+    <!-- An in-memory server, so the dispatch endpoint can be exercised over a real ASP.NET
+         pipeline: authorization is middleware, and only a request through it proves the route is
+         guarded rather than merely annotated. -->
+    <PackageReference Include="Microsoft.AspNetCore.TestHost" Version="10.0.9" />
+    <!-- Mints the test OIDC tokens the guarded endpoint is exercised with. -->
+    <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.16.0" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\src\Spinneret.Queue.Gcp\Spinneret.Queue.Gcp.csproj" />
   </ItemGroup>
 

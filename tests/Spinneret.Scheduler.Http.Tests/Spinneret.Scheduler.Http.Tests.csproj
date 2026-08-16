@@ -5,6 +5,13 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- An in-memory server, so the endpoint can be exercised over a real ASP.NET pipeline:
+         authorization is middleware, and only a request through it proves the route is guarded
+         rather than merely annotated. -->
+    <PackageReference Include="Microsoft.AspNetCore.TestHost" Version="10.0.9" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\src\Spinneret.Scheduler.Http\Spinneret.Scheduler.Http.csproj" />
   </ItemGroup>
 

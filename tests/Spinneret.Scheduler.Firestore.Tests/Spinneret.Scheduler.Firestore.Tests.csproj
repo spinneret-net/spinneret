@@ -4,6 +4,12 @@
     <!-- The package itself needs only the DI abstractions now that the HTTP trigger has moved out;
          building a provider to assert what the Add* call registered is a test-only concern. -->
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.9" />
+    <!-- Hosting, so the integration suite can start the hosted services (the recurring-job
+         installer, the sweeper) the way a real host does. -->
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.9" />
+    <!-- The Firestore emulator, so the register-or-refresh transaction, the dispatch lease and the
+         one-shot enlistment are exercised against a real Firestore rather than argued from source. -->
+    <PackageReference Include="Testcontainers.Firestore" Version="4.10.0" />
   </ItemGroup>
 
   <ItemGroup>
