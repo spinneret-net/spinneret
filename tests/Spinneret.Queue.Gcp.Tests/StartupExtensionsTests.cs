@@ -1,4 +1,3 @@
-using Spinneret.Functional;
 using Google.Cloud.Tasks.V2;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -11,9 +10,6 @@ public sealed class StartupExtensionsTests
 {
     private sealed class FakeMediator : ISpinneretMediator
     {
-        public Task Send(IRequest<Unit> request, CancellationToken cancellationToken = default)
-            => Task.CompletedTask;
-
         public Task<TResponse> Send<TResponse>(IRequest<TResponse> request, CancellationToken cancellationToken = default)
             => Task.FromResult(default(TResponse)!);
     }

@@ -16,7 +16,8 @@ namespace Spinneret.Mediator;
 public interface ISpinneretMediator
 {
     /// <summary>Sends a request that produces no response.</summary>
-    Task Send(IRequest<Unit> request, CancellationToken cancellationToken = default);
+    Task Send(IRequest<Unit> request, CancellationToken cancellationToken = default)
+        => Send<Unit>(request, cancellationToken);
 
     /// <summary>Sends a request and returns its handler's response.</summary>
     Task<TResponse> Send<TResponse>(IRequest<TResponse> request, CancellationToken cancellationToken = default);
@@ -33,11 +34,6 @@ public interface IMediatorCache
 
 internal sealed class SpinneretMediator(IServiceProvider serviceProvider, ITagIndexedCache cache) : ISpinneretMediator
 {
-    public async Task Send(IRequest<Unit> request, CancellationToken cancellationToken = default)
-    {
-        await Send<Unit>(request, cancellationToken);
-    }
-
     public async Task<TResponse> Send<TResponse>(IRequest<TResponse> request, CancellationToken cancellationToken = default)
     {
         var requestType = request.GetType();

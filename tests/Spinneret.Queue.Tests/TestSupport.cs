@@ -97,9 +97,6 @@ internal sealed class FakeMediator : ISpinneretMediator
     public object? LastRequest { get; private set; }
     public int Calls { get; private set; }
 
-    public Task Send(IRequest<Unit> request, CancellationToken cancellationToken = default) =>
-        Send<Unit>(request, cancellationToken);
-
     public Task<TResponse> Send<TResponse>(IRequest<TResponse> request, CancellationToken cancellationToken = default)
     {
         Calls++;
