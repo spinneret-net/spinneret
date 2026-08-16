@@ -15,8 +15,9 @@ public static class QueueCoreServiceCollectionExtensions
     /// </summary>
     /// <remarks>
     /// Deliberately registers no <see cref="IQueuePayloadSerializer"/>, <see cref="IQueue"/>,
-    /// <see cref="IEnvelopeQueue"/> or <see cref="IDeadLetterWriter"/> — every one of those is a
-    /// transport or host decision, and each transport supplies its own default.
+    /// <see cref="IEnvelopeQueue"/>, <see cref="IDeadLetterWriter"/> or
+    /// <see cref="IDeadLetterStore"/> — every one of those is a transport or host decision, and each
+    /// transport supplies its own default.
     /// </remarks>
     /// <remarks>
     /// Takes a collection rather than a <c>params</c> array deliberately: a <c>params</c> parameter
@@ -43,6 +44,12 @@ public static class QueueCoreServiceCollectionExtensions
         services.TryAddScoped<IQueueDeliveryProcessor, QueueDeliveryProcessor>();
         services.TryAddScoped<IQueueDispatchBoundary, DirectDispatchBoundary>();
         services.TryAddSingleton(TimeProvider.System);
+
+        // Resend is transport-agnostic, so it belongs here beside the dispatcher rather than being
+        // repeated by every store package. It resolves only once something asks for it, which keeps
+        // a host that registered no IDeadLetterStore — because it has no admin page — working.
+        services.TryAddSingleton<IQueueTransactionScope, PassThroughQueueTransactionScope>();
+        services.TryAddSingleton<IDeadLetterResender, DeadLetterResender>();
         return services;
     }
 }

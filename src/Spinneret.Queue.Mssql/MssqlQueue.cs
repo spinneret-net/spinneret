@@ -1,3 +1,4 @@
+using System.Data;
 using System.Data.Common;
 using System.Diagnostics;
 using System.Globalization;
@@ -110,6 +111,21 @@ internal static class DbCommandExtensions
         var parameter = command.CreateParameter();
         parameter.ParameterName = name;
         parameter.Value = value ?? DBNull.Value;
+        command.Parameters.Add(parameter);
+    }
+
+    /// <summary>
+    /// Adds a UTC instant as <c>datetime2</c>. The type must be stated: SqlClient infers the legacy
+    /// <c>datetime</c> from a <see cref="DateTime"/>, whose ~3.33 ms resolution cannot represent
+    /// every value a <c>DATETIME2(3)</c> column holds — which would round the value a keyset cursor
+    /// compares for equality, and skip or repeat rows across a page boundary.
+    /// </summary>
+    public static void AddDateTime2Parameter(this DbCommand command, string name, DateTimeOffset value)
+    {
+        var parameter = command.CreateParameter();
+        parameter.ParameterName = name;
+        parameter.DbType = DbType.DateTime2;
+        parameter.Value = value.UtcDateTime;
         command.Parameters.Add(parameter);
     }
 

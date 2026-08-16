@@ -90,6 +90,74 @@ internal sealed class FakeDeadLetterWriter : IDeadLetterWriter
     }
 }
 
+internal sealed class FakeQueue : IQueue
+{
+    public Exception? Throw { get; set; }
+    public List<object> Enqueued { get; } = [];
+
+    public Task Enqueue<TResponse>(IRequest<TResponse> request, QueueOptions? options = null, CancellationToken ct = default)
+    {
+        if (Throw is not null)
+            return Task.FromException(Throw);
+
+        Enqueued.Add(request);
+        return Task.CompletedTask;
+    }
+}
+
+internal sealed class FakeDeadLetterStore : IDeadLetterStore
+{
+    private readonly Dictionary<string, DeadLetter> _entries = new(StringComparer.Ordinal);
+
+    /// <summary>Every key passed to <see cref="DeleteAsync"/>, whether or not it existed.</summary>
+    public List<string> Deleted { get; } = [];
+
+    public FakeDeadLetterStore Add(DeadLetter deadLetter)
+    {
+        _entries[deadLetter.IdempotencyKey] = deadLetter;
+        return this;
+    }
+
+    public Task<DeadLetterPage> ListAsync(DeadLetterQuery query, CancellationToken ct = default) =>
+        Task.FromResult(new DeadLetterPage
+        {
+            Items = _entries.Values.OrderByDescending(e => e.DeadLetteredAt).ToArray(),
+        });
+
+    public Task<DeadLetter?> GetAsync(string idempotencyKey, CancellationToken ct = default) =>
+        Task.FromResult(_entries.GetValueOrDefault(idempotencyKey));
+
+    public Task<bool> DeleteAsync(string idempotencyKey, CancellationToken ct = default)
+    {
+        Deleted.Add(idempotencyKey);
+        return Task.FromResult(_entries.Remove(idempotencyKey));
+    }
+}
+
+/// <summary>
+/// Records whether the work ran inside the scope, so tests can tell a resend that grouped its
+/// enqueue and delete from one that ran them loose.
+/// </summary>
+internal sealed class RecordingQueueTransactionScope : IQueueTransactionScope
+{
+    public int Executions { get; private set; }
+    public bool IsInside { get; private set; }
+
+    public async Task ExecuteAsync(Func<CancellationToken, Task> work, CancellationToken ct)
+    {
+        Executions++;
+        IsInside = true;
+        try
+        {
+            await work(ct);
+        }
+        finally
+        {
+            IsInside = false;
+        }
+    }
+}
+
 internal sealed class FakeMediator : ISpinneretMediator
 {
     /// <summary>The response Send returns; must be castable to the request's TResponse.</summary>

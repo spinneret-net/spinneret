@@ -4,8 +4,8 @@ SQL Server as the transport. Messages are rows in your application's own databas
 workers. Because the queue lives in the same database as your business tables, an enqueue commits
 atomically with the write that caused it, and a handler's writes commit atomically with the dequeue.
 
-Unlike Cloud Tasks, this transport is also its own store — it ships a dead-letter table and needs no
-companion package.
+Unlike Cloud Tasks, this transport is also its own store — it ships the dead-letter table, its reader
+and its resend, needing no companion package.
 
 Read [queue.md](queue.md) first for the retry model; this page is the SQL-specific half.
 
@@ -31,7 +31,7 @@ consumes messages.
 | **Mediator + handlers** | `services.AddMediator([...])`. |
 | **DDL rights**, if `CreateSchema` is left on. |
 
-A dead-letter writer and a payload serializer are supplied by the package.
+The dead-letter writer, the dead-letter store and a payload serializer are supplied by the package.
 
 ## Configuration — `Queue:Mssql`
 
@@ -93,7 +93,13 @@ Two tables, using the defaults:
     Error           NVARCHAR(MAX)  NOT NULL
     Attempts        INT            NOT NULL
     DeadLetteredAt  DATETIME2(3)   NOT NULL
+  + IX_SpinneretDeadLetters_DeadLetteredAt (DeadLetteredAt DESC, IdempotencyKey DESC)
 ```
+
+`IX_SpinneretDeadLetters_DeadLetteredAt` serves the [dead-letter page's](queue.md#the-dead-letter-page)
+keyset paging. It is guarded separately from the table it sits on, so a database created before the
+index existed picks it up on the next startup rather than being skipped because the table was already
+there. If you own your schema, re-run the script — see below.
 
 ### Owning the schema yourself
 
@@ -108,8 +114,9 @@ var ddl = MssqlQueueSchema.CreateScript(new MssqlQueueOptions
 });
 ```
 
-The script is idempotent, and the method needs no DI. Note this one switch also gates the
-[scheduler's](scheduler-mssql.md) table.
+The script is idempotent — safe to re-run, and each object is guarded on its own, so re-running it
+after upgrading the package adds anything new without touching what is already there. Note this one
+switch also gates the [scheduler's](scheduler-mssql.md) table.
 
 ### Permissions
 
@@ -187,3 +194,6 @@ drains at full speed.
 - **`AddMssqlQueue` throws during registration** for bad configuration, not at `Build()`.
 - **Dead-lettering never drops work**: if the dead-letter table is unreachable the message keeps being
   redelivered, logged at Critical with the payload.
+- **A resend is one transaction here.** The enqueue and the dead-letter delete both enlist in a
+  transaction the resend opens, so the entry cannot vanish without the message appearing. Call it
+  inside your own ambient transaction and it joins that one instead, committing with your writes.

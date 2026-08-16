@@ -37,6 +37,30 @@ public sealed class MssqlQueueSchemaTests
         await Assert.That(script).Contains("WHERE DedupeKey IS NOT NULL");
     }
 
+    [Test]
+    public async Task CreateScript_indexes_the_dead_letter_paging_order()
+    {
+        var script = MssqlQueueSchema.CreateScript(new MssqlQueueOptions());
+
+        await Assert.That(script).Contains("(DeadLetteredAt DESC, IdempotencyKey DESC)");
+    }
+
+    [Test]
+    public async Task CreateScript_guards_the_dead_letter_index_outside_the_table_block()
+    {
+        // The table guard would skip the index on any database created before it was added, so the
+        // index has its own guard placed after the table block. Pinned because getting this wrong
+        // is invisible until a listing query goes to a scan on a large table.
+        var script = MssqlQueueSchema.CreateScript(new MssqlQueueOptions());
+
+        var tableGuard = script.IndexOf(
+            "IF OBJECT_ID(N'[dbo].[SpinneretDeadLetters]', N'U') IS NULL", StringComparison.Ordinal);
+        var indexGuard = script.IndexOf("FROM sys.indexes", StringComparison.Ordinal);
+
+        await Assert.That(indexGuard).IsGreaterThan(tableGuard);
+        await Assert.That(script).Contains("N'IX_SpinneretDeadLetters_DeadLetteredAt'");
+    }
+
     // ------------------------------------------------------------------------ identifiers ---
 
     [Test]

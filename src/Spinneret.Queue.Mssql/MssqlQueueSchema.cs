@@ -14,6 +14,7 @@ public static class MssqlQueueSchema
 
         var queueTable = Identifier.Qualify(options.SchemaName, options.QueueTableName);
         var deadLetterTable = Identifier.Qualify(options.SchemaName, options.DeadLetterTableName);
+        var deadLetterOrderIndex = $"IX_{options.DeadLetterTableName}_DeadLetteredAt";
 
         return $"""
             IF OBJECT_ID(N'{queueTable}', N'U') IS NULL
@@ -46,6 +47,18 @@ public static class MssqlQueueSchema
                     Attempts INT NOT NULL,
                     DeadLetteredAt DATETIME2(3) NOT NULL
                 );
+            END;
+
+            -- Outside the table block on purpose: an index added to this script after a database was
+            -- created would otherwise never reach it, because the table already exists. Serves the
+            -- admin page's (DeadLetteredAt DESC, IdempotencyKey DESC) keyset paging.
+            IF NOT EXISTS (
+                SELECT 1 FROM sys.indexes
+                WHERE object_id = OBJECT_ID(N'{deadLetterTable}', N'U')
+                  AND name = N'{deadLetterOrderIndex}')
+            BEGIN
+                CREATE INDEX {Identifier.Quote(deadLetterOrderIndex)}
+                    ON {deadLetterTable} (DeadLetteredAt DESC, IdempotencyKey DESC);
             END;
             """;
     }

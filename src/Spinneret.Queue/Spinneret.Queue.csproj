@@ -24,6 +24,11 @@
              store, so their response type is only known at runtime. -->
         <InternalsVisibleTo Include="Spinneret.Scheduler.Firestore" />
         <InternalsVisibleTo Include="Spinneret.Scheduler.Mssql" />
+        <!-- DeadLetterStorage and DeadLetterCursor: the source spelling and the cursor encoding are
+             one contract shared by every dead-letter store, not a per-provider decision.
+             IQueueTransactionScope additionally lets the MSSQL store make a resend atomic. -->
+        <InternalsVisibleTo Include="Spinneret.Queue.Firestore" />
+        <InternalsVisibleTo Include="Spinneret.Queue.Mssql" />
     </ItemGroup>
 
     <PropertyGroup>

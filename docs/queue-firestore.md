@@ -1,6 +1,7 @@
 # Spinneret.Queue.Firestore
 
-A Firestore-backed dead-letter store: one document per task the queue gave up on.
+A Firestore-backed dead-letter store: one document per task the queue gave up on, written by
+`IDeadLetterWriter` and read back through `IDeadLetterStore`.
 
 It exists because a transport is not always a store. SQL Server keeps dead letters in a table beside
 the queue; Cloud Tasks stores nothing you can query, so a host on Cloud Tasks needs somewhere to put
@@ -18,8 +19,8 @@ services.AddGcpQueue(configuration, o => o.RequestAssemblies = [typeof(SyncCusto
 services.AddFirestoreDeadLetters(configuration);
 ```
 
-Registration order does not matter, and the writer is registered with `TryAdd` — a writer you
-registered yourself always wins.
+That one call registers both the writer and the store. Registration order does not matter, and both
+are registered with `TryAdd` — anything you registered yourself always wins.
 
 ## Requires
 
@@ -68,13 +69,28 @@ retried write land on the document it already wrote instead of creating a second
 `deadLetteredAt` records when the failure actually happened rather than when it was last retried.
 This mirrors the MSSQL writer, whose insert swallows a duplicate key.
 
-These field names are a data contract — anything reading them (an admin page, a resend command) binds
-to them, so treat a rename as a breaking change.
+These field names are a data contract — the `IDeadLetterStore` in this package binds to them, and so
+does the MSSQL one to its columns, so treat a rename as a breaking change.
+
+## Reading them back
+
+`AddFirestoreDeadLetters` also registers `IDeadLetterStore`, so listing, discarding and
+[resending](queue.md#the-dead-letter-page) work against this collection with nothing further to wire.
+
+Entries come back newest first, paged by an opaque cursor:
+
+```csharp
+var page = await store.ListAsync(new DeadLetterQuery { PageSize = 50, Cursor = cursor });
+```
 
 ## Infrastructure
 
-No index is needed: dead letters are written and read by document id. If you build a listing page that
-sorts or filters server-side, that query will need its own composite index — Firestore's error message
+**No index to create.** Listing orders by `deadLetteredAt` descending and then by document id in the
+same direction — which is what Firestore does implicitly anyway, and is served by the automatic
+single-field index. Lookups and deletes go by document id.
+
+That holds only as long as the query stays unfiltered. If a future version filters by `source`, or you
+add your own filtered query, that one **will** need a composite index — Firestore's error message
 names the index to create.
 
 Retention is manual. Nothing expires these documents, which is usually what you want for a store whose
@@ -89,6 +105,10 @@ policy on a field you populate yourself.
   which is why the write must stay idempotent.
 - **Availability is on the critical path.** A task whose dead-letter write keeps failing keeps being
   redelivered rather than dropped, logged at Critical with the full payload.
-- **A writer you register yourself always wins.** The one here is `TryAdd`, so registering your own
+- **A writer or store you register yourself always wins.** Both are `TryAdd`, so registering your own
   before `AddFirestoreDeadLetters` means this one is never added; registering it after shadows this
   one, since the container resolves the last registration. Either order works.
+- **A resend here is ordered, not atomic.** The enqueue goes to the transport and the delete to
+  Firestore, and no transaction spans the two. The enqueue happens first, so an interruption between
+  them leaves an entry that can be resent again rather than a payload that is gone. The SQL Server
+  store, sharing a database with its queue, commits both together.

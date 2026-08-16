@@ -6,6 +6,20 @@ namespace Spinneret.Queue.Mssql;
 /// </summary>
 internal sealed class MssqlQueueSql(MssqlQueueOptions options)
 {
+    /// <summary>
+    /// The dead-letter projection, in the order <see cref="MssqlDeadLetterStore"/> reads its
+    /// ordinals. Shared by the list and lookup statements so the two can never disagree.
+    /// </summary>
+    private const string DeadLetterColumns =
+        "IdempotencyKey, Source, CommandTypeName, Description, PayloadJson, Error, Attempts, DeadLetteredAt";
+
+    /// <summary>
+    /// The paging order, repeated by every dead-letter read. Descending on both columns, and the
+    /// idempotency key breaks ties so the order is total — without it a cursor sitting inside a
+    /// group of entries sharing a millisecond could skip or repeat rows.
+    /// </summary>
+    private const string DeadLetterOrder = "ORDER BY DeadLetteredAt DESC, IdempotencyKey DESC";
+
     public string QueueTable { get; } = Identifier.Qualify(options.SchemaName, options.QueueTableName);
     public string DeadLetterTable { get; } = Identifier.Qualify(options.SchemaName, options.DeadLetterTableName);
 
@@ -70,6 +84,36 @@ internal sealed class MssqlQueueSql(MssqlQueueOptions options)
             IF ERROR_NUMBER() NOT IN (2601, 2627)
                 THROW;
         END CATCH
+        """;
+
+    /// <summary>The newest page of dead letters. One row past the page size is asked for.</summary>
+    public string ListDeadLetters { get; } = $"""
+        SELECT TOP(@Take) {DeadLetterColumns}
+        FROM {Identifier.Qualify(options.SchemaName, options.DeadLetterTableName)}
+        {DeadLetterOrder};
+        """;
+
+    /// <summary>
+    /// The page following a cursor. The predicate is the keyset form of "everything ordered after
+    /// this row": strictly older, or the same instant with a lower key.
+    /// </summary>
+    public string ListDeadLettersAfter { get; } = $"""
+        SELECT TOP(@Take) {DeadLetterColumns}
+        FROM {Identifier.Qualify(options.SchemaName, options.DeadLetterTableName)}
+        WHERE DeadLetteredAt < @CursorDeadLetteredAt
+           OR (DeadLetteredAt = @CursorDeadLetteredAt AND IdempotencyKey < @CursorIdempotencyKey)
+        {DeadLetterOrder};
+        """;
+
+    public string GetDeadLetter { get; } = $"""
+        SELECT {DeadLetterColumns}
+        FROM {Identifier.Qualify(options.SchemaName, options.DeadLetterTableName)}
+        WHERE IdempotencyKey = @IdempotencyKey;
+        """;
+
+    public string DeleteDeadLetter { get; } = $"""
+        DELETE FROM {Identifier.Qualify(options.SchemaName, options.DeadLetterTableName)}
+        WHERE IdempotencyKey = @IdempotencyKey;
         """;
 }
 

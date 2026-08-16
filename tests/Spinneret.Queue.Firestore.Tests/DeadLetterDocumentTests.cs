@@ -5,13 +5,13 @@ namespace Spinneret.Queue.Firestore.Tests;
 /// <summary>
 /// The document shape is a data contract: readers bind to these field names, so a rename here
 /// silently breaks every existing dead-letter page. These tests pin the names and the value forms.
-/// Writing itself needs a live Firestore and is intentionally out of scope.
+/// Talking to Firestore itself needs a live server and is intentionally out of scope.
 /// </summary>
 public class DeadLetterDocumentTests
 {
-    private static readonly DateTimeOffset At = new(2026, 8, 15, 10, 30, 0, TimeSpan.Zero);
+    internal static readonly DateTimeOffset At = new(2026, 8, 15, 10, 30, 0, TimeSpan.Zero);
 
-    private static DeadLetterEntry Entry(
+    internal static DeadLetterEntry Entry(
         DeadLetterSource source = DeadLetterSource.Queue,
         string? description = null) =>
         new()

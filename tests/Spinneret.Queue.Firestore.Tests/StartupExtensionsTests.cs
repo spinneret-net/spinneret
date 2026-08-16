@@ -24,6 +24,30 @@ public class StartupExtensionsTests
     }
 
     [Test]
+    public async Task Registers_the_store_as_the_dead_letter_store()
+    {
+        var services = new ServiceCollection();
+
+        services.AddFirestoreDeadLetters();
+
+        var descriptor = services.Single(d => d.ServiceType == typeof(IDeadLetterStore));
+        await Assert.That(descriptor.ImplementationType?.Name).IsEqualTo("FirestoreDeadLetterStore");
+        await Assert.That(descriptor.Lifetime).IsEqualTo(ServiceLifetime.Singleton);
+    }
+
+    [Test]
+    public async Task A_host_registered_store_wins()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton<IDeadLetterStore, FakeDeadLetterStore>();
+
+        services.AddFirestoreDeadLetters();
+
+        var descriptor = services.Single(d => d.ServiceType == typeof(IDeadLetterStore));
+        await Assert.That(descriptor.ImplementationType).IsEqualTo(typeof(FakeDeadLetterStore));
+    }
+
+    [Test]
     public async Task Defaults_the_collection_to_dead_letters()
     {
         var services = new ServiceCollection();
@@ -83,5 +107,17 @@ public class StartupExtensionsTests
     private sealed class FakeDeadLetterWriter : IDeadLetterWriter
     {
         public Task WriteAsync(DeadLetterEntry entry, CancellationToken ct = default) => Task.CompletedTask;
+    }
+
+    private sealed class FakeDeadLetterStore : IDeadLetterStore
+    {
+        public Task<DeadLetterPage> ListAsync(DeadLetterQuery query, CancellationToken ct = default) =>
+            Task.FromResult(new DeadLetterPage { Items = [] });
+
+        public Task<DeadLetter?> GetAsync(string idempotencyKey, CancellationToken ct = default) =>
+            Task.FromResult<DeadLetter?>(null);
+
+        public Task<bool> DeleteAsync(string idempotencyKey, CancellationToken ct = default) =>
+            Task.FromResult(false);
     }
 }

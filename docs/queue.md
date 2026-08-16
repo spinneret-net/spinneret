@@ -113,6 +113,48 @@ Which package supplies the writer depends on your transport: SQL Server
 rather than acknowledged, logged at Critical with the full payload. Its availability is on the
 critical path.
 
+## The dead-letter page
+
+Writing is only half of it. `IDeadLetterStore` reads the entries back and removes them, and
+`IDeadLetterResender` puts one back on the queue — between them, everything an admin page needs:
+
+```csharp
+public sealed class DeadLetterEndpoints(IDeadLetterStore store, IDeadLetterResender resender)
+{
+    public Task<DeadLetterPage> List(string? cursor) =>
+        store.ListAsync(new DeadLetterQuery { PageSize = 50, Cursor = cursor });
+
+    public async Task<IResult> Resend(string key, string? correctedPayload) =>
+        (await resender.ResendAsync(key, correctedPayload)).Match(
+            () => Results.NoContent(),
+            error => error switch
+            {
+                ResendDeadLetterError.NotFound => Results.NotFound(),
+                ResendDeadLetterError.UnknownCommandType e => Results.Conflict(e.CommandTypeName),
+                ResendDeadLetterError.InvalidPayload e => Results.BadRequest(e.Message),
+            });
+}
+```
+
+The store comes from whichever package holds your dead letters — [SQL Server](queue-mssql.md) or
+[Firestore](queue-firestore.md) — and the resender is registered by the transport, so both are
+available once you have called the two `Add*` methods you already needed.
+
+**Paging is by cursor, not offset.** `ListAsync` returns entries newest first plus a `NextCursor`;
+feed it back to get the next page, and stop when it comes back null — not when a page comes back
+short, since the last full page has no cursor. The cursor is opaque and safe to put in a query
+string. An offset would slide by one every time the page's own delete button was used.
+
+**Resend takes the command type from the entry, never from the payload.** An operator may correct
+the JSON; they cannot redirect it at a different command. A payload that no longer deserializes, or
+a command type the queue no longer knows, comes back as a `ResendDeadLetterError` with the entry left
+in place, so nothing recoverable is thrown away.
+
+**How tightly the resend binds its two halves depends on the transport.** On SQL Server the enqueue
+and the delete commit together. On a transport that does not share a database with its store they are
+merely ordered — enqueue first, so an interruption leaves an entry to resend again rather than losing
+the payload.
+
 ## What you must register
 
 Whichever transport you choose, the host supplies:

@@ -13,8 +13,9 @@ public static class MssqlQueueServiceCollectionExtensions
 {
     /// <summary>
     /// Registers the SQL Server queue: <see cref="IQueue"/> and <see cref="IMssqlTransactionalQueue"/>
-    /// for producers, the ambient-transaction seam, the table-backed dead-letter store, the schema
-    /// initializer, and the type registry built from the supplied assemblies.
+    /// for producers, the ambient-transaction seam, the table-backed <see cref="IDeadLetterWriter"/>
+    /// and <see cref="IDeadLetterStore"/>, the schema initializer, and the type registry built from
+    /// the supplied assemblies.
     /// </summary>
     /// <remarks>
     /// <paramref name="configure"/> runs after the section is bound, and is where
@@ -92,11 +93,20 @@ public static class MssqlQueueServiceCollectionExtensions
         if (boundary is null || boundary.ImplementationType == typeof(DirectDispatchBoundary))
             services.Replace(ServiceDescriptor.Scoped<IQueueDispatchBoundary, MssqlDispatchBoundary>());
 
+        // Same reasoning as the boundary above: a real transaction must win over the pass-through
+        // default whoever registered it first, while a scope the host chose deliberately stands.
+        var transactionScope = services.LastOrDefault(d => d.ServiceType == typeof(IQueueTransactionScope));
+        if (transactionScope is null
+            || transactionScope.ImplementationType == typeof(PassThroughQueueTransactionScope))
+            services.Replace(ServiceDescriptor.Singleton<IQueueTransactionScope, MssqlQueueTransactionScope>());
+
         services.AddQueueCore(registry);
 
         services.TryAddSingleton<IQueuePayloadSerializer, DefaultJsonPayloadSerializer>();
         services.TryAddSingleton<IMssqlTransactionProvider, AsyncLocalMssqlTransactionProvider>();
         services.TryAddSingleton<IDeadLetterWriter, MssqlDeadLetterWriter>();
+        services.TryAddSingleton<IDeadLetterStore, MssqlDeadLetterStore>();
+        services.TryAddSingleton<MssqlConnectionSource>();
         services.TryAddSingleton(sp => new MssqlQueueSql(sp.GetRequiredService<IOptions<MssqlQueueOptions>>().Value));
         services.TryAddSingleton<MssqlQueue>();
         services.TryAddSingleton<IQueue>(sp => sp.GetRequiredService<MssqlQueue>());

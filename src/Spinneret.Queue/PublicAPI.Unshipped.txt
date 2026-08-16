@@ -1,5 +1,25 @@
 #nullable enable
 Microsoft.Extensions.DependencyInjection.QueueCoreServiceCollectionExtensions
+Spinneret.Queue.DeadLetter
+Spinneret.Queue.DeadLetter.<Clone>$() -> Spinneret.Queue.DeadLetter!
+Spinneret.Queue.DeadLetter.Attempts.get -> int
+Spinneret.Queue.DeadLetter.Attempts.init -> void
+Spinneret.Queue.DeadLetter.CommandTypeName.get -> string!
+Spinneret.Queue.DeadLetter.CommandTypeName.init -> void
+Spinneret.Queue.DeadLetter.DeadLetter() -> void
+Spinneret.Queue.DeadLetter.DeadLetteredAt.get -> System.DateTimeOffset
+Spinneret.Queue.DeadLetter.DeadLetteredAt.init -> void
+Spinneret.Queue.DeadLetter.Description.get -> string?
+Spinneret.Queue.DeadLetter.Description.init -> void
+Spinneret.Queue.DeadLetter.Equals(Spinneret.Queue.DeadLetter? other) -> bool
+Spinneret.Queue.DeadLetter.Error.get -> string!
+Spinneret.Queue.DeadLetter.Error.init -> void
+Spinneret.Queue.DeadLetter.IdempotencyKey.get -> string!
+Spinneret.Queue.DeadLetter.IdempotencyKey.init -> void
+Spinneret.Queue.DeadLetter.PayloadJson.get -> string!
+Spinneret.Queue.DeadLetter.PayloadJson.init -> void
+Spinneret.Queue.DeadLetter.Source.get -> Spinneret.Queue.DeadLetterSource
+Spinneret.Queue.DeadLetter.Source.init -> void
 Spinneret.Queue.DeadLetterEntry
 Spinneret.Queue.DeadLetterEntry.<Clone>$() -> Spinneret.Queue.DeadLetterEntry!
 Spinneret.Queue.DeadLetterEntry.Attempts.get -> int
@@ -18,6 +38,22 @@ Spinneret.Queue.DeadLetterEntry.PayloadJson.get -> string!
 Spinneret.Queue.DeadLetterEntry.PayloadJson.init -> void
 Spinneret.Queue.DeadLetterEntry.Source.get -> Spinneret.Queue.DeadLetterSource
 Spinneret.Queue.DeadLetterEntry.Source.init -> void
+Spinneret.Queue.DeadLetterPage
+Spinneret.Queue.DeadLetterPage.<Clone>$() -> Spinneret.Queue.DeadLetterPage!
+Spinneret.Queue.DeadLetterPage.DeadLetterPage() -> void
+Spinneret.Queue.DeadLetterPage.Equals(Spinneret.Queue.DeadLetterPage? other) -> bool
+Spinneret.Queue.DeadLetterPage.Items.get -> System.Collections.Generic.IReadOnlyList<Spinneret.Queue.DeadLetter!>!
+Spinneret.Queue.DeadLetterPage.Items.init -> void
+Spinneret.Queue.DeadLetterPage.NextCursor.get -> string?
+Spinneret.Queue.DeadLetterPage.NextCursor.init -> void
+Spinneret.Queue.DeadLetterQuery
+Spinneret.Queue.DeadLetterQuery.<Clone>$() -> Spinneret.Queue.DeadLetterQuery!
+Spinneret.Queue.DeadLetterQuery.Cursor.get -> string?
+Spinneret.Queue.DeadLetterQuery.Cursor.init -> void
+Spinneret.Queue.DeadLetterQuery.DeadLetterQuery() -> void
+Spinneret.Queue.DeadLetterQuery.Equals(Spinneret.Queue.DeadLetterQuery? other) -> bool
+Spinneret.Queue.DeadLetterQuery.PageSize.get -> int
+Spinneret.Queue.DeadLetterQuery.PageSize.init -> void
 Spinneret.Queue.DeadLetterSource
 Spinneret.Queue.DeadLetterSource.Queue = 0 -> Spinneret.Queue.DeadLetterSource
 Spinneret.Queue.DeadLetterSource.Scheduler = 1 -> Spinneret.Queue.DeadLetterSource
@@ -31,6 +67,12 @@ Spinneret.Queue.ErrorResultAction.Retry = 1 -> Spinneret.Queue.ErrorResultAction
 Spinneret.Queue.ExhaustedAction
 Spinneret.Queue.ExhaustedAction.DeadLetter = 0 -> Spinneret.Queue.ExhaustedAction
 Spinneret.Queue.ExhaustedAction.Discard = 1 -> Spinneret.Queue.ExhaustedAction
+Spinneret.Queue.IDeadLetterResender
+Spinneret.Queue.IDeadLetterResender.ResendAsync(string! idempotencyKey, string? payloadJson = null, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Spinneret.Functional.Result<Spinneret.Queue.ResendDeadLetterError!>!>!
+Spinneret.Queue.IDeadLetterStore
+Spinneret.Queue.IDeadLetterStore.DeleteAsync(string! idempotencyKey, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<bool>!
+Spinneret.Queue.IDeadLetterStore.GetAsync(string! idempotencyKey, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Spinneret.Queue.DeadLetter?>!
+Spinneret.Queue.IDeadLetterStore.ListAsync(Spinneret.Queue.DeadLetterQuery! query, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Spinneret.Queue.DeadLetterPage!>!
 Spinneret.Queue.IDeadLetterWriter
 Spinneret.Queue.IDeadLetterWriter.WriteAsync(Spinneret.Queue.DeadLetterEntry! entry, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
 Spinneret.Queue.IEnvelopeQueue
@@ -148,13 +190,44 @@ Spinneret.Queue.QueueTypeRegistry.RegisteredRequest.RequestType.init -> void
 Spinneret.Queue.QueueTypeRegistry.RegisteredRequest.ResponseType.get -> System.Type!
 Spinneret.Queue.QueueTypeRegistry.RegisteredRequest.ResponseType.init -> void
 Spinneret.Queue.QueueTypeRegistry.Resolve(string! typeName) -> Spinneret.Queue.QueueTypeRegistry.RegisteredRequest!
+Spinneret.Queue.ResendDeadLetterError
+Spinneret.Queue.ResendDeadLetterError.InvalidPayload
+Spinneret.Queue.ResendDeadLetterError.InvalidPayload.Deconstruct(out string! Message) -> void
+Spinneret.Queue.ResendDeadLetterError.InvalidPayload.Equals(Spinneret.Queue.ResendDeadLetterError.InvalidPayload? other) -> bool
+Spinneret.Queue.ResendDeadLetterError.InvalidPayload.InvalidPayload(string! Message) -> void
+Spinneret.Queue.ResendDeadLetterError.InvalidPayload.Message.get -> string!
+Spinneret.Queue.ResendDeadLetterError.InvalidPayload.Message.init -> void
+Spinneret.Queue.ResendDeadLetterError.NotFound
+Spinneret.Queue.ResendDeadLetterError.NotFound.Deconstruct(out string! IdempotencyKey) -> void
+Spinneret.Queue.ResendDeadLetterError.NotFound.Equals(Spinneret.Queue.ResendDeadLetterError.NotFound? other) -> bool
+Spinneret.Queue.ResendDeadLetterError.NotFound.IdempotencyKey.get -> string!
+Spinneret.Queue.ResendDeadLetterError.NotFound.IdempotencyKey.init -> void
+Spinneret.Queue.ResendDeadLetterError.NotFound.NotFound(string! IdempotencyKey) -> void
+Spinneret.Queue.ResendDeadLetterError.ResendDeadLetterError(Spinneret.Queue.ResendDeadLetterError! original) -> void
+Spinneret.Queue.ResendDeadLetterError.UnknownCommandType
+Spinneret.Queue.ResendDeadLetterError.UnknownCommandType.CommandTypeName.get -> string!
+Spinneret.Queue.ResendDeadLetterError.UnknownCommandType.CommandTypeName.init -> void
+Spinneret.Queue.ResendDeadLetterError.UnknownCommandType.Deconstruct(out string! CommandTypeName) -> void
+Spinneret.Queue.ResendDeadLetterError.UnknownCommandType.Equals(Spinneret.Queue.ResendDeadLetterError.UnknownCommandType? other) -> bool
+Spinneret.Queue.ResendDeadLetterError.UnknownCommandType.UnknownCommandType(string! CommandTypeName) -> void
 Spinneret.Queue.UnknownRequestTypeException
 Spinneret.Queue.UnknownRequestTypeException.TypeName.get -> string!
 Spinneret.Queue.UnknownRequestTypeException.UnknownRequestTypeException(string! typeName) -> void
+abstract Spinneret.Queue.ResendDeadLetterError.<Clone>$() -> Spinneret.Queue.ResendDeadLetterError!
+const Spinneret.Queue.DeadLetterQuery.MaxPageSize = 500 -> int
 const Spinneret.Queue.QueuePolicy.DefaultChannel = "default" -> string!
+override Spinneret.Queue.DeadLetter.Equals(object? obj) -> bool
+override Spinneret.Queue.DeadLetter.GetHashCode() -> int
+override Spinneret.Queue.DeadLetter.ToString() -> string!
 override Spinneret.Queue.DeadLetterEntry.Equals(object? obj) -> bool
 override Spinneret.Queue.DeadLetterEntry.GetHashCode() -> int
 override Spinneret.Queue.DeadLetterEntry.ToString() -> string!
+override Spinneret.Queue.DeadLetterPage.Equals(object? obj) -> bool
+override Spinneret.Queue.DeadLetterPage.GetHashCode() -> int
+override Spinneret.Queue.DeadLetterPage.ToString() -> string!
+override Spinneret.Queue.DeadLetterQuery.Equals(object? obj) -> bool
+override Spinneret.Queue.DeadLetterQuery.GetHashCode() -> int
+override Spinneret.Queue.DeadLetterQuery.ToString() -> string!
 override Spinneret.Queue.QueueDeliveryContext.Equals(object? obj) -> bool
 override Spinneret.Queue.QueueDeliveryContext.GetHashCode() -> int
 override Spinneret.Queue.QueueDeliveryContext.ToString() -> string!
@@ -173,10 +246,34 @@ override Spinneret.Queue.QueuePolicy.ToString() -> string!
 override Spinneret.Queue.QueueTypeRegistry.RegisteredRequest.Equals(object? obj) -> bool
 override Spinneret.Queue.QueueTypeRegistry.RegisteredRequest.GetHashCode() -> int
 override Spinneret.Queue.QueueTypeRegistry.RegisteredRequest.ToString() -> string!
+override Spinneret.Queue.ResendDeadLetterError.Equals(object? obj) -> bool
+override Spinneret.Queue.ResendDeadLetterError.GetHashCode() -> int
+override Spinneret.Queue.ResendDeadLetterError.InvalidPayload.<Clone>$() -> Spinneret.Queue.ResendDeadLetterError.InvalidPayload!
+override Spinneret.Queue.ResendDeadLetterError.InvalidPayload.Equals(object? obj) -> bool
+override Spinneret.Queue.ResendDeadLetterError.InvalidPayload.GetHashCode() -> int
+override Spinneret.Queue.ResendDeadLetterError.InvalidPayload.ToString() -> string!
+override Spinneret.Queue.ResendDeadLetterError.NotFound.<Clone>$() -> Spinneret.Queue.ResendDeadLetterError.NotFound!
+override Spinneret.Queue.ResendDeadLetterError.NotFound.Equals(object? obj) -> bool
+override Spinneret.Queue.ResendDeadLetterError.NotFound.GetHashCode() -> int
+override Spinneret.Queue.ResendDeadLetterError.NotFound.ToString() -> string!
+override Spinneret.Queue.ResendDeadLetterError.ToString() -> string!
+override Spinneret.Queue.ResendDeadLetterError.UnknownCommandType.<Clone>$() -> Spinneret.Queue.ResendDeadLetterError.UnknownCommandType!
+override Spinneret.Queue.ResendDeadLetterError.UnknownCommandType.Equals(object? obj) -> bool
+override Spinneret.Queue.ResendDeadLetterError.UnknownCommandType.GetHashCode() -> int
+override Spinneret.Queue.ResendDeadLetterError.UnknownCommandType.ToString() -> string!
+override sealed Spinneret.Queue.ResendDeadLetterError.InvalidPayload.Equals(Spinneret.Queue.ResendDeadLetterError? other) -> bool
+override sealed Spinneret.Queue.ResendDeadLetterError.NotFound.Equals(Spinneret.Queue.ResendDeadLetterError? other) -> bool
+override sealed Spinneret.Queue.ResendDeadLetterError.UnknownCommandType.Equals(Spinneret.Queue.ResendDeadLetterError? other) -> bool
 static Microsoft.Extensions.DependencyInjection.QueueCoreServiceCollectionExtensions.AddQueueCore(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, Spinneret.Queue.QueueTypeRegistry! registry) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
 static Microsoft.Extensions.DependencyInjection.QueueCoreServiceCollectionExtensions.AddQueueCore(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Collections.Generic.IReadOnlyCollection<System.Reflection.Assembly!>! requestAssemblies) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static Spinneret.Queue.DeadLetter.operator !=(Spinneret.Queue.DeadLetter? left, Spinneret.Queue.DeadLetter? right) -> bool
+static Spinneret.Queue.DeadLetter.operator ==(Spinneret.Queue.DeadLetter? left, Spinneret.Queue.DeadLetter? right) -> bool
 static Spinneret.Queue.DeadLetterEntry.operator !=(Spinneret.Queue.DeadLetterEntry? left, Spinneret.Queue.DeadLetterEntry? right) -> bool
 static Spinneret.Queue.DeadLetterEntry.operator ==(Spinneret.Queue.DeadLetterEntry? left, Spinneret.Queue.DeadLetterEntry? right) -> bool
+static Spinneret.Queue.DeadLetterPage.operator !=(Spinneret.Queue.DeadLetterPage? left, Spinneret.Queue.DeadLetterPage? right) -> bool
+static Spinneret.Queue.DeadLetterPage.operator ==(Spinneret.Queue.DeadLetterPage? left, Spinneret.Queue.DeadLetterPage? right) -> bool
+static Spinneret.Queue.DeadLetterQuery.operator !=(Spinneret.Queue.DeadLetterQuery? left, Spinneret.Queue.DeadLetterQuery? right) -> bool
+static Spinneret.Queue.DeadLetterQuery.operator ==(Spinneret.Queue.DeadLetterQuery? left, Spinneret.Queue.DeadLetterQuery? right) -> bool
 static Spinneret.Queue.QueueDeliveryContext.operator !=(Spinneret.Queue.QueueDeliveryContext? left, Spinneret.Queue.QueueDeliveryContext? right) -> bool
 static Spinneret.Queue.QueueDeliveryContext.operator ==(Spinneret.Queue.QueueDeliveryContext? left, Spinneret.Queue.QueueDeliveryContext? right) -> bool
 static Spinneret.Queue.QueueDeliveryOutcome.Acked.get -> Spinneret.Queue.QueueDeliveryOutcome!
@@ -192,7 +289,18 @@ static Spinneret.Queue.QueuePolicy.operator !=(Spinneret.Queue.QueuePolicy? left
 static Spinneret.Queue.QueuePolicy.operator ==(Spinneret.Queue.QueuePolicy? left, Spinneret.Queue.QueuePolicy? right) -> bool
 static Spinneret.Queue.QueueTypeRegistry.RegisteredRequest.operator !=(Spinneret.Queue.QueueTypeRegistry.RegisteredRequest? left, Spinneret.Queue.QueueTypeRegistry.RegisteredRequest? right) -> bool
 static Spinneret.Queue.QueueTypeRegistry.RegisteredRequest.operator ==(Spinneret.Queue.QueueTypeRegistry.RegisteredRequest? left, Spinneret.Queue.QueueTypeRegistry.RegisteredRequest? right) -> bool
+static Spinneret.Queue.ResendDeadLetterError.InvalidPayload.operator !=(Spinneret.Queue.ResendDeadLetterError.InvalidPayload? left, Spinneret.Queue.ResendDeadLetterError.InvalidPayload? right) -> bool
+static Spinneret.Queue.ResendDeadLetterError.InvalidPayload.operator ==(Spinneret.Queue.ResendDeadLetterError.InvalidPayload? left, Spinneret.Queue.ResendDeadLetterError.InvalidPayload? right) -> bool
+static Spinneret.Queue.ResendDeadLetterError.NotFound.operator !=(Spinneret.Queue.ResendDeadLetterError.NotFound? left, Spinneret.Queue.ResendDeadLetterError.NotFound? right) -> bool
+static Spinneret.Queue.ResendDeadLetterError.NotFound.operator ==(Spinneret.Queue.ResendDeadLetterError.NotFound? left, Spinneret.Queue.ResendDeadLetterError.NotFound? right) -> bool
+static Spinneret.Queue.ResendDeadLetterError.UnknownCommandType.operator !=(Spinneret.Queue.ResendDeadLetterError.UnknownCommandType? left, Spinneret.Queue.ResendDeadLetterError.UnknownCommandType? right) -> bool
+static Spinneret.Queue.ResendDeadLetterError.UnknownCommandType.operator ==(Spinneret.Queue.ResendDeadLetterError.UnknownCommandType? left, Spinneret.Queue.ResendDeadLetterError.UnknownCommandType? right) -> bool
+static Spinneret.Queue.ResendDeadLetterError.operator !=(Spinneret.Queue.ResendDeadLetterError? left, Spinneret.Queue.ResendDeadLetterError? right) -> bool
+static Spinneret.Queue.ResendDeadLetterError.operator ==(Spinneret.Queue.ResendDeadLetterError? left, Spinneret.Queue.ResendDeadLetterError? right) -> bool
 static readonly Spinneret.Queue.QueuePolicy.DefaultMaxAge -> string!
 static readonly Spinneret.Queue.QueuePolicy.DefaultMaxAttempts -> int
 static readonly Spinneret.Queue.QueuePolicy.DefaultMaxBackoff -> string!
 static readonly Spinneret.Queue.QueuePolicy.DefaultMinBackoff -> string!
+virtual Spinneret.Queue.ResendDeadLetterError.EqualityContract.get -> System.Type!
+virtual Spinneret.Queue.ResendDeadLetterError.Equals(Spinneret.Queue.ResendDeadLetterError? other) -> bool
+virtual Spinneret.Queue.ResendDeadLetterError.PrintMembers(System.Text.StringBuilder! builder) -> bool

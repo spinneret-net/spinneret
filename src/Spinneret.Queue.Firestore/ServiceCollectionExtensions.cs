@@ -10,13 +10,15 @@ namespace Microsoft.Extensions.DependencyInjection;
 public static class FirestoreDeadLetterServiceCollectionExtensions
 {
     /// <summary>
-    /// Registers the Firestore-backed <see cref="IDeadLetterWriter"/>. Independent of the queue
-    /// transport — a host on Cloud Tasks, SQL Server, or anything else can store dead letters here.
+    /// Registers the Firestore-backed <see cref="IDeadLetterWriter"/> and <see cref="IDeadLetterStore"/>.
+    /// Independent of the queue transport — a host on Cloud Tasks, SQL Server, or anything else can
+    /// store dead letters here.
     /// </summary>
     /// <remarks>
-    /// Requires a host-registered <c>FirestoreDb</c>. Registered with <c>TryAdd</c>, so a writer the
-    /// host registered itself always wins. Configuration is read from the <c>Queue:Firestore</c>
-    /// section.
+    /// Requires a host-registered <c>FirestoreDb</c>. Registered with <c>TryAdd</c>, so a writer or
+    /// store the host registered itself always wins. Configuration is read from the
+    /// <c>Queue:Firestore</c> section. <see cref="IDeadLetterResender"/> comes from the queue
+    /// transport's own registration, so resend works once both have been called.
     /// </remarks>
     public static IServiceCollection AddFirestoreDeadLetters(
         this IServiceCollection services,
@@ -27,7 +29,7 @@ public static class FirestoreDeadLetterServiceCollectionExtensions
     }
 
     /// <summary>
-    /// Registers the Firestore-backed <see cref="IDeadLetterWriter"/> with default options —
+    /// Registers the Firestore-backed dead-letter writer and store with default options —
     /// the <c>dead_letters</c> collection.
     /// </summary>
     public static IServiceCollection AddFirestoreDeadLetters(this IServiceCollection services) =>
@@ -57,6 +59,7 @@ public static class FirestoreDeadLetterServiceCollectionExtensions
 
         services.TryAddSingleton(TimeProvider.System);
         services.TryAddSingleton<IDeadLetterWriter, FirestoreDeadLetterWriter>();
+        services.TryAddSingleton<IDeadLetterStore, FirestoreDeadLetterStore>();
         return services;
     }
 }
