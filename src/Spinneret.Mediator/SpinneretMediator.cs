@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Reflection;
 using System.Runtime.ExceptionServices;
 using Microsoft.Extensions.DependencyInjection;
@@ -40,27 +41,49 @@ internal sealed class SpinneretMediator(IServiceProvider serviceProvider, ITagIn
         var cacheAttr = requestType.GetCustomAttribute<CacheAttribute>();
         var invalidateAttr = requestType.GetCustomAttribute<InvalidateCacheAttribute>();
 
-        TResponse response;
-        if (cacheAttr is not null && typeof(TResponse) != typeof(Unit))
+        using var activity = MediatorTracing.StartSend(requestType);
+
+        try
         {
-            var sharedTask = cache.GetOrCreate(
-                request,
-                () => Dispatch(request, CancellationToken.None),
-                cacheAttr.Duration,
-                cacheAttr.Tags);
+            TResponse response;
+            if (cacheAttr is not null && typeof(TResponse) != typeof(Unit))
+            {
+                // Coalescing means a joiner awaits a task started under a different caller's
+                // activity, so the handler's work is attributed to whoever created it. Inherent to
+                // coalescing; the tag is what makes it legible.
+                var dispatched = false;
+                var sharedTask = cache.GetOrCreate(
+                    request,
+                    () =>
+                    {
+                        dispatched = true;
+                        return Dispatch(request, CancellationToken.None);
+                    },
+                    cacheAttr.Duration,
+                    cacheAttr.Tags);
 
-            response = await sharedTask.WaitAsync(cancellationToken);
+                response = await sharedTask.WaitAsync(cancellationToken);
+                activity?.SetTag(MediatorTags.Cache,
+                    dispatched ? MediatorCacheOutcome.Miss : MediatorCacheOutcome.Hit);
+            }
+            else
+            {
+                activity?.SetTag(MediatorTags.Cache, MediatorCacheOutcome.Bypass);
+                response = await Dispatch(request, cancellationToken);
+            }
+
+            if (invalidateAttr is not null)
+                foreach (var tag in invalidateAttr.Tags)
+                    cache.RemoveByTag(tag);
+
+            return response;
         }
-        else
+        catch (Exception ex)
         {
-            response = await Dispatch(request, cancellationToken);
+            activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
+            activity?.AddException(ex);
+            throw;
         }
-
-        if (invalidateAttr is not null)
-            foreach (var tag in invalidateAttr.Tags)
-                cache.RemoveByTag(tag);
-
-        return response;
     }
 
     private Task<TResponse> Dispatch<TResponse>(IRequest<TResponse> request, CancellationToken cancellationToken)

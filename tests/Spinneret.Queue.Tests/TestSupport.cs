@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Reflection;
 using System.Reflection.Emit;
 using Microsoft.Extensions.DependencyInjection;
@@ -53,9 +54,17 @@ internal sealed class FakeDispatcher : IQueueDispatcher
     public Exception? Throw { get; set; }
     public int Calls { get; private set; }
 
+    /// <summary>The ambient activity as the handler saw it — the trace the message is processed in.</summary>
+    public ActivityContext ObservedContext { get; private set; }
+
+    /// <summary>The parent of the span the handler ran under — who the consumer attached itself to.</summary>
+    public ActivitySpanId ObservedParentSpanId { get; private set; }
+
     public Task Dispatch(QueueEnvelope envelope, CancellationToken ct)
     {
         Calls++;
+        ObservedContext = Activity.Current?.Context ?? default;
+        ObservedParentSpanId = Activity.Current?.ParentSpanId ?? default;
         return Throw is null ? Task.CompletedTask : Task.FromException(Throw);
     }
 }
@@ -192,6 +201,41 @@ internal sealed class FixedTimeProvider(DateTimeOffset now) : TimeProvider
 // ---------------------------------------------------------------------------------------------
 // Helpers.
 // ---------------------------------------------------------------------------------------------
+
+/// <summary>
+/// Collects finished queue spans. <see cref="TaggedWith"/> filters by a tag the caller made unique
+/// to its own test, because an <see cref="ActivityListener"/> is process-global while TUnit runs
+/// tests in parallel — without the filter a test would assert on a sibling's spans.
+/// </summary>
+internal sealed class SpanCollector : IDisposable
+{
+    private readonly List<Activity> _spans = [];
+    private readonly ActivityListener _listener;
+
+    public SpanCollector()
+    {
+        _listener = new ActivityListener
+        {
+            ShouldListenTo = source => source.Name == QueueDiagnostics.ActivitySourceName,
+            Sample = (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllData,
+            ActivityStopped = activity =>
+            {
+                lock (_spans)
+                    _spans.Add(activity);
+            },
+        };
+
+        ActivitySource.AddActivityListener(_listener);
+    }
+
+    public Activity TaggedWith(string tag, string value)
+    {
+        lock (_spans)
+            return Expect.Single(_spans.Where(span => (string?)span.GetTagItem(tag) == value).ToList());
+    }
+
+    public void Dispose() => _listener.Dispose();
+}
 
 internal static class Expect
 {

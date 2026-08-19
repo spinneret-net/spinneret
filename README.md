@@ -101,6 +101,8 @@ await mediator.Send(new AddEmployee("Charlotte"));         // …and now it isn'
 
 Concurrent identical requests share one in-flight task, so a cache miss costs one execution, not one per caller. The request object is the cache key, so cached request types need value equality — records, as above. Cache declarations are validated when `AddMediator` runs, so a bad tag or duration fails the host at boot.
 
+Every `Send` emits a span on the `Spinneret.Mediator` source, tagged with whether the response came from the cache — so a trace explains an absent handler rather than leaving a gap.
+
 ### The sticky spiral — `Spinneret.Parsing`
 
 The boundary catches *everything* wrong with the input in a single pass and hands back either a fully typed model or every property error at once — ready to localize, ready to bind to a form:
@@ -137,6 +139,8 @@ throw new QueueHandlerRetryAfterException(TimeSpan.FromMinutes(10));
 ```
 
 `Spinneret.Queue.Gcp` and `Spinneret.Queue.Mssql` provide the transport while the core queue owns delivery semantics. The GCP adapter uses Google Cloud Tasks with OIDC-authenticated dispatch; the MSSQL adapter uses SQL Server. The application-facing queue API stays the same either way.
+
+Work keeps its trace across the hop: the envelope carries W3C trace context, so a message is processed — and dead-lettered — in the trace of whatever enqueued it, however many retries later. A dead letter records that trace id, which turns "what caused this failure?" into one log query. See **[Tracing](docs/queue.md#tracing)**.
 
 Dead letters need a store the transport does not always provide: the MSSQL transport writes them to a table in the same database, while Cloud Tasks has nowhere to put them, so `Spinneret.Queue.Firestore` supplies a Firestore-backed writer. It depends on the core queue rather than any transport, so it composes with either. Setup for each package — configuration, infrastructure, Terraform and the local emulator — is documented per package under **[docs/](docs/README.md)**.
 

@@ -93,8 +93,17 @@ public static class MssqlQueueSchema
                     PayloadJson NVARCHAR(MAX) NOT NULL,
                     Error NVARCHAR(MAX) NOT NULL,
                     Attempts INT NOT NULL,
-                    DeadLetteredAt DATETIME2(3) NOT NULL
+                    DeadLetteredAt DATETIME2(3) NOT NULL,
+                    TraceId NVARCHAR(32) NULL
                 );
+            END;
+
+            -- Guarded on its own existence, for the same reason every index below is: the CREATE
+            -- above only runs when the table is absent, so a column added to it would never reach a
+            -- database that already exists.
+            IF COL_LENGTH(N'{deadLetterTable}', N'TraceId') IS NULL
+            BEGIN
+                EXEC(N'ALTER TABLE {deadLetterTable} ADD TraceId NVARCHAR(32) NULL;');
             END;
 
             -- Serves the admin page's (DeadLetteredAt DESC, IdempotencyKey DESC) keyset paging.

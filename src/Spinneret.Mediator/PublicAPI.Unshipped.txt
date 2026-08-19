@@ -15,5 +15,7 @@ Spinneret.Mediator.ISpinneretMediator.Send<TResponse>(Spinneret.Mediator.IReques
 Spinneret.Mediator.InvalidateCacheAttribute
 Spinneret.Mediator.InvalidateCacheAttribute.InvalidateCacheAttribute(params object![]! tags) -> void
 Spinneret.Mediator.InvalidateCacheAttribute.Tags.get -> System.Collections.Generic.IReadOnlyList<System.Enum!>!
+Spinneret.Mediator.MediatorDiagnostics
+const Spinneret.Mediator.MediatorDiagnostics.ActivitySourceName = "Spinneret.Mediator" -> string!
 static Microsoft.Extensions.DependencyInjection.MediatorServiceCollectionExtensions.AddMediator(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
 static Microsoft.Extensions.DependencyInjection.MediatorServiceCollectionExtensions.AddMediator(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Collections.Generic.IReadOnlyCollection<System.Reflection.Assembly!>! mediatorAssemblies) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!

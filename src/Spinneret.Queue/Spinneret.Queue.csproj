@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
         <TargetFramework>net10.0</TargetFramework>
@@ -29,6 +29,9 @@
              IQueueTransactionScope additionally lets the MSSQL store make a resend atomic. -->
         <InternalsVisibleTo Include="Spinneret.Queue.Firestore" />
         <InternalsVisibleTo Include="Spinneret.Queue.Mssql" />
+        <!-- QueueTracing: the consumer parses back exactly what the producer wrote, so publishing a
+             span and stamping trace context is one shared contract, not a per-transport decision. -->
+        <InternalsVisibleTo Include="Spinneret.Queue.Gcp" />
     </ItemGroup>
 
     <PropertyGroup>

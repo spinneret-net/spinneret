@@ -99,5 +99,6 @@ internal sealed class MssqlDeadLetterStore(MssqlQueueSql sql, MssqlConnectionSou
             Attempts = reader.GetInt32(6),
             // DATETIME2 comes back with an unspecified kind; the column holds UTC by construction.
             DeadLetteredAt = new DateTimeOffset(reader.GetDateTime(7), TimeSpan.Zero),
+            TraceId = reader.IsDBNull(8) ? null : reader.GetString(8),
         };
 }

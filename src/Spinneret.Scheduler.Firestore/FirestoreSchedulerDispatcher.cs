@@ -29,6 +29,8 @@ internal sealed class FirestoreSchedulerDispatcher(
     /// </summary>
     public async Task<SweepResult> SweepAsync(CancellationToken ct)
     {
+        using var activity = SchedulerTracing.StartSweep();
+
         var dispatched = 0;
         var now = Timestamp.FromDateTimeOffset(timeProvider.GetUtcNow());
         // No status filter: a document exists only while it is still work to do, so being due is the
@@ -57,12 +59,15 @@ internal sealed class FirestoreSchedulerDispatcher(
             }
         }
 
+        activity?.SetTag(SchedulerTags.JobsDispatched, dispatched);
         return SweepResult.Dispatched(dispatched);
     }
 
     /// <summary>True when the job was handed to the queue; false when it was skipped or quarantined.</summary>
-    private Task<bool> EnqueueJobAsync(DocumentSnapshot doc, CancellationToken ct)
+    private async Task<bool> EnqueueJobAsync(DocumentSnapshot doc, CancellationToken ct)
     {
+        using var activity = SchedulerTracing.StartJob(doc.Id);
+
         Schedule? schedule;
         try
         {
@@ -73,12 +78,19 @@ internal sealed class FirestoreSchedulerDispatcher(
             // Written by a newer version before a rollback, or corrupted. Quarantine instead of
             // failing: push the run out and dead-letter the occurrence, leaving the document in
             // place so a host version that understands it can still pick it up.
-            return QuarantineUnreadableAsync(doc, ex, ct);
+            activity.SetOutcome(SchedulerJobOutcome.Quarantined, ex.Message);
+            return await QuarantineUnreadableAsync(doc, ex, ct);
         }
 
-        return schedule is not null
+        activity?.SetTag(SchedulerTags.JobKind,
+            schedule is not null ? SchedulerJobKind.Recurring : SchedulerJobKind.OneShot);
+
+        var enqueued = await (schedule is not null
             ? EnqueueRecurringJobAsync(doc, schedule, ct)
-            : EnqueueOneShotJobAsync(doc, ct);
+            : EnqueueOneShotJobAsync(doc, ct));
+
+        activity.SetOutcome(enqueued ? SchedulerJobOutcome.Enqueued : SchedulerJobOutcome.Skipped);
+        return enqueued;
     }
 
     private async Task<bool> QuarantineUnreadableAsync(DocumentSnapshot doc, FormatException failure, CancellationToken ct)

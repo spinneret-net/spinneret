@@ -18,6 +18,7 @@ Spinneret.Scheduler.Schedule.Equals(Spinneret.Scheduler.Schedule? other) -> bool
 Spinneret.Scheduler.Schedule.Expression.get -> string!
 Spinneret.Scheduler.Schedule.NextRun(System.DateTimeOffset now) -> System.DateTimeOffset
 Spinneret.Scheduler.Schedule.TimeZoneId.get -> string!
+Spinneret.Scheduler.SchedulerDiagnostics
 Spinneret.Scheduler.SchedulerOptions
 Spinneret.Scheduler.SchedulerOptions.SchedulerOptions() -> void
 Spinneret.Scheduler.SchedulerOptions.SweepInterval.get -> System.TimeSpan
@@ -28,6 +29,7 @@ Spinneret.Scheduler.SweepResult.Equals(Spinneret.Scheduler.SweepResult? other) -
 Spinneret.Scheduler.SweepResult.JobsDispatched.get -> int
 Spinneret.Scheduler.SweepResult.JobsDispatched.init -> void
 Spinneret.Scheduler.SweepResult.SweepResult() -> void
+const Spinneret.Scheduler.SchedulerDiagnostics.ActivitySourceName = "Spinneret.Scheduler" -> string!
 override Spinneret.Scheduler.Schedule.Equals(object? obj) -> bool
 override Spinneret.Scheduler.Schedule.GetHashCode() -> int
 override Spinneret.Scheduler.Schedule.ToString() -> string!

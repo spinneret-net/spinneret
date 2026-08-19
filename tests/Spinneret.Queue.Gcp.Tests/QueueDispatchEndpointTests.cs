@@ -104,7 +104,7 @@ public sealed class QueueDispatchEndpointTests
         PayloadJson = """{"name":"widget","count":1}""",
         EnqueuedAtUtc = new DateTimeOffset(2026, 1, 2, 3, 4, 5, TimeSpan.Zero),
         PriorFailures = 2,
-        TraceId = "trace-1",
+        TraceParent = "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
         Description = "sample",
     };
 

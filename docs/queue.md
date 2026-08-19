@@ -104,6 +104,7 @@ When the queue gives up, it writes a `DeadLetterEntry` through `IDeadLetterWrite
 | `Source` | `Queue` or `Scheduler`. Member names are persisted; they are a data contract. |
 | `CommandTypeName`, `PayloadJson`, `Error`, `Attempts` | |
 | `Description` | From `QueueOptions.Description`, when supplied. |
+| `TraceId` | The failed execution's 32-hex trace id — paste it into your log query to reach the request that caused this. See [Tracing](#tracing). |
 
 Which package supplies the writer depends on your transport: SQL Server
 [ships one](queue-mssql.md), Cloud Tasks does not — pair it with
@@ -154,6 +155,59 @@ in place, so nothing recoverable is thrown away.
 and the delete commit together. On a transport that does not share a database with its store they are
 merely ordered — enqueue first, so an interruption leaves an entry to resend again rather than losing
 the payload.
+
+## Tracing
+
+The queue carries [W3C trace context](https://www.w3.org/TR/trace-context/) across the hop, so a
+message is processed in the trace of whatever enqueued it — however long later, and however many
+attempts in. `QueueEnvelope.TraceParent` and `TraceState` hold it; the consumer restores it before
+the handler runs.
+
+Spans are emitted on the `Spinneret.Queue` source (`QueueDiagnostics.ActivitySourceName`): a
+`{Request} publish` producer span at enqueue, and a `{Request} process` consumer span covering the
+whole delivery. Both are named for the request's own type name — `SendWelcomeEmail publish` — with
+the qualified name on the `spinneret.request.type` tag and the channel on
+`messaging.destination.name`; most hosts run one channel, so naming spans after it would say nothing.
+Every Spinneret source name begins with `Spinneret.`, and that prefix is a stability guarantee:
+subscribe by prefix and new packages are picked up as they ship.
+
+```csharp
+// OpenTelemetry
+services.AddOpenTelemetry().WithTracing(t => t.AddSource(QueueDiagnostics.ActivitySourceName));
+```
+
+| Tag | | On |
+| --- | --- | --- |
+| `messaging.system` | Always `spinneret`. | both |
+| `messaging.operation` | `publish` or `process`. | both |
+| `messaging.destination.name` | The channel. | both |
+| `spinneret.request.type` | The request type's qualified name. | both |
+| `spinneret.queue.dedupe_key` | The idempotency key, when the enqueue supplied one. | publish |
+| `messaging.message.id` | The id the *transport* assigned the message. | process |
+| `spinneret.queue.attempt`, `spinneret.queue.max_attempts` | Where this delivery sits in the budget. | process |
+| `spinneret.queue.outcome` | How the delivery ended: `ack`, `retry`, `defer`, `deadletter`, `discard`, or `transport-retry`. | process |
+
+`retry`, `deadletter`, `discard` and `transport-retry` also set the span's status to `Error`; `ack`
+and `defer` leave it unset. These strings are a contract — dashboards query them.
+
+The dedupe key is deliberately not reported as `messaging.message.id`: that attribute means the id
+the transport assigned, and only Cloud Tasks derives one from the dedupe key (it becomes the task
+name). The MSSQL transport's id is an identity column, unrelated to whatever key you passed, so
+folding the two together would make a producer-to-consumer join work on one transport and silently
+not on the other.
+
+Two properties are worth knowing:
+
+- **Propagation does not need a listener.** Context is captured from `Activity.Current`, which
+  ASP.NET Core populates whether or not anything listens. Registering a listener adds the spans; it
+  is not what makes the trace id travel.
+- **Retries and deferrals keep the original traceparent.** Every attempt of a task, and the dead
+  letter it may end as, answer to one trace id — which is what makes "here is the dead letter, show
+  me the request behind it" a single query. Do not rewrite it to the current attempt's context: on a
+  transport redelivery the ambient activity belongs to the transport, not to the business operation.
+
+A consequence worth expecting: a task deferred or retried over hours belongs to a trace that stays
+open for hours. That is intended, not a leak.
 
 ## What you must register
 

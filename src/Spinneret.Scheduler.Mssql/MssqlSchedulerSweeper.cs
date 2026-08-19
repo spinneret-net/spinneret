@@ -42,10 +42,13 @@ internal sealed class MssqlSchedulerSweeper(
     /// </remarks>
     public async Task<SweepResult> SweepAsync(CancellationToken ct)
     {
+        using var activity = SchedulerTracing.StartSweep();
+
         var dispatched = 0;
         while (await TryDispatchNextDue(ct))
             dispatched++;
 
+        activity?.SetTag(SchedulerTags.JobsDispatched, dispatched);
         return SweepResult.Dispatched(dispatched);
     }
 
@@ -60,6 +63,8 @@ internal sealed class MssqlSchedulerSweeper(
         var claimed = await ClaimNextDue(connection, transaction, now, ct);
         if (claimed is null)
             return false;
+
+        using var activity = SchedulerTracing.StartJob(claimed.JobKey);
 
         // Parse the recurrence before doing any work. A row this host cannot parse (written by a
         // newer version before a rollback, or corrupted) must not fail the sweep — that would
@@ -78,10 +83,14 @@ internal sealed class MssqlSchedulerSweeper(
                 logger.LogError(ex,
                     "Scheduled job {JobKey} has an unreadable schedule '{ScheduleText}'; quarantining for {Quarantine}",
                     claimed.JobKey, claimed.ScheduleText, QuarantineDelay);
+                activity.SetOutcome(SchedulerJobOutcome.Quarantined, ex.Message);
                 await QuarantineUnreadable(connection, transaction, claimed, now, ex, ct);
                 return true;
             }
         }
+
+        activity?.SetTag(SchedulerTags.JobKind,
+            schedule is null ? SchedulerJobKind.OneShot : SchedulerJobKind.Recurring);
 
         try
         {
@@ -112,6 +121,7 @@ internal sealed class MssqlSchedulerSweeper(
 
             await transaction.CommitAsync(CancellationToken.None);
             logger.LogInformation("Scheduled job {JobKey} ({Type}) enqueued", claimed.JobKey, claimed.RequestTypeName);
+            activity.SetOutcome(SchedulerJobOutcome.Enqueued);
             return true;
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
@@ -121,6 +131,7 @@ internal sealed class MssqlSchedulerSweeper(
         catch (Exception ex)
         {
             logger.LogError(ex, "Scheduled job {JobKey} ({Type}) failed to enqueue", claimed.JobKey, claimed.RequestTypeName);
+            activity.SetOutcome(SchedulerJobOutcome.Skipped, ex.Message);
             await TryRollback(transaction);
             // A failed compensation leaves the job due, so continuing the drain would re-claim it
             // in a tight loop — report "nothing dispatched" instead so the sweep interval backs off.

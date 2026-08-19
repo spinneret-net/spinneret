@@ -36,7 +36,26 @@ public sealed record QueueEnvelope
     /// </summary>
     public int PriorFailures { get; init; }
 
-    public string? TraceId { get; init; }
+    /// <summary>
+    /// W3C traceparent of the operation that enqueued this request ("00-{trace}-{span}-{flags}"), or
+    /// null when the enqueue had no W3C activity. Consumers restore it with
+    /// <see cref="System.Diagnostics.ActivityContext.TryParse(string?, string?, out System.Diagnostics.ActivityContext)"/>.
+    /// <para>
+    /// Preserved verbatim across re-enqueues — a booked retry and a deferral both keep the original —
+    /// so every attempt of a task, and the dead letter it may end as, share one trace id. That is what
+    /// makes "here is the dead letter, show me the request that caused it" a single log query. Do not
+    /// "improve" this to the current attempt's context: on a transport redelivery the ambient activity
+    /// belongs to the transport, not the business operation, so rewriting can silently swap a good
+    /// trace id for an unrelated one.
+    /// </para>
+    /// </summary>
+    public string? TraceParent { get; init; }
+
+    /// <summary>
+    /// W3C tracestate at enqueue time, carried alongside <see cref="TraceParent"/> so vendor context
+    /// survives the hop. Null unless something set one.
+    /// </summary>
+    public string? TraceState { get; init; }
 
     /// <summary>
     /// Optional human-readable description of the task (from <see cref="QueueOptions.Description"/>),

@@ -28,14 +28,14 @@ public class QueueDeliveryProcessorTests
     }
 
     private static QueueEnvelope Envelope<TCommand>(
-        int priorFailures = 0, TimeSpan? age = null, string? description = null, string? traceId = null) => new()
+        int priorFailures = 0, TimeSpan? age = null, string? description = null, string? traceParent = null) => new()
     {
         RequestTypeName = typeof(TCommand).FullName!,
         PayloadJson = """{"id":42}""",
         EnqueuedAtUtc = Now - (age ?? TimeSpan.Zero),
         PriorFailures = priorFailures,
         Description = description,
-        TraceId = traceId,
+        TraceParent = traceParent,
     };
 
     // -----------------------------------------------------------------------------------------
@@ -83,13 +83,13 @@ public class QueueDeliveryProcessorTests
     public async Task ProcessAsync_failure_re_enqueue_preserves_enqueue_time_trace_id_and_payload()
     {
         _dispatcher.Throw = new InvalidOperationException("boom");
-        var envelope = Envelope<UnannotatedCommand>(age: TimeSpan.FromMinutes(3), traceId: "trace-7");
+        var envelope = Envelope<UnannotatedCommand>(age: TimeSpan.FromMinutes(3), traceParent: "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01");
 
         await CreateProcessor().ProcessAsync(envelope, "task-1", CancellationToken.None);
 
         var reEnqueued = Expect.Single(_envelopeQueue.Enqueued).Envelope;
         await Assert.That(reEnqueued.EnqueuedAtUtc).IsEqualTo(envelope.EnqueuedAtUtc);
-        await Assert.That(reEnqueued.TraceId).IsEqualTo("trace-7");
+        await Assert.That(reEnqueued.TraceParent).IsEqualTo("00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01");
         await Assert.That(reEnqueued.PayloadJson).IsEqualTo(envelope.PayloadJson);
     }
 

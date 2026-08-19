@@ -86,6 +86,25 @@ public sealed class MssqlSchemaInitializerTests(MssqlContainerFixture fixture)
     }
 
     [Test]
+    public async Task The_trace_id_column_reaches_a_database_that_predates_it()
+    {
+        // Same hazard as the paging index, and the one a new column walks straight into: the
+        // CREATE TABLE only runs when the table is absent, so a column added to it would never
+        // reach an existing database and every dead letter written there would fail to insert.
+        var suffix = Guid.NewGuid().ToString("N")[..12];
+        await using (var existing = await StartOn(fixture.ConnectionString, suffix))
+            await existing.ExecuteAsync($"ALTER TABLE [DL_{suffix}] DROP COLUMN [TraceId];");
+
+        await using var upgraded = await StartOn(fixture.ConnectionString, suffix);
+
+        await Assert.That(await ColumnExists(upgraded, $"DL_{suffix}", "TraceId")).IsTrue();
+
+        // And the repair leaves a usable table, not merely a column-shaped one.
+        await upgraded.Queue.Enqueue(new PingCommand("after-the-upgrade"));
+        await Assert.That(await upgraded.QueueRowCount()).IsEqualTo(1);
+    }
+
+    [Test]
     public async Task The_script_is_not_run_at_all_when_the_host_owns_the_schema()
     {
         // Hosts that manage their schema through migrations turn this off; leaving tables uncreated
@@ -104,6 +123,10 @@ public sealed class MssqlSchemaInitializerTests(MssqlContainerFixture fixture)
     private static async Task<bool> TableExists(QueueTestHost host, string table) =>
         await host.ScalarAsync<int>(
             $"SELECT COUNT(*) FROM sys.tables WHERE name = N'{table}'") == 1;
+
+    private static async Task<bool> ColumnExists(QueueTestHost host, string table, string column) =>
+        await host.ScalarAsync<int>(
+            $"SELECT COUNT(*) FROM sys.columns WHERE object_id = OBJECT_ID(N'[{table}]', N'U') AND name = N'{column}'") == 1;
 
     private static async Task<bool> IndexExists(QueueTestHost host, string table, string index) =>
         await host.ScalarAsync<int>($"""

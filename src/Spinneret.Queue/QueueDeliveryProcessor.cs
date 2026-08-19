@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Microsoft.Extensions.Logging;
 
 namespace Spinneret.Queue;
@@ -50,6 +51,10 @@ internal sealed class QueueDeliveryProcessor(
         var envelope = context.Envelope;
         var taskId = context.TaskId;
 
+        // The span covers the whole delivery rather than the handler call: the outcome is the
+        // interesting part, and the unknown-type path below never reaches dispatch at all.
+        using var activity = QueueTracing.StartConsumer(envelope, taskId);
+
         QueuePolicy policy;
         try
         {
@@ -62,7 +67,8 @@ internal sealed class QueueDeliveryProcessor(
             logger.LogError(ex, "Queue task for unknown request type {RequestType}; dead-lettering",
                 envelope.RequestTypeName);
 
-            return await DeadLetterAsync(envelope, taskId, envelope.PriorFailures + 1, ex.Message, ct);
+            activity.SetOutcome(QueueOutcome.DeadLetter, ex.Message);
+            return await DeadLetterAsync(envelope, taskId, envelope.PriorFailures + 1, ex.Message, activity, ct);
         }
 
         // PriorFailures counts only failures this processor observed and booked via re-enqueue.
@@ -72,21 +78,26 @@ internal sealed class QueueDeliveryProcessor(
         var attempt = envelope.PriorFailures + 1;
         var age = timeProvider.GetUtcNow() - envelope.EnqueuedAtUtc;
 
+        activity?.SetTag(QueueTags.Destination, policy.ResolvedChannel);
+        activity?.SetTag(QueueTags.MaxAttempts, policy.MaxAttempts);
+
         try
         {
             await dispatchBoundary.ExecuteAsync(context, () => dispatcher.Dispatch(envelope, ct), ct);
+            activity.SetOutcome(QueueOutcome.Ack);
             return QueueDeliveryOutcome.Acked;
         }
         catch (QueueHandlerRetryAfterException ex)
         {
-            return await DeferAsync(envelope, policy, attempt, age, ex, taskId, ct);
+            return await DeferAsync(envelope, policy, attempt, age, ex, taskId, activity, ct);
         }
         catch (QueueHandlerPermanentException ex)
         {
             logger.LogError(ex,
                 "Queue handler for {RequestType} failed permanently on attempt {Attempt}; dead-lettering",
                 envelope.RequestTypeName, attempt);
-            return await DeadLetterAsync(envelope, taskId, attempt, ex.Message, ct);
+            activity.SetOutcome(QueueOutcome.DeadLetter, ex.Message);
+            return await DeadLetterAsync(envelope, taskId, attempt, ex.Message, activity, ct);
         }
         catch (QueueHandlerFailedException ex)
         {
@@ -98,16 +109,18 @@ internal sealed class QueueDeliveryProcessor(
                     logger.LogError(ex,
                         "Queue handler for {RequestType} returned an error result on attempt {Attempt}; dead-lettering: {@Error}",
                         envelope.RequestTypeName, attempt, ex.Error);
-                    return await DeadLetterAsync(envelope, taskId, attempt, ex.Message, ct);
+                    activity.SetOutcome(QueueOutcome.DeadLetter, ex.Message);
+                    return await DeadLetterAsync(envelope, taskId, attempt, ex.Message, activity, ct);
 
                 case ErrorResultAction.Discard:
                     logger.LogWarning(ex,
                         "Queue handler for {RequestType} returned an error result; discarding per policy: {@Error}",
                         envelope.RequestTypeName, ex.Error);
+                    activity.SetOutcome(QueueOutcome.Discard, ex.Message);
                     return QueueDeliveryOutcome.Acked;
 
                 case ErrorResultAction.Retry:
-                    return await FailAsync(envelope, policy, attempt, age, ex, taskId, ct);
+                    return await FailAsync(envelope, policy, attempt, age, ex, taskId, activity, ct);
 
                 default:
                     throw new InvalidOperationException(
@@ -116,20 +129,20 @@ internal sealed class QueueDeliveryProcessor(
         }
         catch (Exception ex)
         {
-            return await FailAsync(envelope, policy, attempt, age, ex, taskId, ct);
+            return await FailAsync(envelope, policy, attempt, age, ex, taskId, activity, ct);
         }
     }
 
     private async Task<QueueDeliveryOutcome> FailAsync(
         QueueEnvelope envelope, QueuePolicy policy, int attempt, TimeSpan age, Exception ex,
-        string taskId, CancellationToken ct)
+        string taskId, Activity? activity, CancellationToken ct)
     {
         if (attempt >= policy.MaxAttempts || age > policy.MaxAge)
         {
             logger.LogError(ex,
                 "Queue handler for {RequestType} failed on attempt {Attempt}/{MaxAttempts} (age {Age}); giving up",
                 envelope.RequestTypeName, attempt, policy.MaxAttempts, age);
-            return await GiveUpAsync(envelope, policy, taskId, attempt, ex.Message, ct);
+            return await GiveUpAsync(envelope, policy, taskId, attempt, ex.Message, activity, ct);
         }
 
         var backoff = policy.BackoffFor(attempt);
@@ -147,25 +160,27 @@ internal sealed class QueueDeliveryProcessor(
             logger.LogWarning(enqueueEx,
                 "Failed to re-enqueue {RequestType} retry; falling back to transport retry in {Backoff}",
                 envelope.RequestTypeName, backoff);
+            activity.SetOutcome(QueueOutcome.TransportRetry, ex.Message);
             return QueueDeliveryOutcome.RetryIn(backoff);
         }
 
         logger.LogWarning(ex,
             "Queue handler for {RequestType} failed on attempt {Attempt}/{MaxAttempts}; retrying in {Backoff}",
             envelope.RequestTypeName, attempt, policy.MaxAttempts, backoff);
+        activity.SetOutcome(QueueOutcome.Retry, ex.Message);
         return QueueDeliveryOutcome.Acked;
     }
 
     private async Task<QueueDeliveryOutcome> DeferAsync(
         QueueEnvelope envelope, QueuePolicy policy, int attempt, TimeSpan age,
-        QueueHandlerRetryAfterException ex, string taskId, CancellationToken ct)
+        QueueHandlerRetryAfterException ex, string taskId, Activity? activity, CancellationToken ct)
     {
         if (age + ex.RetryAfter > policy.MaxAge)
         {
             logger.LogError(ex,
                 "Queue handler for {RequestType} deferred by {RetryAfter} but the task (age {Age}) would exceed its max age {MaxAge}; giving up",
                 envelope.RequestTypeName, ex.RetryAfter, age, policy.MaxAge);
-            return await GiveUpAsync(envelope, policy, taskId, attempt, ex.Message, ct);
+            return await GiveUpAsync(envelope, policy, taskId, attempt, ex.Message, activity, ct);
         }
 
         try
@@ -180,12 +195,14 @@ internal sealed class QueueDeliveryProcessor(
             logger.LogWarning(enqueueEx,
                 "Failed to re-enqueue deferred {RequestType}; falling back to transport retry in {RetryAfter}",
                 envelope.RequestTypeName, ex.RetryAfter);
+            activity.SetOutcome(QueueOutcome.TransportRetry, ex.Message);
             return QueueDeliveryOutcome.RetryIn(ex.RetryAfter);
         }
 
         logger.LogInformation(
             "Queue handler for {RequestType} deferred; re-enqueued to run in {RetryAfter}",
             envelope.RequestTypeName, ex.RetryAfter);
+        activity.SetOutcome(QueueOutcome.Defer);
         return QueueDeliveryOutcome.Acked;
     }
 
@@ -195,21 +212,25 @@ internal sealed class QueueDeliveryProcessor(
     /// something else redoes.
     /// </summary>
     private async Task<QueueDeliveryOutcome> GiveUpAsync(
-        QueueEnvelope envelope, QueuePolicy policy, string taskId, int attempts, string error, CancellationToken ct)
+        QueueEnvelope envelope, QueuePolicy policy, string taskId, int attempts, string error,
+        Activity? activity, CancellationToken ct)
     {
         if (policy.OnExhausted == ExhaustedAction.Discard)
         {
             logger.LogWarning(
                 "Discarding exhausted {RequestType} task per policy after {Attempts} attempt(s): {Error}",
                 envelope.RequestTypeName, attempts, error);
+            activity.SetOutcome(QueueOutcome.Discard, error);
             return QueueDeliveryOutcome.Acked;
         }
 
-        return await DeadLetterAsync(envelope, taskId, attempts, error, ct);
+        activity.SetOutcome(QueueOutcome.DeadLetter, error);
+        return await DeadLetterAsync(envelope, taskId, attempts, error, activity, ct);
     }
 
     private async Task<QueueDeliveryOutcome> DeadLetterAsync(
-        QueueEnvelope envelope, string taskId, int attempts, string error, CancellationToken ct)
+        QueueEnvelope envelope, string taskId, int attempts, string error,
+        Activity? activity, CancellationToken ct)
     {
         try
         {
@@ -219,6 +240,8 @@ internal sealed class QueueDeliveryProcessor(
                 Source = DeadLetterSource.Queue,
                 CommandTypeName = envelope.RequestTypeName,
                 Description = envelope.Description,
+                // The producer's trace id, so every attempt and the dead letter answer one query.
+                TraceId = QueueTracing.TraceIdOf(envelope.TraceParent) ?? Activity.Current?.TraceId.ToHexString(),
                 PayloadJson = envelope.PayloadJson,
                 Error = error,
                 Attempts = attempts,
@@ -233,6 +256,7 @@ internal sealed class QueueDeliveryProcessor(
             logger.LogCritical(ex,
                 "Failed to write dead-letter for {CommandType} (task {TaskId}, attempts: {Attempts}). Payload: {Payload}",
                 envelope.RequestTypeName, taskId, attempts, envelope.PayloadJson);
+            activity.SetOutcome(QueueOutcome.TransportRetry, ex.Message);
             return QueueDeliveryOutcome.RetryIn(DeadLetterWriteRetryBackoff);
         }
     }

@@ -114,6 +114,7 @@ public sealed class MssqlDeadLetterStoreTests(MssqlContainerFixture fixture)
             PayloadJson = """{"Name":"x"}""",
             Error = "it broke",
             Attempts = 7,
+            TraceId = "4bf92f3577b34da6a3ce929d0e0e4736",
         });
 
         var deadLetter = await Store(host).GetAsync("written-1");
@@ -123,6 +124,20 @@ public sealed class MssqlDeadLetterStoreTests(MssqlContainerFixture fixture)
         await Assert.That(deadLetter.Description).IsEqualTo("from the writer");
         await Assert.That(deadLetter.Error).IsEqualTo("it broke");
         await Assert.That(deadLetter.Attempts).IsEqualTo(7);
+        // The store reads by ordinal, so a column inserted anywhere but last would shift every
+        // field after it and this would come back holding someone else's value.
+        await Assert.That(deadLetter.TraceId).IsEqualTo("4bf92f3577b34da6a3ce929d0e0e4736");
+    }
+
+    [Test]
+    public async Task Reads_a_dead_letter_that_has_no_trace_id_back_as_null()
+    {
+        await using var host = await QueueTestHost.StartAsync(fixture.ConnectionString, worker: false);
+        await Seed(host, "no-trace", Base);
+
+        var deadLetter = await Store(host).GetAsync("no-trace");
+
+        await Assert.That(deadLetter!.TraceId).IsNull();
     }
 
     [Test]

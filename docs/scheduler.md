@@ -130,6 +130,27 @@ For a host that scales to zero and has no thread to tick, use
 [`Spinneret.Scheduler.Http`](scheduler-http.md) and an external cron instead. Same sweep, different
 clock.
 
+## Tracing
+
+Spans are emitted on the `Spinneret.Scheduler` source
+(`SchedulerDiagnostics.ActivitySourceName`): one `scheduler sweep` per pass, tagged
+`scheduler.jobs_dispatched`, and one `scheduler job` per *claimed* job — a pass that finds nothing
+due emits only the sweep span. Each job span carries `scheduler.job_id`, `scheduler.job_kind`
+(`recurring` or `oneshot`) and `scheduler.outcome` (`enqueued`, `skipped` or `quarantined`).
+
+**A job runs in the sweep's trace, never the one that scheduled it.** For a recurring job the
+"scheduling trace" is a host bootstrap that may have happened a year ago, and parenting every
+occurrence onto it would build one endless trace. A one-shot can fire months after it was booked, and
+a parent that far back describes an operation nothing performed — it is also long past any tracing
+backend's retention.
+
+The join back to the scheduling side is the job key, which the sweep logs. The job is then enqueued
+through the queue, so from that point on it carries [the queue's trace context](queue.md#tracing)
+normally.
+
+If you ever do want the provenance, the right primitive is an `ActivityLink` to the scheduling
+context, not a parent.
+
 ## What you must register
 
 - **A storage provider** — `AddFirestoreScheduler` or `AddMssqlScheduler`.

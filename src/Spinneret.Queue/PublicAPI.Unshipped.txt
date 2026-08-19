@@ -20,6 +20,8 @@ Spinneret.Queue.DeadLetter.PayloadJson.get -> string!
 Spinneret.Queue.DeadLetter.PayloadJson.init -> void
 Spinneret.Queue.DeadLetter.Source.get -> Spinneret.Queue.DeadLetterSource
 Spinneret.Queue.DeadLetter.Source.init -> void
+Spinneret.Queue.DeadLetter.TraceId.get -> string?
+Spinneret.Queue.DeadLetter.TraceId.init -> void
 Spinneret.Queue.DeadLetterEntry
 Spinneret.Queue.DeadLetterEntry.<Clone>$() -> Spinneret.Queue.DeadLetterEntry!
 Spinneret.Queue.DeadLetterEntry.Attempts.get -> int
@@ -38,6 +40,8 @@ Spinneret.Queue.DeadLetterEntry.PayloadJson.get -> string!
 Spinneret.Queue.DeadLetterEntry.PayloadJson.init -> void
 Spinneret.Queue.DeadLetterEntry.Source.get -> Spinneret.Queue.DeadLetterSource
 Spinneret.Queue.DeadLetterEntry.Source.init -> void
+Spinneret.Queue.DeadLetterEntry.TraceId.get -> string?
+Spinneret.Queue.DeadLetterEntry.TraceId.init -> void
 Spinneret.Queue.DeadLetterPage
 Spinneret.Queue.DeadLetterPage.<Clone>$() -> Spinneret.Queue.DeadLetterPage!
 Spinneret.Queue.DeadLetterPage.DeadLetterPage() -> void
@@ -102,6 +106,7 @@ Spinneret.Queue.QueueDeliveryOutcome.Ack.get -> bool
 Spinneret.Queue.QueueDeliveryOutcome.Equals(Spinneret.Queue.QueueDeliveryOutcome? other) -> bool
 Spinneret.Queue.QueueDeliveryOutcome.QueueDeliveryOutcome() -> void
 Spinneret.Queue.QueueDeliveryOutcome.RetryAfter.get -> System.TimeSpan?
+Spinneret.Queue.QueueDiagnostics
 Spinneret.Queue.QueueEnvelope
 Spinneret.Queue.QueueEnvelope.<Clone>$() -> Spinneret.Queue.QueueEnvelope!
 Spinneret.Queue.QueueEnvelope.Description.get -> string?
@@ -118,8 +123,10 @@ Spinneret.Queue.QueueEnvelope.RequestTypeName.get -> string!
 Spinneret.Queue.QueueEnvelope.RequestTypeName.init -> void
 Spinneret.Queue.QueueEnvelope.SchemaVersion.get -> int
 Spinneret.Queue.QueueEnvelope.SchemaVersion.init -> void
-Spinneret.Queue.QueueEnvelope.TraceId.get -> string?
-Spinneret.Queue.QueueEnvelope.TraceId.init -> void
+Spinneret.Queue.QueueEnvelope.TraceParent.get -> string?
+Spinneret.Queue.QueueEnvelope.TraceParent.init -> void
+Spinneret.Queue.QueueEnvelope.TraceState.get -> string?
+Spinneret.Queue.QueueEnvelope.TraceState.init -> void
 Spinneret.Queue.QueueHandlerFailedException
 Spinneret.Queue.QueueHandlerFailedException.Error.get -> object?
 Spinneret.Queue.QueueHandlerFailedException.QueueHandlerFailedException(object? error) -> void
@@ -215,6 +222,7 @@ Spinneret.Queue.UnknownRequestTypeException.TypeName.get -> string!
 Spinneret.Queue.UnknownRequestTypeException.UnknownRequestTypeException(string! typeName) -> void
 abstract Spinneret.Queue.ResendDeadLetterError.<Clone>$() -> Spinneret.Queue.ResendDeadLetterError!
 const Spinneret.Queue.DeadLetterQuery.MaxPageSize = 500 -> int
+const Spinneret.Queue.QueueDiagnostics.ActivitySourceName = "Spinneret.Queue" -> string!
 const Spinneret.Queue.QueuePolicy.DefaultChannel = "default" -> string!
 override Spinneret.Queue.DeadLetter.Equals(object? obj) -> bool
 override Spinneret.Queue.DeadLetter.GetHashCode() -> int

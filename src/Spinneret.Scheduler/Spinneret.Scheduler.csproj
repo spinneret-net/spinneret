@@ -26,6 +26,10 @@
 
     <ItemGroup>
         <InternalsVisibleTo Include="Spinneret.Scheduler.Tests" />
+        <!-- SchedulerTracing: the span shape is one contract shared by every storage provider, so the
+             sweeps must not drift apart on names or tags. -->
+        <InternalsVisibleTo Include="Spinneret.Scheduler.Firestore" />
+        <InternalsVisibleTo Include="Spinneret.Scheduler.Mssql" />
     </ItemGroup>
 
     <PropertyGroup>

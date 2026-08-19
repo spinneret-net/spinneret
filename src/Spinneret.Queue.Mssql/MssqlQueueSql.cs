@@ -11,7 +11,9 @@ internal sealed class MssqlQueueSql(MssqlQueueOptions options)
     /// ordinals. Shared by the list and lookup statements so the two can never disagree.
     /// </summary>
     private const string DeadLetterColumns =
-        "IdempotencyKey, Source, CommandTypeName, Description, PayloadJson, Error, Attempts, DeadLetteredAt";
+        // TraceId is appended last on purpose: MssqlDeadLetterStore reads by ordinal, so a new column
+        // anywhere else would silently shift every existing field one place.
+        "IdempotencyKey, Source, CommandTypeName, Description, PayloadJson, Error, Attempts, DeadLetteredAt, TraceId";
 
     /// <summary>
     /// The paging order, repeated by every dead-letter read. Descending on both columns, and the
@@ -77,8 +79,8 @@ internal sealed class MssqlQueueSql(MssqlQueueOptions options)
     public string WriteDeadLetter { get; } = $"""
         BEGIN TRY
             INSERT INTO {Identifier.Qualify(options.SchemaName, options.DeadLetterTableName)}
-                (IdempotencyKey, Source, CommandTypeName, Description, PayloadJson, Error, Attempts, DeadLetteredAt)
-            VALUES (@IdempotencyKey, @Source, @CommandTypeName, @Description, @PayloadJson, @Error, @Attempts, @DeadLetteredAt);
+                (IdempotencyKey, Source, CommandTypeName, Description, PayloadJson, Error, Attempts, DeadLetteredAt, TraceId)
+            VALUES (@IdempotencyKey, @Source, @CommandTypeName, @Description, @PayloadJson, @Error, @Attempts, @DeadLetteredAt, @TraceId);
         END TRY
         BEGIN CATCH
             IF ERROR_NUMBER() NOT IN (2601, 2627)

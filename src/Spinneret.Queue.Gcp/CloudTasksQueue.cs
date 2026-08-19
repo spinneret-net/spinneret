@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Text.Json;
 using Google.Cloud.Tasks.V2;
 using Grpc.Core;
@@ -31,7 +30,6 @@ internal sealed class CloudTasksQueue(
             RequestTypeName = typeName,
             PayloadJson = payloadJson,
             EnqueuedAtUtc = DateTimeOffset.UtcNow,
-            TraceId = Activity.Current?.Id,
             Description = queueOptions?.Description,
         };
 
@@ -47,6 +45,9 @@ internal sealed class CloudTasksQueue(
         var value = gcpOptions.Value;
         var channel = registry.Resolve(envelope.RequestTypeName).Policy.ResolvedChannel;
         var queueId = value.QueueIdFor(channel);
+
+        using var activity = QueueTracing.StartProducer(channel, envelope, dedupeKey);
+        envelope = QueueTracing.StampTraceContext(envelope);
 
         var envelopeBytes = JsonSerializer.SerializeToUtf8Bytes(envelope);
 
@@ -68,6 +69,15 @@ internal sealed class CloudTasksQueue(
                 }
             },
         };
+
+        // From the envelope, not the ambient activity, so header and body cannot disagree. It is what
+        // puts ASP.NET's own server span for the dispatch request in the business trace.
+        if (envelope.TraceParent is { } traceParent)
+        {
+            task.HttpRequest.Headers["traceparent"] = traceParent;
+            if (envelope.TraceState is { } traceState)
+                task.HttpRequest.Headers["tracestate"] = traceState;
+        }
 
         if (delay is { } scheduleDelay && scheduleDelay > TimeSpan.Zero)
             task.ScheduleTime = Timestamp.FromDateTime(DateTime.UtcNow + scheduleDelay);

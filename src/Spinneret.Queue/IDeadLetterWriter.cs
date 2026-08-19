@@ -1,3 +1,5 @@
+using System.Diagnostics;
+
 namespace Spinneret.Queue;
 
 /// <summary>
@@ -35,6 +37,18 @@ public sealed record DeadLetterEntry
     public required string PayloadJson { get; init; }
     public required string Error { get; init; }
     public required int Attempts { get; init; }
+
+    /// <summary>
+    /// 32-hex W3C trace id of the execution that failed — the value an operator pastes into a log
+    /// query to reach the request that caused this. Deliberately the trace id and not the full
+    /// traceparent: a span id is meaningless once the span is gone, and this record outlives it.
+    /// <para>
+    /// Defaults to the ambient trace, which is what every writer wants: an entry is built at the
+    /// point of failure. The queue overrides it with the trace the message was enqueued in, so all
+    /// of a task's attempts and the dead letter they end as answer to one trace id.
+    /// </para>
+    /// </summary>
+    public string? TraceId { get; init; } = Activity.Current?.TraceId.ToHexString();
 }
 
 /// <summary>

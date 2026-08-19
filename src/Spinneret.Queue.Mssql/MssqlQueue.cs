@@ -1,6 +1,5 @@
 using System.Data;
 using System.Data.Common;
-using System.Diagnostics;
 using System.Globalization;
 using System.Text.Json;
 using Microsoft.Data.SqlClient;
@@ -55,7 +54,6 @@ internal sealed class MssqlQueue(
             RequestTypeName = registry.GetName(requestType),
             PayloadJson = serializer.Serialize(request, requestType),
             EnqueuedAtUtc = timeProvider.GetUtcNow(),
-            TraceId = Activity.Current?.Id,
             Description = queueOptions?.Description,
         };
     }
@@ -64,6 +62,10 @@ internal sealed class MssqlQueue(
         QueueEnvelope envelope, TimeSpan? delay, string? dedupeKey, DbTransaction? transaction, CancellationToken ct)
     {
         var channel = registry.Resolve(envelope.RequestTypeName).Policy.ResolvedChannel;
+
+        using var activity = QueueTracing.StartProducer(channel, envelope, dedupeKey);
+        envelope = QueueTracing.StampTraceContext(envelope);
+
         var now = timeProvider.GetUtcNow();
         var visibleAt = delay is { } d && d > TimeSpan.Zero ? now + d : now;
         // The envelope itself uses default serialization; only PayloadJson uses the host serializer.

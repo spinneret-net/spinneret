@@ -167,7 +167,17 @@ public sealed class CloudTasksQueueTests
 
         var envelope = ReadEnvelope(client.SingleRequest);
         await Assert.That(envelope.Description).IsEqualTo("widget sync");
-        await Assert.That(envelope.TraceId).IsEqualTo(activity.Id);
+
+        // The trace is what must survive the hop, not one particular span: when a listener records
+        // the publish span, that span - not the caller's activity - is current at capture, so the
+        // envelope points at the publish. Asserting the exact id would encode "no listener present".
+        await Assert.That(ActivityContext.TryParse(envelope.TraceParent, null, out var captured)).IsTrue();
+        await Assert.That(captured.TraceId).IsEqualTo(activity.TraceId);
+
+        // The same context rides the delivery request in-band, so the dispatch endpoint's own server
+        // span joins this trace instead of starting a fresh root.
+        await Assert.That(client.SingleRequest.Task.HttpRequest.Headers["traceparent"])
+            .IsEqualTo(envelope.TraceParent);
     }
 
     [Test]
@@ -238,7 +248,7 @@ public sealed class CloudTasksQueueTests
             PayloadJson = """{"name":"widget","count":1}""",
             EnqueuedAtUtc = new DateTimeOffset(2026, 1, 2, 3, 4, 5, TimeSpan.Zero),
             PriorFailures = 3,
-            TraceId = "trace-123",
+            TraceParent = "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
             Description = "retry generation",
         };
 

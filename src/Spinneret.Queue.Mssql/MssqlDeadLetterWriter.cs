@@ -25,6 +25,7 @@ internal sealed class MssqlDeadLetterWriter(
             command.AddParameter("@PayloadJson", entry.PayloadJson);
             command.AddParameter("@Error", entry.Error);
             command.AddParameter("@Attempts", entry.Attempts);
+            command.AddParameter("@TraceId", entry.TraceId);
             command.AddDateTime2Parameter("@DeadLetteredAt", timeProvider.GetUtcNow());
             await command.ExecuteNonQueryAsync(ct);
         }, ct);

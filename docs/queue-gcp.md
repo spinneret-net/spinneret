@@ -87,6 +87,22 @@ the app to show for it.
 The endpoint answers `200` when the delivery is finished and `429` with `Retry-After` when the app
 wants redelivery.
 
+### Trace context on the task
+
+Besides the envelope, the enqueue copies the traceparent onto the Cloud Tasks request as a
+`traceparent` header (and `tracestate` when set). Cloud Tasks reserves the `X-CloudTasks-*`,
+`X-Google-*` and `X-AppEngine-*` prefixes, so this passes through untouched.
+
+The header is what puts ASP.NET Core's own server span for the dispatch request in the business
+trace. Without it that span is a fresh root, and every line the framework logs for the delivery —
+request logging, an auth failure, an envelope too corrupt to read — lands in a trace unrelated to
+the work.
+
+The envelope stays the source of truth: it is what the consumer parses, it is transport-neutral, and
+it survives dead-lettering and a later resend. The header is taken from the envelope rather than the
+ambient activity so the two cannot disagree. If a future Cloud Tasks change were to overwrite the
+header, propagation still works — only the server-span link is lost.
+
 ### The OIDC scheme it registers
 
 `AddGcpQueue` also registers a JwtBearer authentication scheme and an authorization policy, both

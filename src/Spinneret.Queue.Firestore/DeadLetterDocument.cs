@@ -23,6 +23,7 @@ internal static class DeadLetterDocument
         public const string PayloadJson = "payloadJson";
         public const string Error = "error";
         public const string Attempts = "attempts";
+        public const string TraceId = "traceId";
         public const string DeadLetteredAt = "deadLetteredAt";
     }
 
@@ -41,6 +42,7 @@ internal static class DeadLetterDocument
             [Fields.PayloadJson] = entry.PayloadJson,
             [Fields.Error] = entry.Error,
             [Fields.Attempts] = entry.Attempts,
+            [Fields.TraceId] = entry.TraceId,
             [Fields.DeadLetteredAt] = Timestamp.FromDateTimeOffset(deadLetteredAt),
         };
 
@@ -68,6 +70,7 @@ internal static class DeadLetterDocument
             PayloadJson = ReadString(fields, Fields.PayloadJson, id),
             Error = ReadString(fields, Fields.Error, id),
             Attempts = ReadInt(fields, Fields.Attempts, id),
+            TraceId = fields.GetValueOrDefault(Fields.TraceId) as string,
             DeadLetteredAt = ReadTimestamp(fields, Fields.DeadLetteredAt, id),
         };
 

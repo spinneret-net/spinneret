@@ -13,7 +13,8 @@ public class DeadLetterDocumentTests
 
     internal static DeadLetterEntry Entry(
         DeadLetterSource source = DeadLetterSource.Queue,
-        string? description = null) =>
+        string? description = null,
+        string? traceId = "4bf92f3577b34da6a3ce929d0e0e4736") =>
         new()
         {
             IdempotencyKey = "task-1",
@@ -23,6 +24,7 @@ public class DeadLetterDocumentTests
             PayloadJson = """{"id":1}""",
             Error = "boom",
             Attempts = 3,
+            TraceId = traceId,
         };
 
     [Test]
@@ -33,6 +35,7 @@ public class DeadLetterDocumentTests
         await Assert.That(fields.Keys).IsEquivalentTo(new[]
         {
             "source", "commandTypeName", "description", "payloadJson", "error", "attempts", "deadLetteredAt",
+            "traceId",
         });
     }
 
@@ -46,6 +49,30 @@ public class DeadLetterDocumentTests
         await Assert.That(fields["payloadJson"]).IsEqualTo("""{"id":1}""");
         await Assert.That(fields["error"]).IsEqualTo("boom");
         await Assert.That(fields["attempts"]).IsEqualTo(3);
+        await Assert.That(fields["traceId"]).IsEqualTo("4bf92f3577b34da6a3ce929d0e0e4736");
+    }
+
+    [Test]
+    public async Task Reads_back_the_trace_id_it_wrote()
+    {
+        var fields = DeadLetterDocument.From(Entry(), At);
+
+        var deadLetter = DeadLetterDocument.ToDeadLetter("task-1", fields!);
+
+        await Assert.That(deadLetter.TraceId).IsEqualTo("4bf92f3577b34da6a3ce929d0e0e4736");
+    }
+
+    [Test]
+    public async Task Reads_a_document_written_before_the_trace_id_existed()
+    {
+        // Optional on read, unlike every required field: entries already in the store predate the
+        // column, and an old dead letter must stay readable rather than throw on the admin page.
+        var fields = DeadLetterDocument.From(Entry(), At);
+        fields.Remove("traceId");
+
+        var deadLetter = DeadLetterDocument.ToDeadLetter("task-1", fields!);
+
+        await Assert.That(deadLetter.TraceId).IsNull();
     }
 
     [Test]

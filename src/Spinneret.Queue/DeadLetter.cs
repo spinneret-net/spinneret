@@ -23,6 +23,9 @@ public sealed record DeadLetter
     public required string Error { get; init; }
     public required int Attempts { get; init; }
 
+    /// <summary>The failed execution's 32-hex trace id — <see cref="DeadLetterEntry.TraceId"/>.</summary>
+    public string? TraceId { get; init; }
+
     /// <summary>When the entry was first recorded. Never moves: writers keep the first write.</summary>
     public required DateTimeOffset DeadLetteredAt { get; init; }
 }
