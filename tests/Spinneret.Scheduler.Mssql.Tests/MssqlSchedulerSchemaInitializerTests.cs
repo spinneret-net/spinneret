@@ -49,7 +49,7 @@ public sealed class MssqlSchedulerSchemaInitializerTests(MssqlContainerFixture f
 
         try
         {
-            await Assert.That(hosts).HasCount(16);
+            await Assert.That(hosts).Count().IsEqualTo(16);
             await hosts[0].Scheduler.RegisterAsync("after-the-race", new TickCommand("a"), Hourly);
             await Assert.That(await hosts[15].JobExists("after-the-race")).IsTrue();
         }

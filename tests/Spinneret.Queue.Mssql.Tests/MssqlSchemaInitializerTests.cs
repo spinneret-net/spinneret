@@ -57,7 +57,7 @@ public sealed class MssqlSchemaInitializerTests(MssqlContainerFixture fixture)
 
         try
         {
-            await Assert.That(hosts).HasCount(16);
+            await Assert.That(hosts).Count().IsEqualTo(16);
             // One set of tables, shared, and usable from every one of them.
             await hosts[0].Queue.Enqueue(new PingCommand("after-the-race"));
             await Assert.That(await hosts[15].QueueRowCount()).IsEqualTo(1);

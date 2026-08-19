@@ -134,7 +134,7 @@ public sealed class FirestoreDeadLetterStoreTests(FirestoreEmulatorFixture fixtu
 
         var page = await host.Store.ListAsync(new DeadLetterQuery { PageSize = 2 });
 
-        await Assert.That(page.Items).HasCount(2);
+        await Assert.That(page.Items).Count().IsEqualTo(2);
         await Assert.That(page.NextCursor).IsNull();
     }
 
@@ -198,8 +198,8 @@ public sealed class FirestoreDeadLetterStoreTests(FirestoreEmulatorFixture fixtu
 
         var keys = await host.PageThrough(1);
 
-        await Assert.That(keys).HasCount(6);
-        await Assert.That(keys.Distinct()).HasCount(6);
+        await Assert.That(keys).Count().IsEqualTo(6);
+        await Assert.That(keys.Distinct()).Count().IsEqualTo(6);
     }
 
     [Test]
@@ -230,7 +230,7 @@ public sealed class FirestoreDeadLetterStoreTests(FirestoreEmulatorFixture fixtu
     {
         await using var host = DeadLetterTestHost.Start(fixture);
 
-        await Assert.That(() => host.Store.ListAsync(new DeadLetterQuery { Cursor = cursor }))
+        await Assert.That(async () => await host.Store.ListAsync(new DeadLetterQuery { Cursor = cursor }))
             .Throws<ArgumentException>();
     }
 
@@ -328,7 +328,7 @@ public sealed class FirestoreDeadLetterStoreTests(FirestoreEmulatorFixture fixtu
         await host.Seed("task-1", Base);
         host.Queue.FailWith = new InvalidOperationException("transport is down");
 
-        await Assert.That(() => host.Resender.ResendAsync("task-1")).Throws<InvalidOperationException>();
+        await Assert.That(async () => await host.Resender.ResendAsync("task-1")).Throws<InvalidOperationException>();
 
         await Assert.That(await host.Store.GetAsync("task-1")).IsNotNull();
     }

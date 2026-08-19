@@ -70,7 +70,7 @@ public class ServerRenderContextTests
         public override ConnectionInfo Connection => throw new NotSupportedException();
         public override WebSocketManager WebSockets => throw new NotSupportedException();
         public override ClaimsPrincipal User { get; set; } = new();
-        public override IDictionary<object, object> Items { get; set; } = new Dictionary<object, object>();
+        public override IDictionary<object, object?> Items { get; set; } = new Dictionary<object, object?>();
         public override IServiceProvider RequestServices { get; set; } = null!;
         public override CancellationToken RequestAborted { get; set; }
         public override string TraceIdentifier { get; set; } = "";
@@ -90,7 +90,7 @@ public class ServerRenderContextTests
         public override IHeaderDictionary Headers => throw new NotSupportedException();
         public override Stream Body { get; set; } = Stream.Null;
         public override long? ContentLength { get; set; }
-        public override string ContentType { get; set; } = "";
+        public override string? ContentType { get; set; } = "";
         public override IResponseCookies Cookies => throw new NotSupportedException();
 
         public override void OnStarting(Func<object, Task> callback, object state)

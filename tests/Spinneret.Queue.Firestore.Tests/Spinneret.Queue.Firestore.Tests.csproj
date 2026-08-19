@@ -6,7 +6,7 @@
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.9" />
     <!-- The Firestore emulator, so the store's query, cursors and preconditions are exercised
          against a real Firestore rather than argued from the source. -->
-    <PackageReference Include="Testcontainers.Firestore" Version="4.10.0" />
+    <PackageReference Include="Testcontainers.Firestore" Version="4.14.0" />
   </ItemGroup>
 
   <ItemGroup>

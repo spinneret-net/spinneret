@@ -40,7 +40,7 @@ public class MediatorTracingTests
             .Select(a => a.GetTagItem("spinneret.mediator.cache"))
             .ToList();
 
-        await Assert.That(caches).HasCount(2);
+        await Assert.That(caches).Count().IsEqualTo(2);
         await Assert.That(caches).Contains("miss");
         await Assert.That(caches).Contains("hit");
     }

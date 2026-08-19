@@ -141,7 +141,7 @@ public sealed class FirestoreSchedulerDispatcherTests(FirestoreEmulatorFixture f
 
         await host.Sweep.SweepAsync(CancellationToken.None);
 
-        await Assert.That(host.DeadLetters.Entries).HasCount(1);
+        await Assert.That(host.DeadLetters.Entries).Count().IsEqualTo(1);
         var entry = host.DeadLetters.Entries.Single();
         await Assert.That(entry.Source).IsEqualTo(DeadLetterSource.Scheduler);
         await Assert.That(entry.CommandTypeName).IsEqualTo("No.Such.Type");
@@ -164,8 +164,8 @@ public sealed class FirestoreSchedulerDispatcherTests(FirestoreEmulatorFixture f
         await host.MakeDue("repeatedly-broken");
         await host.Sweep.SweepAsync(CancellationToken.None);
 
-        await Assert.That(host.DeadLetters.Entries).HasCount(2);
-        await Assert.That(host.DeadLetters.Entries.Select(e => e.IdempotencyKey).Distinct()).HasCount(2);
+        await Assert.That(host.DeadLetters.Entries).Count().IsEqualTo(2);
+        await Assert.That(host.DeadLetters.Entries.Select(e => e.IdempotencyKey).Distinct()).Count().IsEqualTo(2);
     }
 
     [Test]
@@ -188,7 +188,7 @@ public sealed class FirestoreSchedulerDispatcherTests(FirestoreEmulatorFixture f
         // Kept, not deleted: it is unreadable, not finished. And pushed out of the way.
         await Assert.That(await host.JobExists("poison")).IsTrue();
         await Assert.That(await host.JobNextExecuteAt("poison") > DateTimeOffset.UtcNow.AddMinutes(4)).IsTrue();
-        await Assert.That(host.DeadLetters.Entries).HasCount(1);
+        await Assert.That(host.DeadLetters.Entries).Count().IsEqualTo(1);
     }
 
     [Test]
@@ -204,7 +204,7 @@ public sealed class FirestoreSchedulerDispatcherTests(FirestoreEmulatorFixture f
         await host.Sweep.SweepAsync(CancellationToken.None);
 
         // Both were attempted and both were dead-lettered, rather than the first aborting the pass.
-        await Assert.That(host.DeadLetters.Entries).HasCount(2);
+        await Assert.That(host.DeadLetters.Entries).Count().IsEqualTo(2);
         await Assert.That(await host.JobExists("first")).IsTrue();
         await Assert.That(await host.JobExists("second")).IsTrue();
     }
@@ -260,7 +260,7 @@ public sealed class FirestoreSchedulerDispatcherTests(FirestoreEmulatorFixture f
 
         await host.Sweep.SweepAsync(CancellationToken.None);
 
-        await Assert.That(host.DeadLetters.Entries).HasCount(1);
+        await Assert.That(host.DeadLetters.Entries).Count().IsEqualTo(1);
         await Assert.That(host.DeadLetters.Entries.Single().Source).IsEqualTo(DeadLetterSource.Scheduler);
         // Safe in the dead-letter store, so the document may go.
         await Assert.That(await host.JobExists(handle)).IsFalse();

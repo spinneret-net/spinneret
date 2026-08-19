@@ -9,7 +9,7 @@
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.9" />
     <!-- The Firestore emulator, so the register-or-refresh transaction, the dispatch lease and the
          one-shot enlistment are exercised against a real Firestore rather than argued from source. -->
-    <PackageReference Include="Testcontainers.Firestore" Version="4.10.0" />
+    <PackageReference Include="Testcontainers.Firestore" Version="4.14.0" />
   </ItemGroup>
 
   <ItemGroup>
