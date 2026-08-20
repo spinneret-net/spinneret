@@ -103,6 +103,27 @@ Concurrent identical requests share one in-flight task, so a cache miss costs on
 
 Every `Send` emits a span on the `Spinneret.Mediator` source, tagged with whether the response came from the cache — so a trace explains an absent handler rather than leaving a gap.
 
+Cross-cutting concerns — auditing, metrics, logging — hang on a behavior that wraps every send:
+
+```csharp
+public sealed class AuditBehavior(IAuditLog audit) : IMediatorBehavior
+{
+    public async Task<TResponse> Handle<TResponse>(IRequest<TResponse> request, Func<Task<TResponse>> next, CancellationToken ct)
+    {
+        if (request is not ICommand) return await next();
+        await audit.Begin(request, ct);
+        var response = await next();
+        await audit.Complete(response, ct);
+        return response;
+    }
+}
+
+services.AddMediator([typeof(Program).Assembly])
+        .AddMediatorBehavior<AuditBehavior>();
+```
+
+Behaviors run in registration order, the first registered outermost, and inside the send's span — so `Activity.Current` is the span of that very send, and a nested send's parent is the outer one. They wrap the cache path too: a cached request still passes through, so decide on the request, not the response. `ResultIntrospection` in `Spinneret.Functional` reads a boxed `Result` at runtime for exactly this kind of code.
+
 ### The sticky spiral — `Spinneret.Parsing`
 
 The boundary catches *everything* wrong with the input in a single pass and hands back either a fully typed model or every property error at once — ready to localize, ready to bind to a form:

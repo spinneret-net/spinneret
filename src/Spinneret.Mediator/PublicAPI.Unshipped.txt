@@ -19,3 +19,6 @@ Spinneret.Mediator.MediatorDiagnostics
 const Spinneret.Mediator.MediatorDiagnostics.ActivitySourceName = "Spinneret.Mediator" -> string!
 static Microsoft.Extensions.DependencyInjection.MediatorServiceCollectionExtensions.AddMediator(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
 static Microsoft.Extensions.DependencyInjection.MediatorServiceCollectionExtensions.AddMediator(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Collections.Generic.IReadOnlyCollection<System.Reflection.Assembly!>! mediatorAssemblies) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+Spinneret.Mediator.IMediatorBehavior
+Spinneret.Mediator.IMediatorBehavior.Handle<TResponse>(Spinneret.Mediator.IRequest<TResponse>! request, System.Func<System.Threading.Tasks.Task<TResponse>!>! next, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<TResponse>!
+static Microsoft.Extensions.DependencyInjection.MediatorServiceCollectionExtensions.AddMediatorBehavior<TBehavior>(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!

@@ -1,6 +1,7 @@
 using System.Reflection;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
+using Spinneret.Functional;
 using Spinneret.Mediator;
 
 namespace Spinneret.Queue;

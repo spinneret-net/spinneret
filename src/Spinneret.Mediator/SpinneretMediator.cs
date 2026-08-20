@@ -33,50 +33,28 @@ public interface IMediatorCache
     void Clear();
 }
 
-internal sealed class SpinneretMediator(IServiceProvider serviceProvider, ITagIndexedCache cache) : ISpinneretMediator
+internal sealed class SpinneretMediator(
+    IServiceProvider serviceProvider,
+    ITagIndexedCache cache,
+    IEnumerable<IMediatorBehavior> behaviors) : ISpinneretMediator
 {
+    private readonly IMediatorBehavior[] _behaviors = [.. behaviors];
+
     public async Task<TResponse> Send<TResponse>(IRequest<TResponse> request, CancellationToken cancellationToken = default)
     {
-        var requestType = request.GetType();
-        var cacheAttr = requestType.GetCustomAttribute<CacheAttribute>();
-        var invalidateAttr = requestType.GetCustomAttribute<InvalidateCacheAttribute>();
-
-        using var activity = MediatorTracing.StartSend(requestType);
+        using var activity = MediatorTracing.StartSend(request.GetType());
 
         try
         {
-            TResponse response;
-            if (cacheAttr is not null && typeof(TResponse) != typeof(Unit))
+            var pipeline = () => SendCore(request, activity, cancellationToken);
+            for (var i = _behaviors.Length - 1; i >= 0; i--)
             {
-                // Coalescing means a joiner awaits a task started under a different caller's
-                // activity, so the handler's work is attributed to whoever created it. Inherent to
-                // coalescing; the tag is what makes it legible.
-                var dispatched = false;
-                var sharedTask = cache.GetOrCreate(
-                    request,
-                    () =>
-                    {
-                        dispatched = true;
-                        return Dispatch(request, CancellationToken.None);
-                    },
-                    cacheAttr.Duration,
-                    cacheAttr.Tags);
-
-                response = await sharedTask.WaitAsync(cancellationToken);
-                activity?.SetTag(MediatorTags.Cache,
-                    dispatched ? MediatorCacheOutcome.Miss : MediatorCacheOutcome.Hit);
-            }
-            else
-            {
-                activity?.SetTag(MediatorTags.Cache, MediatorCacheOutcome.Bypass);
-                response = await Dispatch(request, cancellationToken);
+                var behavior = _behaviors[i];
+                var next = pipeline;
+                pipeline = () => behavior.Handle(request, next, cancellationToken);
             }
 
-            if (invalidateAttr is not null)
-                foreach (var tag in invalidateAttr.Tags)
-                    cache.RemoveByTag(tag);
-
-            return response;
+            return await pipeline();
         }
         catch (Exception ex)
         {
@@ -84,6 +62,46 @@ internal sealed class SpinneretMediator(IServiceProvider serviceProvider, ITagIn
             activity?.AddException(ex);
             throw;
         }
+    }
+
+    private async Task<TResponse> SendCore<TResponse>(IRequest<TResponse> request, Activity? activity, CancellationToken cancellationToken)
+    {
+        var requestType = request.GetType();
+        var cacheAttr = requestType.GetCustomAttribute<CacheAttribute>();
+        var invalidateAttr = requestType.GetCustomAttribute<InvalidateCacheAttribute>();
+
+        TResponse response;
+        if (cacheAttr is not null && typeof(TResponse) != typeof(Unit))
+        {
+            // Coalescing means a joiner awaits a task started under a different caller's
+            // activity, so the handler's work is attributed to whoever created it. Inherent to
+            // coalescing; the tag is what makes it legible.
+            var dispatched = false;
+            var sharedTask = cache.GetOrCreate(
+                request,
+                () =>
+                {
+                    dispatched = true;
+                    return Dispatch(request, CancellationToken.None);
+                },
+                cacheAttr.Duration,
+                cacheAttr.Tags);
+
+            response = await sharedTask.WaitAsync(cancellationToken);
+            activity?.SetTag(MediatorTags.Cache,
+                dispatched ? MediatorCacheOutcome.Miss : MediatorCacheOutcome.Hit);
+        }
+        else
+        {
+            activity?.SetTag(MediatorTags.Cache, MediatorCacheOutcome.Bypass);
+            response = await Dispatch(request, cancellationToken);
+        }
+
+        if (invalidateAttr is not null)
+            foreach (var tag in invalidateAttr.Tags)
+                cache.RemoveByTag(tag);
+
+        return response;
     }
 
     private Task<TResponse> Dispatch<TResponse>(IRequest<TResponse> request, CancellationToken cancellationToken)

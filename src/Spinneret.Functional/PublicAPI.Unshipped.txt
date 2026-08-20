@@ -158,3 +158,7 @@ static Spinneret.Functional.Unit.Value.get -> Spinneret.Functional.Unit
 ~override Spinneret.Functional.TaskResult<TOk, TError>.ToString() -> string
 ~override Spinneret.Functional.Unit.Equals(object obj) -> bool
 ~override Spinneret.Functional.Unit.ToString() -> string
+Spinneret.Functional.ResultIntrospection
+static Spinneret.Functional.ResultIntrospection.IsResult(object? value) -> bool
+static Spinneret.Functional.ResultIntrospection.TryGetError(object? value) -> object?
+static Spinneret.Functional.ResultIntrospection.TryGetOk(object? value, out object? okValue) -> bool

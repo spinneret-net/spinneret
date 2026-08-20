@@ -62,6 +62,14 @@ public static class MediatorServiceCollectionExtensions
         return services.AddScoped<ISpinneretMediator, SpinneretMediator>();
     }
 
+    /// <summary>
+    /// Registers an <see cref="IMediatorBehavior"/> that wraps every send. Behaviors run in the
+    /// order they are added, the first added outermost. Scoped, like the mediator itself.
+    /// </summary>
+    public static IServiceCollection AddMediatorBehavior<TBehavior>(this IServiceCollection services)
+        where TBehavior : class, IMediatorBehavior =>
+        services.AddScoped<IMediatorBehavior, TBehavior>();
+
     private static void ValidateCacheAttributes(Type requestType)
     {
         // Attribute constructors validate duration and tag types; instantiating them here

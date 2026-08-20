@@ -30,6 +30,19 @@ public class StartupExtensionsTests
     }
 
     [Test]
+    public async Task AddMediator_resolves_a_mediator_with_no_behaviors_registered()
+    {
+        var services = new ServiceCollection();
+        services.AddMediator([typeof(StartupExtensionsTests).Assembly]);
+        await using var provider = services.BuildServiceProvider();
+
+        var response = await provider.GetRequiredService<ISpinneretMediator>().Send(new EchoQuery(3));
+
+        await Assert.That(response).IsEqualTo(3);
+        await Assert.That(provider.GetServices<IMediatorBehavior>()).IsEmpty();
+    }
+
+    [Test]
     public async Task AddMediator_does_not_register_abstract_handler_types()
     {
         var services = new ServiceCollection();

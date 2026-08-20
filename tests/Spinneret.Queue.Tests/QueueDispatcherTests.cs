@@ -6,9 +6,9 @@ using Spinneret.Mediator;
 namespace Spinneret.Queue.Tests;
 
 /// <summary>
-/// Covers QueueDispatcher and, through it, ResultIntrospection — both are internal, so the
-/// dispatcher is resolved the way a host gets it (AddQueueCore + IQueueDispatcher) and result
-/// introspection is observed via which handler responses raise QueueHandlerFailedException.
+/// Covers QueueDispatcher — internal, so it is resolved the way a host gets it (AddQueueCore +
+/// IQueueDispatcher) and the result-to-exception mapping is observed via which handler responses
+/// raise QueueHandlerFailedException.
 /// </summary>
 public class QueueDispatcherTests
 {
