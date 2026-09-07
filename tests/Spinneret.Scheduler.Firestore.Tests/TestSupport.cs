@@ -214,6 +214,12 @@ public sealed class SchedulerTestHost : IAsyncDisposable
     public async Task<T> JobField<T>(string key, string field) =>
         (await Job(key).GetSnapshotAsync()).GetValue<T>(field);
 
+    /// <summary>
+    /// When the document was last written. Firestore only moves this on a commit that touches the
+    /// document, so it is how a test tells "wrote identical values" apart from "wrote nothing".
+    /// </summary>
+    public async Task<Timestamp?> JobUpdateTime(string key) => (await Job(key).GetSnapshotAsync()).UpdateTime;
+
     /// <summary>Makes the job due now, so a sweep picks it up without waiting out its schedule.</summary>
     public Task MakeDue(string key, TimeSpan? ago = null) =>
         Job(key).UpdateAsync(

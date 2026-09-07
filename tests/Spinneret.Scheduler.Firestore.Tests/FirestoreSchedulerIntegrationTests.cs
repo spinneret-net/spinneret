@@ -79,6 +79,22 @@ public sealed class FirestoreSchedulerIntegrationTests(FirestoreEmulatorFixture 
     }
 
     [Test]
+    public async Task RegisterAsync_that_changes_nothing_writes_nothing()
+    {
+        // The ordinary case: every instance re-asserts every job on every startup. Firestore bills
+        // a write for a commit that sets identical values, and during a rolling deploy all of them
+        // land on the same document at once, so the no-op refresh must not reach the document.
+        await using var host = await SchedulerTestHost.StartAsync(fixture);
+
+        await host.Scheduler.RegisterAsync("settled", new TestRequest("v1"), Hourly);
+        var written = await host.JobUpdateTime("settled");
+
+        await host.Scheduler.RegisterAsync("settled", new TestRequest("v1"), Hourly);
+
+        await Assert.That(await host.JobUpdateTime("settled")).IsEqualTo(written);
+    }
+
+    [Test]
     public async Task RegisterAsync_with_a_changed_schedule_rearms_the_job()
     {
         await using var host = await SchedulerTestHost.StartAsync(fixture);
