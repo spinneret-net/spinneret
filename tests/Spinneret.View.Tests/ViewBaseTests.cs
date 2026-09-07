@@ -115,6 +115,59 @@ public class ViewBaseTests
         await Assert.That(harness.Renderer.RenderBatchCount).IsEqualTo(renderCountBefore);
     }
 
+    [Test]
+    public async Task OnInitializedAsync_property_changes_raised_during_initialization_rerender_without_calling_UpdateAsync()
+    {
+        var harness = new Harness();
+        var gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        harness.OnViewModelCreated = vm => vm.InitializeGate = gate;
+        var rendering = harness.RenderAsync<OwnedVmView>();
+        await TestWait.UntilAsync(() => harness.CreatedViewModels.Count == 1);
+        var viewModel = harness.CreatedViewModels.Single();
+        // Blazor renders once at the first await inside OnInitializedAsync; wait for that.
+        await TestWait.UntilAsync(() => harness.Renderer.RenderBatchCount >= 1);
+        var renderCountBefore = harness.Renderer.RenderBatchCount;
+
+        viewModel.Raise("IsBusy");
+
+        await TestWait.UntilAsync(() => harness.Renderer.RenderBatchCount > renderCountBefore);
+        await Assert.That(viewModel.UpdateCallCount).IsEqualTo(0);
+
+        gate.SetResult();
+        await rendering;
+
+        await Assert.That(viewModel.UpdateCallCount).IsEqualTo(0);
+        await Assert.That(viewModel.PropertyChangedHandlerCount).IsEqualTo(1);
+
+        // Once initialized, the full pipeline (UpdateAsync, then render) applies.
+        viewModel.Raise("Name");
+
+        await TestWait.UntilAsync(() => viewModel.UpdateCallCount >= 1);
+        await Assert.That(viewModel.UpdatedProperties).Contains("Name");
+        await Assert.That(viewModel.UpdatedProperties).DoesNotContain("IsBusy");
+    }
+
+    [Test]
+    public async Task DisposeAsync_during_initialization_leaves_no_subscription_behind()
+    {
+        var harness = new Harness();
+        var gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        harness.OnViewModelCreated = vm => vm.InitializeGate = gate;
+        var view = harness.Renderer.CreateComponent<OwnedVmView>();
+        var rendering = harness.Renderer.AttachAndRenderAsync(view, ParameterView.Empty);
+        await TestWait.UntilAsync(() => harness.CreatedViewModels.Count == 1);
+        var viewModel = harness.CreatedViewModels.Single();
+
+        await view.DisposeAsync();
+        gate.SetResult();
+        await rendering;
+
+        await Assert.That(view.State).IsEqualTo(ViewState.Disposed);
+        await Assert.That(viewModel.PropertyChangedHandlerCount).IsEqualTo(0);
+        await Assert.That(viewModel.DisposeCallCount).IsEqualTo(1);
+        await Assert.That(harness.Coordinator.ActiveRefreshSubscriptionCount).IsEqualTo(0);
+    }
+
     // ----- ViewModel property -----
 
     [Test]
@@ -166,6 +219,35 @@ public class ViewBaseTests
         await Assert.That(ReferenceEquals(view.ViewModel, harness.CreatedViewModels[1])).IsTrue();
         await Assert.That(view.State).IsEqualTo(ViewState.Initialized);
         await Assert.That(harness.Renderer.RenderBatchCount > renderCountBefore).IsTrue();
+    }
+
+    [Test]
+    public async Task Refresh_renders_the_new_view_model_before_its_initialization_completes()
+    {
+        var harness = new Harness();
+        var (view, _) = await harness.RenderAsync<OwnedVmView>();
+        var gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        harness.OnViewModelCreated = vm => vm.InitializeGate = gate;
+        var renderCountBefore = harness.Renderer.RenderBatchCount;
+
+        var refresh = harness.Coordinator.RequestRefreshAsync();
+
+        // The new view model is on screen (in its loading state) while it is still initializing.
+        await TestWait.UntilAsync(() => harness.Renderer.RenderBatchCount > renderCountBefore);
+        await Assert.That(refresh.IsCompleted).IsFalse();
+        await Assert.That(harness.CreatedViewModels.Count).IsEqualTo(2);
+        await Assert.That(ReferenceEquals(view.ViewModel, harness.CreatedViewModels[1])).IsTrue();
+
+        // Changes it raises while initializing (IsBusy from Run) keep re-rendering it.
+        var renderCountDuring = harness.Renderer.RenderBatchCount;
+        harness.CreatedViewModels[1].Raise("IsBusy");
+        await TestWait.UntilAsync(() => harness.Renderer.RenderBatchCount > renderCountDuring);
+        await Assert.That(harness.CreatedViewModels[1].UpdateCallCount).IsEqualTo(0);
+
+        gate.SetResult();
+        await refresh;
+
+        await Assert.That(view.State).IsEqualTo(ViewState.Initialized);
     }
 
     [Test]

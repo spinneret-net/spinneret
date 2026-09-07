@@ -112,9 +112,11 @@ public abstract class ViewBase<T> : ComponentBase, IView<T>, IAsyncDisposable wh
         await SafeExecute(() => InitializeViewModel(SpecifiedViewModel), "Initialize updated view model");
 
         // A failed initialization must leave the view in InitializationFailed, mirroring the
-        // refresh path: InitializeViewModel sets the state before rethrowing and SafeExecute
-        // reports the exception, so the view renders nothing and never subscribes.
-        if (State == ViewState.InitializationFailed)
+        // refresh path: InitializeViewModel detaches from the view model and sets the state
+        // before rethrowing, and SafeExecute reports the exception, so the view renders nothing
+        // and never subscribes to refreshes. Likewise a view disposed while its view model was
+        // still initializing stays Disposed and must not subscribe.
+        if (State is ViewState.InitializationFailed or ViewState.Disposed)
         {
             return;
         }
@@ -149,7 +151,11 @@ public abstract class ViewBase<T> : ComponentBase, IView<T>, IAsyncDisposable wh
         {
             await DisposeViewModel(current);
             _specifiedViewModel = null;
-            await SafeExecute(() => InitializeViewModel(SpecifiedViewModel), "Refresh view model");
+            // Refresh runs outside Blazor's lifecycle, so nothing renders at the first await the
+            // way OnInitializedAsync does. Render immediately so the disposed view model's stale
+            // tree is replaced by the new one's loading state instead of lingering until it
+            // finishes initializing.
+            await SafeExecute(() => InitializeViewModel(SpecifiedViewModel, renderImmediately: true), "Refresh view model");
             StateHasChanged();
         }
         finally
@@ -196,10 +202,10 @@ public abstract class ViewBase<T> : ComponentBase, IView<T>, IAsyncDisposable wh
         }
     }
 
-    private async ValueTask InitializeViewModel(ViewModelWrapper viewModel)
+    private async ValueTask InitializeViewModel(ViewModelWrapper viewModel, bool renderImmediately = false)
     {
         _effectiveViewModel = viewModel;
-        
+
         if (viewModel.ViewModel is ViewModelBase vmBaseClass)
         {
             var exceptionService = ServiceProvider.GetService<IViewModelExceptionService>();
@@ -208,18 +214,35 @@ public abstract class ViewBase<T> : ComponentBase, IView<T>, IAsyncDisposable wh
                 vmBaseClass.ExceptionService = exceptionService;
             }
         }
-        
+
+        if (renderImmediately)
+        {
+            StateHasChanged();
+        }
+
+        // Subscribe before initializing so changes the view model raises while it initializes
+        // (IsBusy from a Run inside OnInitializeAsync, data arriving) re-render the view. Until
+        // MarkInitialized, the wrapper treats those batches as render-only: UpdateAsync would only
+        // queue behind the update lock that initialization holds, and OnUpdateAsync has never seen
+        // initialization-time changes.
+        viewModel.ViewModel.PropertyChanged += OnViewModelPropertyChanged;
+
         try
         {
             await viewModel.InitializeAsync(_cancellationTokenSource.Token);
         }
         catch
         {
+            DetachViewModel(viewModel);
             State = ViewState.InitializationFailed;
             throw;
         }
 
-        viewModel.ViewModel.PropertyChanged += OnViewModelPropertyChanged;
+        // A view disposed mid-initialization has already detached; do not revive the pipeline.
+        if (!_cancellationTokenSource.IsCancellationRequested)
+        {
+            viewModel.MarkInitialized();
+        }
     }
 
     private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -332,6 +355,13 @@ public abstract class ViewBase<T> : ComponentBase, IView<T>, IAsyncDisposable wh
         public required bool OwnedByView { get; init; }
         private readonly HashSet<string> _changedProperties = [];
         private bool _updateLockAcquired;
+        private volatile bool _initialized;
+
+        /// <summary>
+        /// Switches the pipeline from render-only (during initialization) to the full
+        /// UpdateAsync-then-render cycle.
+        /// </summary>
+        public void MarkInitialized() => _initialized = true;
 
         public bool AddPropertyChangeAndTryToAcquireUpdateLock(string propertyName)
         {
@@ -368,7 +398,9 @@ public abstract class ViewBase<T> : ComponentBase, IView<T>, IAsyncDisposable wh
 
             var properties = GetChangedPropertiesAndReleaseUpdateLock();
 
-            if (!cancellationToken.IsCancellationRequested)
+            // Changes raised while the view model is still initializing only re-render; see
+            // ViewBase.InitializeViewModel.
+            if (_initialized && !cancellationToken.IsCancellationRequested)
             {
                 await ViewModel.UpdateAsync(properties);
             }

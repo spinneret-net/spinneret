@@ -123,6 +123,28 @@ public class ViewModelBaseTests
     }
 
     [Test]
+    public async Task Run_inside_OnInitializeAsync_raises_IsBusy_before_the_first_await()
+    {
+        // The view subscribes before initializing and relies on IsBusy being raised synchronously,
+        // so a loading indicator bound to it shows for the whole initialization.
+        var gate = new TaskCompletionSource();
+        var sut = new InitializingViewModel(gate.Task);
+        var raised = new List<string?>();
+        sut.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+
+        var initializing = sut.InitializeAsync(CancellationToken.None);
+        var busyDuring = sut.IsBusy;
+        var raisedDuring = raised.ToArray();
+        gate.SetResult();
+        await initializing;
+
+        await Assert.That(busyDuring).IsTrue();
+        await Assert.That(string.Join(",", raisedDuring)).IsEqualTo("IsBusy");
+        await Assert.That(sut.IsBusy).IsFalse();
+        await Assert.That(string.Join(",", raised)).IsEqualTo("IsBusy,IsBusy");
+    }
+
+    [Test]
     public async Task Run_passes_the_token_from_InitializeAsync_to_the_work()
     {
         var sut = new TestViewModel();
@@ -253,6 +275,12 @@ public class ViewModelBaseTests
 
         public TNested NestedPublic<TNested>(TNested viewModel, string name) where TNested : BindableBase =>
             Nested(viewModel, name);
+    }
+
+    /// <summary>The typical derived view model: loads its data through Run during initialization.</summary>
+    private sealed class InitializingViewModel(Task work) : ViewModelBase
+    {
+        protected override Task OnInitializeAsync() => Run(_ => work);
     }
 
     private sealed class FakeExceptionService(bool handles) : IViewModelExceptionService
