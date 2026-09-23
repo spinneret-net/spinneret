@@ -113,7 +113,12 @@ public abstract class ViewModelBase : BindableBase, IViewModel, IValidationState
     {
         return Task.CompletedTask;
     }
-    
+
+    /// <remarks>
+    /// Changes raised before <see cref="OnInitializeAsync"/> completes — including ones raised from outside
+    /// this view model, such as an event handler it subscribed during initialization — re-render the view
+    /// but never reach this method. Do not latch work in a property for this method to pick up.
+    /// </remarks>
     protected virtual Task OnUpdateAsync(ICollection<string> changedProperties)
     {
         return Task.CompletedTask;

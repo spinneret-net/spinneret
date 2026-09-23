@@ -24,6 +24,9 @@ public sealed class FakeViewModel : IViewModel, IDisposable, IAsyncDisposable
     /// <summary>When set, <see cref="InitializeAsync"/> does not complete until the gate is released.</summary>
     public TaskCompletionSource? InitializeGate { get; set; }
 
+    /// <summary>When set, <see cref="InitializeAsync"/> raises this change as its last step, as a <c>Run</c> does when it clears <c>IsBusy</c>.</summary>
+    public string? RaiseAsInitializeCompletes { get; set; }
+
     public int InitializeCallCount => Volatile.Read(ref _initializeCallCount);
 
     public int UpdateCallCount
@@ -55,6 +58,11 @@ public sealed class FakeViewModel : IViewModel, IDisposable, IAsyncDisposable
         if (ThrowOnInitialize)
         {
             throw new InvalidOperationException("Initialization failed");
+        }
+
+        if (RaiseAsInitializeCompletes != null)
+        {
+            Raise(RaiseAsInitializeCompletes);
         }
     }
 

@@ -148,6 +148,31 @@ public class ViewBaseTests
     }
 
     [Test]
+    public async Task OnInitializedAsync_property_change_raised_as_initialization_completes_rerenders_without_calling_UpdateAsync()
+    {
+        var harness = new Harness();
+        var gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        harness.OnViewModelCreated = vm =>
+        {
+            vm.InitializeGate = gate;
+            vm.RaiseAsInitializeCompletes = "IsBusy";
+        };
+        var rendering = harness.RenderAsync<OwnedVmView>();
+        await TestWait.UntilAsync(() => harness.CreatedViewModels.Count == 1);
+        var viewModel = harness.CreatedViewModels.Single();
+        await TestWait.UntilAsync(() => harness.Renderer.RenderBatchCount >= 1);
+        var renderCountBefore = harness.Renderer.RenderBatchCount;
+
+        gate.SetResult();
+        await rendering;
+
+        await TestWait.UntilAsync(() => harness.Renderer.RenderBatchCount > renderCountBefore);
+        // Negative check: give a would-be update pipeline time to run before asserting.
+        await Task.Delay(100);
+        await Assert.That(viewModel.UpdateCallCount).IsEqualTo(0);
+    }
+
+    [Test]
     public async Task DisposeAsync_during_initialization_leaves_no_subscription_behind()
     {
         var harness = new Harness();

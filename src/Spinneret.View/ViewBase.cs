@@ -361,7 +361,18 @@ public abstract class ViewBase<T> : ComponentBase, IView<T>, IAsyncDisposable wh
         /// Switches the pipeline from render-only (during initialization) to the full
         /// UpdateAsync-then-render cycle.
         /// </summary>
-        public void MarkInitialized() => _initialized = true;
+        /// <remarks>
+        /// A change raised as initialization completes (the <c>IsBusy</c> a <c>Run</c> clears) is still
+        /// queued behind its batch's yield, so it is dropped here rather than read as a post-initialization edit.
+        /// </remarks>
+        public void MarkInitialized()
+        {
+            lock (_changedProperties)
+            {
+                _changedProperties.Clear();
+                _initialized = true;
+            }
+        }
 
         public bool AddPropertyChangeAndTryToAcquireUpdateLock(string propertyName)
         {
@@ -400,7 +411,7 @@ public abstract class ViewBase<T> : ComponentBase, IView<T>, IAsyncDisposable wh
 
             // Changes raised while the view model is still initializing only re-render; see
             // ViewBase.InitializeViewModel.
-            if (_initialized && !cancellationToken.IsCancellationRequested)
+            if (_initialized && properties.Count > 0 && !cancellationToken.IsCancellationRequested)
             {
                 await ViewModel.UpdateAsync(properties);
             }
