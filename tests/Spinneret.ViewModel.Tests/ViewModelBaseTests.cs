@@ -202,6 +202,41 @@ public class ViewModelBaseTests
         await Assert.That(sut.IsBusy).IsFalse();
     }
 
+    // The view that owned the work went away mid-request — navigating off a page that is still loading.
+    [Test]
+    public async Task Run_cancelled_through_its_own_token_is_neither_reported_nor_rethrown()
+    {
+        var sut = new TestViewModel();
+        var service = new FakeExceptionService(handles: false);
+        sut.ExceptionService = service;
+        using var cts = new CancellationTokenSource();
+        await sut.InitializeAsync(cts.Token);
+
+        await sut.RunPublic(async token =>
+        {
+            await cts.CancelAsync();
+            token.ThrowIfCancellationRequested();
+        });
+
+        await Assert.That(service.Handled.Count).IsEqualTo(0);
+        await Assert.That(sut.IsBusy).IsFalse();
+    }
+
+    // An HTTP timeout surfaces as a cancellation too, and that one is a failure.
+    [Test]
+    public async Task Run_cancelled_by_anything_else_is_reported()
+    {
+        var sut = new TestViewModel();
+        var service = new FakeExceptionService(handles: true);
+        sut.ExceptionService = service;
+        using var cts = new CancellationTokenSource();
+        await sut.InitializeAsync(cts.Token);
+
+        await sut.RunPublic(_ => throw new TaskCanceledException("timed out"));
+
+        await Assert.That(service.Handled.Count).IsEqualTo(1);
+    }
+
     [Test]
     public async Task Run_with_a_non_handling_exception_service_rethrows()
     {

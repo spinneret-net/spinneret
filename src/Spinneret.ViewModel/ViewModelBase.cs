@@ -165,9 +165,16 @@ public abstract class ViewModelBase : BindableBase, IViewModel, IValidationState
 
     private async Task Execute(Func<CancellationToken, Task> function)
     {
+        var cancellationToken = _cancellationToken ?? CancellationToken.None;
         try
         {
-            await function(_cancellationToken ?? CancellationToken.None);
+            await function(cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            // The view that owns this work is gone, so nobody is left to tell. Any other cancellation — an HTTP
+            // timeout — is a failure and goes to the exception service.
+            return;
         }
         catch (Exception e)
         {
