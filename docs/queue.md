@@ -110,6 +110,12 @@ Which package supplies the writer depends on your transport: SQL Server
 [ships one](queue-mssql.md), Cloud Tasks does not — pair it with
 [`Spinneret.Queue.Firestore`](queue-firestore.md) or write your own.
 
+**A delivery naming a type the consumer does not know is redelivered for 15 minutes, then
+dead-lettered.** During a rolling deploy a new instance can enqueue a command an old instance
+receives; once the rollout finishes the redelivery lands. A type renamed or removed across a deploy
+never resolves, and dead-letters when the window closes. The window is measured from the original
+enqueue, so a task delayed past it dead-letters on its first unknown delivery.
+
 **Dead-lettering never drops work.** If the dead-letter store is unreachable the delivery is retried
 rather than acknowledged, logged at Critical with the full payload. Its availability is on the
 critical path.

@@ -45,6 +45,8 @@ internal sealed class QueueDeliveryProcessor(
     : IQueueDeliveryProcessor
 {
     private static readonly TimeSpan DeadLetterWriteRetryBackoff = TimeSpan.FromMinutes(1);
+    private static readonly TimeSpan UnknownTypeRetryBackoff = TimeSpan.FromSeconds(30);
+    private static readonly TimeSpan UnknownTypeGracePeriod = TimeSpan.FromMinutes(15);
 
     public async Task<QueueDeliveryOutcome> ProcessAsync(QueueDeliveryContext context, CancellationToken ct)
     {
@@ -62,13 +64,7 @@ internal sealed class QueueDeliveryProcessor(
         }
         catch (UnknownRequestTypeException ex)
         {
-            // Producer and consumer are out of sync (e.g. a command type renamed across a deploy).
-            // No retry can resolve a type that no longer exists.
-            logger.LogError(ex, "Queue task for unknown request type {RequestType}; dead-lettering",
-                envelope.RequestTypeName);
-
-            activity.SetOutcome(QueueOutcome.DeadLetter, ex.Message);
-            return await DeadLetterAsync(envelope, taskId, envelope.PriorFailures + 1, ex.Message, activity, ct);
+            return await UnknownTypeAsync(envelope, taskId, ex, activity, ct);
         }
 
         // PriorFailures counts only failures this processor observed and booked via re-enqueue.
@@ -131,6 +127,33 @@ internal sealed class QueueDeliveryProcessor(
         {
             return await FailAsync(envelope, policy, attempt, age, ex, taskId, activity, ct);
         }
+    }
+
+    /// <remarks>
+    /// During a rolling deploy a new instance can enqueue a type that an old instance receives, which a
+    /// redelivery after the rollout resolves; a type renamed or removed across a deploy never resolves.
+    /// The two look identical here, so the task is redelivered until <see cref="UnknownTypeGracePeriod"/>
+    /// and dead-lettered after. The transport redelivers rather than a booked re-enqueue: routing a
+    /// re-enqueue needs the type's channel, which only its <see cref="QueuePolicy"/> knows.
+    /// </remarks>
+    private async Task<QueueDeliveryOutcome> UnknownTypeAsync(
+        QueueEnvelope envelope, string taskId, UnknownRequestTypeException ex, Activity? activity,
+        CancellationToken ct)
+    {
+        var age = timeProvider.GetUtcNow() - envelope.EnqueuedAtUtc;
+        if (age < UnknownTypeGracePeriod)
+        {
+            logger.LogInformation(
+                "Queue task for unknown request type {RequestType} (age {Age}); redelivering in {Backoff} in case a deploy is rolling out",
+                envelope.RequestTypeName, age, UnknownTypeRetryBackoff);
+            activity.SetOutcome(QueueOutcome.TransportRetry, ex.Message);
+            return QueueDeliveryOutcome.RetryIn(UnknownTypeRetryBackoff);
+        }
+
+        logger.LogError(ex, "Queue task for unknown request type {RequestType} (age {Age}); dead-lettering",
+            envelope.RequestTypeName, age);
+        activity.SetOutcome(QueueOutcome.DeadLetter, ex.Message);
+        return await DeadLetterAsync(envelope, taskId, envelope.PriorFailures + 1, ex.Message, activity, ct);
     }
 
     private async Task<QueueDeliveryOutcome> FailAsync(

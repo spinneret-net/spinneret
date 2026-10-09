@@ -363,9 +363,23 @@ public class QueueDeliveryProcessorTests
     // -----------------------------------------------------------------------------------------
 
     [Test]
-    public async Task ProcessAsync_unknown_request_type_dead_letters_without_dispatching()
+    public async Task ProcessAsync_unknown_request_type_within_the_rollout_window_is_redelivered_by_the_transport()
     {
-        var envelope = Envelope<UnannotatedCommand>(priorFailures: 3) with { RequestTypeName = "No.Such.Type" };
+        var envelope = Envelope<UnannotatedCommand>(age: TimeSpan.FromMinutes(14)) with { RequestTypeName = "No.Such.Type" };
+
+        var outcome = await CreateProcessor().ProcessAsync(envelope, "task-1", CancellationToken.None);
+
+        await Assert.That(outcome.Ack).IsFalse();
+        await Assert.That(outcome.RetryAfter).IsEqualTo(TimeSpan.FromSeconds(30));
+        await Assert.That(_dispatcher.Calls).IsEqualTo(0);
+        await Assert.That(_envelopeQueue.Enqueued).IsEmpty();
+        await Assert.That(_deadLetters.Entries).IsEmpty();
+    }
+
+    [Test]
+    public async Task ProcessAsync_unknown_request_type_past_the_rollout_window_dead_letters_without_dispatching()
+    {
+        var envelope = Envelope<UnannotatedCommand>(priorFailures: 3, age: TimeSpan.FromMinutes(15)) with { RequestTypeName = "No.Such.Type" };
 
         var outcome = await CreateProcessor().ProcessAsync(envelope, "task-1", CancellationToken.None);
 
