@@ -25,8 +25,8 @@ services.AddQueue(q => q
     .AddRequestAssemblies(typeof(SyncCustomer).Assembly)
     .UseMssqlStorage(configuration)                    // or .UsePostgresStorage(configuration)
     .UseInHostDelivery(configuration));                 // or .UseCloudTasksDelivery(configuration)
-services.AddScheduler(s => s.UseMssql(configuration)   // or s.UsePostgres(configuration)
-    .UseSweeper());
+services.AddScheduler(s => s.UseMssqlStorage(configuration)   // or s.UsePostgresStorage(configuration)
+    .UseInHostSweeper());
 ```
 
 `AddQueue` and `AddScheduler` can be called in either order.
@@ -36,7 +36,7 @@ services.AddScheduler(s => s.UseMssql(configuration)   // or s.UsePostgres(confi
 | | |
 |---|---|
 | **The matching queue storage** | Not merely any queue — one stored in this database. Connection, schema name and schema creation are all inherited from the queue storage's section. Any other storage, or none, fails the host at startup with the reason. |
-| **A trigger** | `s.UseSweeper()` for a timer, or [`Spinneret.Scheduler.AspNetCore`](scheduler-aspnetcore.md) for an endpoint. |
+| **A trigger** | `s.UseInHostSweeper()` for a timer, or [`Spinneret.Scheduler.AspNetCore`](scheduler-aspnetcore.md) for an endpoint. |
 | **A delivery somewhere** | The sweep only enqueues; an in-host worker or Cloud Tasks delivers. |
 
 The dead-letter writer comes from the queue's storage; nothing extra is needed. A dead-letter store
@@ -50,10 +50,10 @@ Bind it yourself, or set it in code:
 ```csharp
 services.Configure<SchedulerOptions>(
     configuration.GetSection(SchedulerOptions.SectionName));
-services.AddScheduler(s => s.UseMssql(configuration).UseSweeper());
+services.AddScheduler(s => s.UseMssqlStorage(configuration).UseInHostSweeper());
 
 // or, without configuration:
-services.AddScheduler(s => s.UseMssql(configuration).UseSweeper(o => o.SweepInterval = TimeSpan.FromMinutes(1)));
+services.AddScheduler(s => s.UseMssqlStorage(configuration).UseInHostSweeper(o => o.SweepInterval = TimeSpan.FromMinutes(1)));
 ```
 
 See [scheduler.md](scheduler.md#driving-the-sweep).

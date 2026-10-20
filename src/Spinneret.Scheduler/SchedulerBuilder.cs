@@ -4,8 +4,8 @@ namespace Spinneret.Scheduler;
 
 /// <summary>
 /// Composes the scheduler a host runs, inside <c>services.AddScheduler(s => ...)</c>: where jobs are
-/// stored (a provider's <c>Use*</c> extension, e.g. <c>UseMssql</c>, <c>UsePostgres</c> or <c>UseFirestore</c>) and,
-/// optionally, a timer that dispatches them as they fall due (<see cref="UseSweeper"/>).
+/// stored (a provider's <c>Use*</c> extension, e.g. <c>UseMssqlStorage</c>, <c>UsePostgresStorage</c> or <c>UseFirestoreStorage</c>) and,
+/// optionally, a timer that dispatches them as they fall due (<see cref="UseInHostSweeper"/>).
 /// </summary>
 /// <remarks>
 /// Due jobs are enqueued onto the host's queue, so the scheduler needs <c>AddQueue</c> as well — in
@@ -35,7 +35,7 @@ public sealed class SchedulerBuilder
     /// interval from configuration, call <c>services.Configure&lt;SchedulerOptions&gt;(section)</c> —
     /// this package deliberately takes no dependency on the configuration binder.
     /// </remarks>
-    public SchedulerBuilder UseSweeper(Action<SchedulerOptions>? configure = null)
+    public SchedulerBuilder UseInHostSweeper(Action<SchedulerOptions>? configure = null)
     {
         _useSweeper = true;
         _sweeper = configure;
@@ -61,7 +61,7 @@ public sealed class SchedulerBuilder
 
         if (Storage is null)
             throw new InvalidOperationException(
-                "The scheduler has nowhere to keep its jobs. Choose a storage, e.g. s.UseMssql(...), s.UsePostgres(...) or s.UseFirestore(...).");
+                "The scheduler has nowhere to keep its jobs. Choose a storage, e.g. s.UseMssqlStorage(...), s.UsePostgresStorage(...) or s.UseFirestoreStorage(...).");
 
         Services.AddSingleton<SchedulerRegistered>();
         Storage.Register(Services);
@@ -86,7 +86,7 @@ public sealed class SchedulerBuilder
                 + "the backoff a stalled provider relies on.")
             .ValidateOnStart();
 
-        Services.AddHostedService<SchedulerSweeperService>();
+        Services.AddHostedService<InHostSweeperService>();
     }
 
     /// <summary>Marks a collection AddScheduler has composed, so a second call fails instead of half-overriding the first.</summary>

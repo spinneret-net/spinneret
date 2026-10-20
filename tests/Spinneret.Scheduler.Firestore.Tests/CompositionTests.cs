@@ -39,7 +39,7 @@ public class CompositionTests
         // credentials, and what matters here is that the wiring lines up across three packages.
         var services = AnotherTransportsQueue();
 
-        services.AddScheduler(s => s.UseFirestore(EmptyConfiguration).UseSweeper());
+        services.AddScheduler(s => s.UseFirestoreStorage(EmptyConfiguration).UseInHostSweeper());
 
         var sweep = services.Single(d => d.ServiceType == typeof(ISchedulerSweep));
         await Assert.That(sweep.ImplementationType!.FullName)
@@ -47,7 +47,7 @@ public class CompositionTests
         await Assert.That(services
             .Where(d => d.ServiceType == typeof(IHostedService))
             .Select(d => d.ImplementationType?.FullName))
-            .Contains("Spinneret.Scheduler.SchedulerSweeperService");
+            .Contains("Spinneret.Scheduler.InHostSweeperService");
     }
 
     [Test]
@@ -57,12 +57,12 @@ public class CompositionTests
         // to throw.
         var schedulerFirst = new ServiceCollection();
         schedulerFirst.AddSingleton(typeof(ILogger<>), typeof(NullLogger<>));
-        schedulerFirst.AddScheduler(s => s.UseFirestore(EmptyConfiguration).UseSweeper());
+        schedulerFirst.AddScheduler(s => s.UseFirestoreStorage(EmptyConfiguration).UseInHostSweeper());
         schedulerFirst.AddSingleton(new QueueTypeRegistry([]));
         schedulerFirst.AddSingleton<IQueuePayloadSerializer, FakeQueuePayloadSerializer>();
 
         var queueFirst = AnotherTransportsQueue();
-        queueFirst.AddScheduler(s => s.UseFirestore(EmptyConfiguration).UseSweeper());
+        queueFirst.AddScheduler(s => s.UseFirestoreStorage(EmptyConfiguration).UseInHostSweeper());
 
         await Assert.That(schedulerFirst.Select(d => d.ServiceType.FullName).OrderBy(n => n))
             .IsEquivalentTo(queueFirst.Select(d => d.ServiceType.FullName).OrderBy(n => n));

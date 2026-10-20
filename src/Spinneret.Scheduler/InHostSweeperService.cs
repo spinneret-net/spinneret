@@ -14,10 +14,10 @@ namespace Spinneret.Scheduler;
 /// wants the HTTP trigger in <c>Spinneret.Scheduler.AspNetCore</c> and an external cron instead — same
 /// sweep, different clock.
 /// </remarks>
-internal sealed class SchedulerSweeperService(
+internal sealed class InHostSweeperService(
     IServiceScopeFactory scopeFactory,
     IOptions<SchedulerOptions> options,
-    ILogger<SchedulerSweeperService> logger)
+    ILogger<InHostSweeperService> logger)
     : BackgroundService
 {
     public override Task StartAsync(CancellationToken ct)
@@ -27,8 +27,8 @@ internal sealed class SchedulerSweeperService(
         using var scope = scopeFactory.CreateScope();
         if (scope.ServiceProvider.GetService<ISchedulerSweep>() is null)
             throw new InvalidOperationException(
-                "UseSweeper requires a scheduler storage to be registered "
-                + "(s.UseMssql, s.UsePostgres, s.UseFirestore, or another): the sweeper is only a "
+                "UseInHostSweeper requires a scheduler storage to be registered "
+                + "(s.UseMssqlStorage, s.UsePostgresStorage, s.UseFirestoreStorage, or another): the sweeper is only a "
                 + "clock, and something has to tell it what is due.");
 
         return base.StartAsync(ct);

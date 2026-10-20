@@ -11,7 +11,7 @@ public static class SchedulerSweepEndpointRouteBuilderExtensions
 {
     /// <summary>
     /// Maps an endpoint that runs one scheduler sweep per request, guarded by
-    /// <paramref name="authorizationPolicy"/>. The counterpart to <c>UseSweeper()</c>:
+    /// <paramref name="authorizationPolicy"/>. The counterpart to <c>UseInHostSweeper()</c>:
     /// use this where an external scheduler owns the clock — notably on a host that scales to
     /// zero, which has no thread of its own to tick.
     /// </summary>
@@ -44,7 +44,7 @@ public static class SchedulerSweepEndpointRouteBuilderExtensions
         if (endpoints.ServiceProvider.GetService<ISchedulerSweep>() is null)
             throw new InvalidOperationException(
                 "MapSchedulerSweep requires a scheduler storage provider to be registered "
-                + "(AddScheduler with s.UseMssql, s.UsePostgres, s.UseFirestore, or another): this package only exposes "
+                + "(AddScheduler with s.UseMssqlStorage, s.UsePostgresStorage, s.UseFirestoreStorage, or another): this package only exposes "
                 + "the trigger, and something has to tell it what is due.");
 
         return SchedulerSweepEndpoint.Map(

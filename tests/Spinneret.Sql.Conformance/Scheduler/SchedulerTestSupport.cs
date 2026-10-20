@@ -105,7 +105,7 @@ public sealed class SchedulerTestHost : IAsyncDisposable
             dialect.UseScheduler(s, configuration);
             if (sweeper)
                 // Fast ticks so integration tests do not wait out the 15s default.
-                s.UseSweeper(o => o.SweepInterval = TimeSpan.FromMilliseconds(100));
+                s.UseInHostSweeper(o => o.SweepInterval = TimeSpan.FromMilliseconds(100));
         });
         configure?.Invoke(services);
 

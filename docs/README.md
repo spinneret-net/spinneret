@@ -10,7 +10,7 @@ from two. The two calls can be written in either order.
 | **Queue delivery** — how messages reach handlers | `UseInHostDelivery()` ([in-host workers](queue-sql.md#in-host-delivery)) · [`Spinneret.Queue.CloudTasks`](queue-cloudtasks.md) · none, on a producer-only host |
 | **Dead letters** — where given-up work lands | the SQL storage's own table · [`Spinneret.Queue.Firestore`](queue-firestore.md) |
 | **Schedule storage** — where job definitions live | [`Spinneret.Scheduler.Mssql`](scheduler-mssql.md) · [`Spinneret.Scheduler.Postgres`](scheduler-postgres.md) — both via [`Spinneret.Scheduler.Sql`](scheduler-sql.md) · [`Spinneret.Scheduler.Firestore`](scheduler-firestore.md) |
-| **Sweep trigger** — what decides when to sweep | `UseSweeper()` from [`Spinneret.Scheduler`](scheduler.md) (timer) · [`Spinneret.Scheduler.AspNetCore`](scheduler-aspnetcore.md) (endpoint + external cron) |
+| **Sweep trigger** — what decides when to sweep | `UseInHostSweeper()` from [`Spinneret.Scheduler`](scheduler.md) (timer) · [`Spinneret.Scheduler.AspNetCore`](scheduler-aspnetcore.md) (endpoint + external cron) |
 
 What a SQL storage buys is atomicity: with one, every enqueue commits with the business write that
 caused it, and every delivery's writes, cascades and outcome commit together — whether in-host
@@ -38,7 +38,7 @@ services.AddQueue(q => q
     .AddRequestAssemblies(typeof(SomeCommand).Assembly)
     .UseCloudTasksDelivery(config)                              // Cloud Tasks, called directly
     .UseFirestoreDeadLetters(config));                          // dead letters
-services.AddScheduler(s => s.UseFirestore(config));             // schedules
+services.AddScheduler(s => s.UseFirestoreStorage(config));             // schedules
 
 app.UseAuthentication();
 app.UseAuthorization();
@@ -60,7 +60,7 @@ services.AddQueue(q => q
     .AddRequestAssemblies(typeof(SomeCommand).Assembly)
     .UseMssqlStorage(config)                                    // the outbox
     .UseCloudTasksDelivery(config, o => o.Relay.RunInBackground = false));
-services.AddScheduler(s => s.UseMssql(config));
+services.AddScheduler(s => s.UseMssqlStorage(config));
 
 app.UseAuthentication();
 app.UseAuthorization();
@@ -87,7 +87,7 @@ services.AddQueue(q => q
     .AddRequestAssemblies(typeof(SomeCommand).Assembly)
     .UsePostgresStorage(sp => sp.GetRequiredService<NpgsqlDataSource>(), config)
     .UseInHostDelivery(config));                                // or .UseCloudTasksDelivery(config)
-services.AddScheduler(s => s.UsePostgres(config).UseSweeper());
+services.AddScheduler(s => s.UsePostgresStorage(config).UseInHostSweeper());
 ```
 
 Read: [queue-sql.md](queue-sql.md) · [queue-postgres.md](queue-postgres.md) ·
@@ -101,7 +101,7 @@ services.AddQueue(q => q
     .AddRequestAssemblies(typeof(SomeCommand).Assembly)
     .UseMssqlStorage(config)
     .UseInHostDelivery(config));                                // this host consumes
-services.AddScheduler(s => s.UseMssql(config).UseSweeper());    // timer
+services.AddScheduler(s => s.UseMssqlStorage(config).UseInHostSweeper());    // timer
 ```
 
 A producer-only host — a public API in front of this worker — composes the same storage without
@@ -119,7 +119,7 @@ services.AddQueue(q => q
     .AddRequestAssemblies(typeof(SomeCommand).Assembly)
     .UseMssqlStorage(config)
     .UseInHostDelivery(config));
-services.AddScheduler(s => s.UseFirestore(config).UseSweeper());
+services.AddScheduler(s => s.UseFirestoreStorage(config).UseInHostSweeper());
 ```
 
 The `FirestoreDb` registration is easy to forget here — the SQL packages need nothing like it, and

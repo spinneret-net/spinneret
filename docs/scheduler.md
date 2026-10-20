@@ -13,11 +13,11 @@ the jobs are stored, plus the timer that drives them.
 | Decision | Where |
 |---|---|
 | What the jobs are | this package — `IRecurringJob`, `AddRecurringJob` |
-| Where they live | a storage, chosen in `AddScheduler(s => s.UseMssql(...))`, `s.UsePostgres(...)` or `s.UseFirestore(...)` |
-| What decides when to sweep | `s.UseSweeper()` here, or [`Spinneret.Scheduler.AspNetCore`](scheduler-aspnetcore.md) |
+| Where they live | a storage, chosen in `AddScheduler(s => s.UseMssqlStorage(...))`, `s.UsePostgresStorage(...)` or `s.UseFirestoreStorage(...)` |
+| What decides when to sweep | `s.UseInHostSweeper()` here, or [`Spinneret.Scheduler.AspNetCore`](scheduler-aspnetcore.md) |
 
 ```csharp
-services.AddScheduler(s => s.UseFirestore(configuration).UseSweeper());
+services.AddScheduler(s => s.UseFirestoreStorage(configuration).UseInHostSweeper());
 ```
 
 `AddScheduler` checks the composition when it returns — no storage, or two, fails there — and adds
@@ -102,16 +102,16 @@ A slot finer than the sweep interval is reached on the following sweep, not at t
 ## Driving the sweep
 
 Nothing dispatches until something drives it. A scheduler with no trigger is a silent no-op, and a
-trigger with nothing to sweep is a wiring mistake, so `AddScheduler` refuses `UseSweeper()` without a
+trigger with nothing to sweep is a wiring mistake, so `AddScheduler` refuses `UseInHostSweeper()` without a
 storage.
 
 A pass returns a `SweepResult` reporting how many jobs it enqueued. The timer logs it; the HTTP
 trigger returns it in the response body, so an external cron can see whether a tick did any work.
 
 ```csharp
-services.AddScheduler(s => s.UseMssql(configuration).UseSweeper());                     // default 15s
-services.AddScheduler(s => s.UseMssql(configuration)
-    .UseSweeper(o => o.SweepInterval = TimeSpan.FromMinutes(1)));
+services.AddScheduler(s => s.UseMssqlStorage(configuration).UseInHostSweeper());   // default 15s
+services.AddScheduler(s => s.UseMssqlStorage(configuration)
+    .UseInHostSweeper(o => o.SweepInterval = TimeSpan.FromMinutes(1)));
 ```
 
 | Option | Config key | Type | Default |
@@ -123,7 +123,7 @@ the host's call:
 
 ```csharp
 services.Configure<SchedulerOptions>(configuration.GetSection(SchedulerOptions.SectionName));
-services.AddScheduler(s => s.UseMssql(configuration).UseSweeper());
+services.AddScheduler(s => s.UseMssqlStorage(configuration).UseInHostSweeper());
 ```
 
 Sweeps race safely across hosts, so every instance may run its own. This loop never overlaps its own
@@ -161,9 +161,9 @@ context, not a parent.
 
 ## What you must register
 
-- **A storage** — `s.UseFirestore(...)`, `s.UseMssql(...)` or `s.UsePostgres(...)`, in `AddScheduler`.
+- **A storage** — `s.UseFirestoreStorage(...)`, `s.UseMssqlStorage(...)` or `s.UsePostgresStorage(...)`, in `AddScheduler`.
 - **A queue** (`AddQueue`), since the sweep dispatches onto it. A SQL scheduler needs the queue's
-  storage in the same database — `s.UseMssql` beside `q.UseMssqlStorage`, `s.UsePostgres` beside
+  storage in the same database — `s.UseMssqlStorage` beside `q.UseMssqlStorage`, `s.UsePostgresStorage` beside
   `q.UsePostgresStorage` — and fails the host at startup otherwise.
 - **A trigger** — the sweeper above, or the HTTP endpoint.
 - **Your jobs**, and any retirements.

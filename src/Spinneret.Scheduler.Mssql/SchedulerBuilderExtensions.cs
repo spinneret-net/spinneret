@@ -10,7 +10,7 @@ namespace Microsoft.Extensions.DependencyInjection;
 public static class MssqlSchedulerBuilderExtensions
 {
     private static readonly SqlSchedulerDescriptor Descriptor = new(
-        nameof(UseMssql), MssqlSchedulerOptions.SectionName, MssqlSchedulerDialect.Instance);
+        nameof(UseMssqlStorage), MssqlSchedulerOptions.SectionName, MssqlSchedulerDialect.Instance);
 
     /// <summary>
     /// Stores scheduled jobs in SQL Server, next to the queue: provides
@@ -21,24 +21,24 @@ public static class MssqlSchedulerBuilderExtensions
     /// queue storage's.
     /// </summary>
     /// <remarks>
-    /// The sweep runs only when something drives it: <c>s.UseSweeper()</c> for a timer, or the
+    /// The sweep runs only when something drives it: <c>s.UseInHostSweeper()</c> for a timer, or the
     /// endpoint from <c>Spinneret.Scheduler.AspNetCore</c> for an external cron; sweeps race safely across
     /// hosts either way. Configuration is read from the <c>Scheduler:Mssql</c> section.
     /// </remarks>
-    public static SchedulerBuilder UseMssql(this SchedulerBuilder scheduler, IConfiguration configuration)
+    public static SchedulerBuilder UseMssqlStorage(this SchedulerBuilder scheduler, IConfiguration configuration)
     {
         ArgumentNullException.ThrowIfNull(configuration);
         return scheduler.UseSqlStorage<MssqlSchedulerOptions>(Descriptor, configuration, configure: null);
     }
 
-    /// <summary>As <see cref="UseMssql(SchedulerBuilder, IConfiguration)"/>, configured in code.</summary>
-    public static SchedulerBuilder UseMssql(this SchedulerBuilder scheduler, Action<MssqlSchedulerOptions> configure)
+    /// <summary>As <see cref="UseMssqlStorage(SchedulerBuilder, IConfiguration)"/>, configured in code.</summary>
+    public static SchedulerBuilder UseMssqlStorage(this SchedulerBuilder scheduler, Action<MssqlSchedulerOptions> configure)
     {
         ArgumentNullException.ThrowIfNull(configure);
         return scheduler.UseSqlStorage(Descriptor, configuration: null, configure);
     }
 
-    /// <summary>As <see cref="UseMssql(SchedulerBuilder, IConfiguration)"/>, with the defaults.</summary>
-    public static SchedulerBuilder UseMssql(this SchedulerBuilder scheduler) =>
+    /// <summary>As <see cref="UseMssqlStorage(SchedulerBuilder, IConfiguration)"/>, with the defaults.</summary>
+    public static SchedulerBuilder UseMssqlStorage(this SchedulerBuilder scheduler) =>
         scheduler.UseSqlStorage<MssqlSchedulerOptions>(Descriptor, configuration: null, configure: null);
 }

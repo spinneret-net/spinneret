@@ -14,7 +14,7 @@ namespace Microsoft.Extensions.DependencyInjection
         /// </summary>
         /// <example>
         /// <code>
-        /// services.AddScheduler(s => s.UseMssql(configuration).UseSweeper());
+        /// services.AddScheduler(s => s.UseMssqlStorage(configuration).UseInHostSweeper());
         /// </code>
         /// </example>
         public static IServiceCollection AddScheduler(this IServiceCollection services, Action<SchedulerBuilder> configure)

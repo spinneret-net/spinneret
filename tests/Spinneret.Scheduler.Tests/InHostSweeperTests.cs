@@ -10,7 +10,7 @@ namespace Spinneret.Scheduler.Tests;
 /// behind it: it keeps ticking after a failed sweep, it never overlaps two sweeps, and it always
 /// waits between them — that delay is the backoff a provider relies on when it cannot make progress.
 /// </summary>
-public class SchedulerSweeperTests
+public class InHostSweeperTests
 {
     private sealed class RecordingSweep : ISchedulerSweep
     {
@@ -44,11 +44,11 @@ public class SchedulerSweeperTests
         IServiceCollection services, ISchedulerSweep sweep, TimeSpan interval)
     {
         services.AddSingleton(typeof(ILogger<>), typeof(NullLogger<>));
-        services.AddScheduler(s => s.UseTestStorage(sweep).UseSweeper(o => o.SweepInterval = interval));
+        services.AddScheduler(s => s.UseTestStorage(sweep).UseInHostSweeper(o => o.SweepInterval = interval));
 
         var provider = services.BuildServiceProvider();
         var sweeper = provider.GetServices<IHostedService>()
-            .Single(s => s.GetType().Name == "SchedulerSweeperService");
+            .Single(s => s.GetType().Name == "InHostSweeperService");
         await sweeper.StartAsync(CancellationToken.None);
         return sweeper;
     }
@@ -128,7 +128,7 @@ public class SchedulerSweeperTests
     {
         var services = new ServiceCollection();
 
-        var ex = Assert.Throws<InvalidOperationException>(() => services.AddScheduler(s => s.UseSweeper()));
+        var ex = Assert.Throws<InvalidOperationException>(() => services.AddScheduler(s => s.UseInHostSweeper()));
 
         await Assert.That(ex.Message).Contains("nowhere to keep its jobs");
     }
@@ -138,7 +138,7 @@ public class SchedulerSweeperTests
     {
         var services = new ServiceCollection();
         services.AddSingleton(typeof(ILogger<>), typeof(NullLogger<>));
-        services.AddScheduler(s => s.UseTestStorage(new RecordingSweep()).UseSweeper(o => o.SweepInterval = TimeSpan.Zero));
+        services.AddScheduler(s => s.UseTestStorage(new RecordingSweep()).UseInHostSweeper(o => o.SweepInterval = TimeSpan.Zero));
 
         var options = services.BuildServiceProvider()
             .GetRequiredService<Microsoft.Extensions.Options.IOptions<SchedulerOptions>>();
@@ -152,7 +152,7 @@ public class SchedulerSweeperTests
     {
         var services = new ServiceCollection();
         services.AddSingleton(typeof(ILogger<>), typeof(NullLogger<>));
-        services.AddScheduler(s => s.UseTestStorage(new RecordingSweep()).UseSweeper());
+        services.AddScheduler(s => s.UseTestStorage(new RecordingSweep()).UseInHostSweeper());
 
         var options = services.BuildServiceProvider()
             .GetRequiredService<Microsoft.Extensions.Options.IOptions<SchedulerOptions>>().Value;

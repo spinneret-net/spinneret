@@ -32,7 +32,7 @@ public sealed class MssqlTestDialect(ISqlDatabaseFixture? database = null) : Sql
         queue.UseMssqlStorage(dataSource, configuration);
 
     public override SchedulerBuilder UseScheduler(SchedulerBuilder scheduler, IConfiguration configuration) =>
-        scheduler.UseMssql(configuration);
+        scheduler.UseMssqlStorage(configuration);
 
     public override SqlStorageOptions StorageOptions(IServiceProvider services) =>
         services.GetRequiredService<IOptions<MssqlStorageOptions>>().Value;

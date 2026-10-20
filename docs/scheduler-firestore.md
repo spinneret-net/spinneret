@@ -22,9 +22,9 @@ services.AddQueue(q => q
     .UseFirestoreDeadLetters(configuration));
 
 // then pick a trigger — one of:
-services.AddScheduler(s => s.UseFirestore(configuration).UseSweeper());   // timer, for an always-on host
-services.AddScheduler(s => s.UseFirestore(configuration));                // plus, for a host that scales to zero:
-app.MapSchedulerSweep(CloudTasksAuth.PolicyName);                         // an endpoint Cloud Scheduler calls
+services.AddScheduler(s => s.UseFirestoreStorage(configuration).UseInHostSweeper());   // timer, for an always-on host
+services.AddScheduler(s => s.UseFirestoreStorage(configuration));                      // plus, for a host that scales to zero:
+app.MapSchedulerSweep(CloudTasksAuth.PolicyName);                                      // an endpoint Cloud Scheduler calls
 ```
 
 `AddQueue` and `AddScheduler` can be called in either order.

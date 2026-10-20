@@ -139,7 +139,7 @@ public sealed class CompositionRulesTests
                 services.AddQueue(q => q
                     .AddRequestAssemblies(typeof(CompositionRulesTests).Assembly)
                     .UseMssqlStorage(Configuration()));
-                services.AddScheduler(s => s.UsePostgres(Configuration()));
+                services.AddScheduler(s => s.UsePostgresStorage(Configuration()));
             })
             .Build();
 
@@ -157,12 +157,12 @@ public sealed class CompositionRulesTests
                 services.AddQueue(q => q
                     .AddRequestAssemblies(typeof(CompositionRulesTests).Assembly)
                     .UseCloudTasksDelivery(Configuration()));
-                services.AddScheduler(s => s.UseMssql(Configuration()));
+                services.AddScheduler(s => s.UseMssqlStorage(Configuration()));
             })
             .Build();
 
         var ex = await Assert.ThrowsAsync<Exception>(() => host.StartAsync());
 
-        await Assert.That(ex!.Message).Contains("s.UseMssql(...) requires the queue's storage in the same database");
+        await Assert.That(ex!.Message).Contains("s.UseMssqlStorage(...) requires the queue's storage in the same database");
     }
 }

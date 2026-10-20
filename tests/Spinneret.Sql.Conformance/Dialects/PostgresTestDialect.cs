@@ -32,7 +32,7 @@ public sealed class PostgresTestDialect(ISqlDatabaseFixture? database = null) : 
         queue.UsePostgresStorage(sp => (NpgsqlDataSource)dataSource(sp), configuration);
 
     public override SchedulerBuilder UseScheduler(SchedulerBuilder scheduler, IConfiguration configuration) =>
-        scheduler.UsePostgres(configuration);
+        scheduler.UsePostgresStorage(configuration);
 
     public override SqlStorageOptions StorageOptions(IServiceProvider services) =>
         services.GetRequiredService<IOptions<PostgresStorageOptions>>().Value;

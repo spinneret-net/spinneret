@@ -52,4 +52,4 @@ static readonly Spinneret.Scheduler.SchedulerOptions.SectionName -> string!
 static Microsoft.Extensions.DependencyInjection.SchedulerServiceCollectionExtensions.AddScheduler(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Spinneret.Scheduler.SchedulerBuilder!>! configure) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
 Spinneret.Scheduler.SchedulerBuilder
 Spinneret.Scheduler.SchedulerBuilder.Services.get -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
-Spinneret.Scheduler.SchedulerBuilder.UseSweeper(System.Action<Spinneret.Scheduler.SchedulerOptions!>? configure = null) -> Spinneret.Scheduler.SchedulerBuilder!
+Spinneret.Scheduler.SchedulerBuilder.UseInHostSweeper(System.Action<Spinneret.Scheduler.SchedulerOptions!>? configure = null) -> Spinneret.Scheduler.SchedulerBuilder!

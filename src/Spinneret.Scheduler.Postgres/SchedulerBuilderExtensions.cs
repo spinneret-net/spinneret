@@ -10,7 +10,7 @@ namespace Microsoft.Extensions.DependencyInjection;
 public static class PostgresSchedulerBuilderExtensions
 {
     private static readonly SqlSchedulerDescriptor Descriptor = new(
-        nameof(UsePostgres), PostgresSchedulerOptions.SectionName, PostgresSchedulerDialect.Instance);
+        nameof(UsePostgresStorage), PostgresSchedulerOptions.SectionName, PostgresSchedulerDialect.Instance);
 
     /// <summary>
     /// Stores scheduled jobs in PostgreSQL, next to the queue: provides
@@ -21,24 +21,24 @@ public static class PostgresSchedulerBuilderExtensions
     /// follow the queue storage's.
     /// </summary>
     /// <remarks>
-    /// The sweep runs only when something drives it: <c>s.UseSweeper()</c> for a timer, or the
+    /// The sweep runs only when something drives it: <c>s.UseInHostSweeper()</c> for a timer, or the
     /// endpoint from <c>Spinneret.Scheduler.AspNetCore</c> for an external cron; sweeps race safely across
     /// hosts either way. Configuration is read from the <c>Scheduler:Postgres</c> section.
     /// </remarks>
-    public static SchedulerBuilder UsePostgres(this SchedulerBuilder scheduler, IConfiguration configuration)
+    public static SchedulerBuilder UsePostgresStorage(this SchedulerBuilder scheduler, IConfiguration configuration)
     {
         ArgumentNullException.ThrowIfNull(configuration);
         return scheduler.UseSqlStorage<PostgresSchedulerOptions>(Descriptor, configuration, configure: null);
     }
 
-    /// <summary>As <see cref="UsePostgres(SchedulerBuilder, IConfiguration)"/>, configured in code.</summary>
-    public static SchedulerBuilder UsePostgres(this SchedulerBuilder scheduler, Action<PostgresSchedulerOptions> configure)
+    /// <summary>As <see cref="UsePostgresStorage(SchedulerBuilder, IConfiguration)"/>, configured in code.</summary>
+    public static SchedulerBuilder UsePostgresStorage(this SchedulerBuilder scheduler, Action<PostgresSchedulerOptions> configure)
     {
         ArgumentNullException.ThrowIfNull(configure);
         return scheduler.UseSqlStorage(Descriptor, configuration: null, configure);
     }
 
-    /// <summary>As <see cref="UsePostgres(SchedulerBuilder, IConfiguration)"/>, with the defaults.</summary>
-    public static SchedulerBuilder UsePostgres(this SchedulerBuilder scheduler) =>
+    /// <summary>As <see cref="UsePostgresStorage(SchedulerBuilder, IConfiguration)"/>, with the defaults.</summary>
+    public static SchedulerBuilder UsePostgresStorage(this SchedulerBuilder scheduler) =>
         scheduler.UseSqlStorage<PostgresSchedulerOptions>(Descriptor, configuration: null, configure: null);
 }

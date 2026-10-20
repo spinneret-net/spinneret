@@ -17,33 +17,33 @@ public static class FirestoreSchedulerBuilderExtensions
     /// <remarks>
     /// Requires <c>AddQueue</c> (for the type registry and payload serializer the sweep dispatches
     /// through, in any registration order) and a host-registered <c>FirestoreDb</c>. The sweep runs
-    /// only when something drives it: <c>s.UseSweeper()</c> for a timer, or the endpoint from
+    /// only when something drives it: <c>s.UseInHostSweeper()</c> for a timer, or the endpoint from
     /// <c>Spinneret.Scheduler.AspNetCore</c> for an external cron. Configuration is read from the
     /// <c>Scheduler:Firestore</c> section.
     /// </remarks>
-    public static SchedulerBuilder UseFirestore(this SchedulerBuilder scheduler, IConfiguration configuration)
+    public static SchedulerBuilder UseFirestoreStorage(this SchedulerBuilder scheduler, IConfiguration configuration)
     {
         ArgumentNullException.ThrowIfNull(configuration);
         var section = configuration.GetSection(FirestoreSchedulerOptions.SectionName);
-        return scheduler.UseFirestoreCore(options => section.Bind(options));
+        return scheduler.UseFirestoreStorageCore(options => section.Bind(options));
     }
 
-    /// <summary>As <see cref="UseFirestore(SchedulerBuilder, IConfiguration)"/>, configured in code.</summary>
-    public static SchedulerBuilder UseFirestore(this SchedulerBuilder scheduler, Action<FirestoreSchedulerOptions> configure)
+    /// <summary>As <see cref="UseFirestoreStorage(SchedulerBuilder, IConfiguration)"/>, configured in code.</summary>
+    public static SchedulerBuilder UseFirestoreStorage(this SchedulerBuilder scheduler, Action<FirestoreSchedulerOptions> configure)
     {
         ArgumentNullException.ThrowIfNull(configure);
-        return scheduler.UseFirestoreCore(configure);
+        return scheduler.UseFirestoreStorageCore(configure);
     }
 
-    /// <summary>As <see cref="UseFirestore(SchedulerBuilder, IConfiguration)"/>, with the defaults.</summary>
-    public static SchedulerBuilder UseFirestore(this SchedulerBuilder scheduler) =>
-        scheduler.UseFirestoreCore(_ => { });
+    /// <summary>As <see cref="UseFirestoreStorage(SchedulerBuilder, IConfiguration)"/>, with the defaults.</summary>
+    public static SchedulerBuilder UseFirestoreStorage(this SchedulerBuilder scheduler) =>
+        scheduler.UseFirestoreStorageCore(_ => { });
 
-    private static SchedulerBuilder UseFirestoreCore(this SchedulerBuilder scheduler, Action<FirestoreSchedulerOptions> configure)
+    private static SchedulerBuilder UseFirestoreStorageCore(this SchedulerBuilder scheduler, Action<FirestoreSchedulerOptions> configure)
     {
         ArgumentNullException.ThrowIfNull(scheduler);
 
-        return scheduler.UseStorage(new SchedulerStorageRole(nameof(UseFirestore), services =>
+        return scheduler.UseStorage(new SchedulerStorageRole(nameof(UseFirestoreStorage), services =>
         {
             services.AddOptions<FirestoreSchedulerOptions>()
                 .Configure(configure)
@@ -57,7 +57,7 @@ public static class FirestoreSchedulerBuilderExtensions
             services.TryAddSingleton<IRecurringJobScheduler, FirestoreScheduler>();
             services.TryAddSingleton<IFirestoreTransactionalScheduler, FirestoreTransactionalScheduler>();
             // The sweep engine, not the trigger: registering it costs nothing until something drives
-            // it, and the host chooses that separately with UseSweeper() or an HTTP trigger.
+            // it, and the host chooses that separately with UseInHostSweeper() or an HTTP trigger.
             services.TryAddSingleton<ISchedulerSweep, FirestoreSchedulerDispatcher>();
         }));
     }

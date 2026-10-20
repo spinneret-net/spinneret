@@ -2,7 +2,7 @@ namespace Spinneret.Scheduler;
 
 /// <summary>
 /// One pass over the scheduled jobs that are currently due, implemented by whichever storage
-/// provider the host registered. This is the seam a trigger drives: <c>UseSweeper()</c>
+/// provider the host registered. This is the seam a trigger drives: <c>UseInHostSweeper()</c>
 /// runs it on a timer, an HTTP endpoint runs it on request, and neither needs to know where the
 /// jobs live.
 /// </summary>

@@ -2,7 +2,7 @@
 
 An authorized endpoint that runs one scheduler sweep per request.
 
-The counterpart to `s.UseSweeper()`: use it where an external scheduler owns the clock. That is
+The counterpart to `s.UseInHostSweeper()`: use it where an external scheduler owns the clock. That is
 the normal arrangement on a host that scales to zero, which has no thread of its own to tick — and
 where an inbound request conveniently both wakes the service and triggers the sweep.
 
@@ -19,7 +19,7 @@ services.AddQueue(q => q
     .AddRequestAssemblies(typeof(SyncCustomer).Assembly)
     .UseCloudTasksDelivery(configuration)
     .UseFirestoreDeadLetters(configuration));
-services.AddScheduler(s => s.UseFirestore(configuration));   // no UseSweeper: the endpoint is the clock
+services.AddScheduler(s => s.UseFirestoreStorage(configuration));   // no UseInHostSweeper: the endpoint is the clock
 
 app.UseAuthentication();
 app.UseAuthorization();
@@ -37,7 +37,7 @@ app.MapSchedulerSweep(
 
 | | |
 |---|---|
-| **A scheduler storage** | `AddScheduler(s => s.UseFirestore(...))`, `s.UseMssql(...)` or `s.UsePostgres(...)`. Mapping without one throws — a sweep endpoint with nothing to sweep looks healthy while doing nothing. |
+| **A scheduler storage** | `AddScheduler(s => s.UseFirestoreStorage(...))`, `s.UseMssqlStorage(...)` or `s.UsePostgresStorage(...)`. Mapping without one throws — a sweep endpoint with nothing to sweep looks healthy while doing nothing. |
 | **An authorization policy** | Required, not defaulted. Passing a blank one throws. |
 | **Auth middleware** | `UseAuthentication()` / `UseAuthorization()` before endpoints. |
 
@@ -119,7 +119,7 @@ the app rides this one sweep, one cron covers all of them — do not add a cron 
 
 - **Nothing dispatches if you map neither trigger.** The storage packages register the sweep *engine*
   only; both triggers are opt-in, and a scheduler with no trigger is silent rather than loud.
-- **Do not map this and `s.UseSweeper()` on the same host** unless you mean it. Both would drive
+- **Do not map this and `s.UseInHostSweeper()` on the same host** unless you mean it. Both would drive
   the same sweep — and unlike two timer ticks, an inbound request can land *during* a timer sweep, so
   the two genuinely overlap. That is safe (sweeps already race safely across hosts) but you are paying
   twice for one cadence.

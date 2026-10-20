@@ -14,7 +14,7 @@
         <PackageReference Include="Google.Cloud.Firestore" Version="4.5.0" />
         <!-- Was arriving transitively through the AspNetCore framework reference this package no
              longer takes. Configuration.Binder is what ConfigurationBinder.Bind lives in, which is
-             what the IConfiguration overload of UseFirestore actually calls. -->
+             what the IConfiguration overload of UseFirestoreStorage actually calls. -->
         <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="10.0.13" />
         <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.13" />
         <PackageReference Include="Microsoft.Extensions.Options" Version="10.0.13" />

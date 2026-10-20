@@ -76,7 +76,7 @@ internal static class SqlSchedulerRegistration
         services.TryAddSingleton<IRecurringJobScheduler, SqlScheduler>();
         services.TryAddSingleton<ISqlTransactionalScheduler, SqlTransactionalScheduler>();
         // The sweep engine, not the trigger: registering it costs nothing until something drives it,
-        // and the host chooses that separately with UseSweeper() or an HTTP trigger.
+        // and the host chooses that separately with UseInHostSweeper() or an HTTP trigger.
         services.TryAddSingleton<ISchedulerSweep, SqlSchedulerSweeper>();
         // Before the recurring-job installer, which SchedulerBuilder adds after the storage: hosted
         // services start in registration order, and the installer writes into this table. It is

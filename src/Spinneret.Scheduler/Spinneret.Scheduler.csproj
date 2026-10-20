@@ -13,7 +13,7 @@
         <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.13" />
         <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.13" />
         <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.13" />
-        <!-- IOptions/AddOptions/ValidateOnStart, used by UseSweeper. Reaches us anyway
+        <!-- IOptions/AddOptions/ValidateOnStart, used by UseInHostSweeper. Reaches us anyway
              through Hosting.Abstractions, but this package uses it directly. -->
         <PackageReference Include="Microsoft.Extensions.Options" Version="10.0.13" />
     </ItemGroup>

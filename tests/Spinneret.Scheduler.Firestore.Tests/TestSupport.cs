@@ -86,10 +86,10 @@ public sealed class SchedulerTestHost : IAsyncDisposable
         services.AddQueueCore([typeof(SchedulerTestHost).Assembly]);
         services.AddScheduler(s =>
         {
-            s.UseFirestore(o => o.Collection = collection);
+            s.UseFirestoreStorage(o => o.Collection = collection);
             if (sweeper)
                 // Fast ticks so integration tests do not wait out the 15s default.
-                s.UseSweeper(o => o.SweepInterval = TimeSpan.FromMilliseconds(100));
+                s.UseInHostSweeper(o => o.SweepInterval = TimeSpan.FromMilliseconds(100));
         });
         configure?.Invoke(services);
 

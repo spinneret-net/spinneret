@@ -18,7 +18,7 @@ services.AddQueue(q => q
     .AddRequestAssemblies(typeof(SyncCustomer).Assembly)
     .UsePostgresStorage(configuration)
     .UseInHostDelivery(configuration));   // or .UseCloudTasksDelivery(configuration)
-services.AddScheduler(s => s.UsePostgres(configuration).UseSweeper());
+services.AddScheduler(s => s.UsePostgresStorage(configuration).UseInHostSweeper());
 ```
 
 ## Requires

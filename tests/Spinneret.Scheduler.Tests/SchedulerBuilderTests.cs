@@ -22,7 +22,7 @@ public class SchedulerBuilderTests
             sv.AddHostedService<StorageInitializer>();
         })));
 
-        var hosted = services.Where(d => d.ServiceType == typeof(IHostedService)).Select(d => d.ImplementationType).ToList();
+        var hosted = services.Where(d => d.ServiceType == typeof(IHostedService)).Select(d => d.ImplementationType!).ToList();
 
         await Assert.That(hosted).IsEquivalentTo([typeof(StorageInitializer), typeof(RecurringJobInstaller)]);
     }
@@ -33,7 +33,7 @@ public class SchedulerBuilderTests
         var services = new ServiceCollection();
         services.AddScheduler(s => s.UseTestStorage(new NoSweep()));
 
-        await Assert.That(services.Any(d => d.ImplementationType == typeof(SchedulerSweeperService))).IsFalse();
+        await Assert.That(services.Any(d => d.ImplementationType == typeof(InHostSweeperService))).IsFalse();
     }
 
     [Test]

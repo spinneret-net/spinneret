@@ -200,7 +200,7 @@ Dead letters need a store the delivery does not always provide: a SQL storage wr
 A recurring job is an interface, not infrastructure. Register it in DI and it installs itself idempotently at startup:
 
 ```csharp
-public class RemindProjectMonthClose : IRecurringJob
+public class RemindProjectMonthClose : IRecurringJob<Unit>
 {
     public string Key => "project-month-close-reminder";
     public Schedule Schedule => Schedule.Cron("0 3 * * *", "Europe/Stockholm");
@@ -240,7 +240,7 @@ The installer unregisters retired keys alongside installing the declared ones �
 
 Installing happens in the background and retries with capped, jittered backoff until it succeeds, so a store that is briefly unreachable costs a short delay rather than a missing job — a single always-on host would otherwise carry that gap until its next restart. Startup is never held up by it, and each job stops being retried as soon as it is installed: this is a retry, not a reconciliation loop, so two revisions never fight over a definition during a rolling deploy. Running many instances needs no coordination — registration is idempotent and guarded by the store (the job key is the primary key in SQL Server and PostgreSQL, and the document id in Firestore), so ten instances asserting the same job converge on one job.
 
-The scheduler itself is infrastructure-agnostic. `Spinneret.Scheduler.Firestore` provides Firestore-backed scheduling, while `Spinneret.Scheduler.Mssql` and `Spinneret.Scheduler.Postgres` keep jobs beside the SQL outbox and commit each due job's booking with its enqueue. The job declaration and application-facing scheduling model stay the same, composed with `services.AddScheduler(s => s.UseMssql(config).UseSweeper())`. Firestore scheduling depends only on the core queue, so it runs with any queue composition; SQL scheduling needs the queue's storage in the same database, whichever delivery drains it. What each package needs is documented per package under **[docs/](docs/README.md)**.
+The scheduler itself is infrastructure-agnostic. `Spinneret.Scheduler.Firestore` provides Firestore-backed scheduling, while `Spinneret.Scheduler.Mssql` and `Spinneret.Scheduler.Postgres` keep jobs beside the SQL outbox and commit each due job's booking with its enqueue. The job declaration and application-facing scheduling model stay the same, composed with `services.AddScheduler(s => s.UseMssqlStorage(config).UseInHostSweeper())`. Firestore scheduling depends only on the core queue, so it runs with any queue composition; SQL scheduling needs the queue's storage in the same database, whichever delivery drains it. What each package needs is documented per package under **[docs/](docs/README.md)**.
 
 ### The hub — `Spinneret.View` + `Spinneret.ViewModel`
 
@@ -282,22 +282,22 @@ Storage, delivery, dead letters, schedule storage and trigger are separate choic
 ```csharp
 services.AddQueue(q => q
     .AddRequestAssemblies(typeof(SyncCustomer).Assembly)
-    .UseMssqlStorage(config)                  // where messages wait
-    .UseInHostDelivery(config));              // how they reach handlers
+    .UseMssqlStorage(config)       // messages wait in an outbox table in your database
+    .UseInHostDelivery(config));   // a worker in this host polls the outbox and runs handlers
 services.AddScheduler(s => s
-    .UseFirestore(config)                     // where schedules live
-    .UseSweeper());                           // what drives them
+    .UseFirestoreStorage(config)   // job definitions and next due times live in Firestore
+    .UseInHostSweeper());          // a timer in this host enqueues due jobs every 15 s
 ```
 
 A SQL storage is the outbox; in-host workers drain it, or a relay forwards it to Cloud Tasks. Without a storage, Cloud Tasks is called directly — it stores nothing you can query, so its dead letters live in Firestore. The `.Firestore` packages depend only on the provider-agnostic core, so they compose with any queue. A combination that cannot work — in-host delivery with no storage, two deliveries, two storages — fails at registration, naming the reason; a SQL scheduler beside a queue stored elsewhere fails as the host starts, since the two can be registered in either order.
 
-The trigger is likewise independent of where jobs are stored. `UseSweeper()` runs a timer inside the host; `Spinneret.Scheduler.AspNetCore` exposes an authorized endpoint instead, for a host that scales to zero and has no thread of its own to tick. Both drive the same `ISchedulerSweep`. See **[docs/](docs/README.md)** for the combinations and their guarantees.
+The trigger is likewise independent of where jobs are stored. `UseInHostSweeper()` runs a timer inside the host; `Spinneret.Scheduler.AspNetCore` exposes an authorized endpoint instead, for a host that scales to zero and has no thread of its own to tick. Both drive the same `ISchedulerSweep`. See **[docs/](docs/README.md)** for the combinations and their guarantees.
 
 ```mermaid
 graph BT
   Functional["Spinneret.Functional"]
   Parsing["Spinneret.Parsing"] --> Functional
-  Mediator["Spinneret.Mediator"]
+  Mediator["Spinneret.Mediator"] --> Functional
   Queue["Spinneret.Queue"] --> Mediator & Functional
   QueueSql["Spinneret.Queue.Sql"] --> Queue
   QueueMssql["Spinneret.Queue.Mssql"] --> QueueSql

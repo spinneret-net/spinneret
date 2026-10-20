@@ -18,7 +18,7 @@ services.AddQueue(q => q
     .AddRequestAssemblies(typeof(SyncCustomer).Assembly)
     .UseMssqlStorage(configuration)
     .UseInHostDelivery(configuration));   // or .UseCloudTasksDelivery(configuration)
-services.AddScheduler(s => s.UseMssql(configuration).UseSweeper());
+services.AddScheduler(s => s.UseMssqlStorage(configuration).UseInHostSweeper());
 ```
 
 ## Requires

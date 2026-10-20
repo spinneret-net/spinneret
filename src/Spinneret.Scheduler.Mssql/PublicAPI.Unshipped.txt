@@ -4,7 +4,7 @@ Spinneret.Scheduler.Mssql.MssqlSchedulerOptions.MssqlSchedulerOptions() -> void
 Spinneret.Scheduler.Mssql.MssqlSchedulerSchema
 static readonly Spinneret.Scheduler.Mssql.MssqlSchedulerOptions.SectionName -> string!
 Microsoft.Extensions.DependencyInjection.MssqlSchedulerBuilderExtensions
-static Microsoft.Extensions.DependencyInjection.MssqlSchedulerBuilderExtensions.UseMssql(this Spinneret.Scheduler.SchedulerBuilder! scheduler, Microsoft.Extensions.Configuration.IConfiguration! configuration) -> Spinneret.Scheduler.SchedulerBuilder!
+static Microsoft.Extensions.DependencyInjection.MssqlSchedulerBuilderExtensions.UseMssqlStorage(this Spinneret.Scheduler.SchedulerBuilder! scheduler, Microsoft.Extensions.Configuration.IConfiguration! configuration) -> Spinneret.Scheduler.SchedulerBuilder!
 static Spinneret.Scheduler.Mssql.MssqlSchedulerSchema.CreateScript(Spinneret.Queue.Mssql.MssqlStorageOptions! storageOptions, Spinneret.Scheduler.Mssql.MssqlSchedulerOptions! schedulerOptions) -> string!
-static Microsoft.Extensions.DependencyInjection.MssqlSchedulerBuilderExtensions.UseMssql(this Spinneret.Scheduler.SchedulerBuilder! scheduler) -> Spinneret.Scheduler.SchedulerBuilder!
-static Microsoft.Extensions.DependencyInjection.MssqlSchedulerBuilderExtensions.UseMssql(this Spinneret.Scheduler.SchedulerBuilder! scheduler, System.Action<Spinneret.Scheduler.Mssql.MssqlSchedulerOptions!>! configure) -> Spinneret.Scheduler.SchedulerBuilder!
+static Microsoft.Extensions.DependencyInjection.MssqlSchedulerBuilderExtensions.UseMssqlStorage(this Spinneret.Scheduler.SchedulerBuilder! scheduler) -> Spinneret.Scheduler.SchedulerBuilder!
+static Microsoft.Extensions.DependencyInjection.MssqlSchedulerBuilderExtensions.UseMssqlStorage(this Spinneret.Scheduler.SchedulerBuilder! scheduler, System.Action<Spinneret.Scheduler.Mssql.MssqlSchedulerOptions!>! configure) -> Spinneret.Scheduler.SchedulerBuilder!
