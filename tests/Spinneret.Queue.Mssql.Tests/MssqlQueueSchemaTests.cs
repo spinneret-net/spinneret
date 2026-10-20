@@ -51,11 +51,7 @@ public sealed class MssqlQueueSchemaTests
     [Arguments("IX_SpinneretDeadLetters_DeadLetteredAt")]
     public async Task CreateScript_guards_every_index_on_its_own_existence(string index)
     {
-        // Never on the owning table's existence. Two databases would otherwise keep an index
-        // forever missing: one created before the index was added to this script, and one whose
-        // table was created by a host that lost the create race before it had run the CREATE INDEX
-        // statements. Both are invisible until a query silently goes to a scan — or, for the dedupe
-        // index, until deduplication stops happening and says nothing.
+        // Guarding on the table would leave an index forever missing on older or race-losing databases.
         var script = MssqlQueueSchema.CreateScript(new MssqlStorageOptions());
 
         await Assert.That(script).Contains($"AND name = N'{index}'");
@@ -64,9 +60,7 @@ public sealed class MssqlQueueSchemaTests
     [Test]
     public async Task CreateScript_creates_no_index_inside_a_table_block()
     {
-        // The structural half of the rule above: as many sys.indexes guards as index creations, so
-        // no index can be riding on a table block's guard instead of its own. Counted over the
-        // statements only — the script's own comments discuss CREATE INDEX and would inflate this.
+        // One sys.indexes guard per index creation, counted over statements since comments mention CREATE INDEX.
         var statements = string.Join('\n', MssqlQueueSchema.CreateScript(new MssqlStorageOptions())
             .Split('\n')
             .Where(line => !line.TrimStart().StartsWith("--", StringComparison.Ordinal)));
@@ -82,8 +76,7 @@ public sealed class MssqlQueueSchemaTests
     [Test]
     public async Task CreateScript_adds_the_message_id_and_lease_columns_to_an_existing_table()
     {
-        // Tables created before the relay existed get the columns too, each guarded on its own
-        // existence; the MessageId default fills rows already waiting so they keep their place.
+        // Older tables get the columns too; the MessageId default lets waiting rows keep their place.
         var script = MssqlQueueSchema.CreateScript(new MssqlStorageOptions());
 
         await Assert.That(script).Contains("IF COL_LENGTH(N'[dbo].[SpinneretQueue]', N'MessageId') IS NULL");
@@ -95,10 +88,7 @@ public sealed class MssqlQueueSchemaTests
     [Test]
     public async Task CreateScript_serializes_itself_against_other_hosts_running_it()
     {
-        // Every host runs this at startup, so a fleet scaling from zero runs it from every replica
-        // at once. "IF OBJECT_ID(...) IS NULL CREATE TABLE" is not atomic and nothing here shares an
-        // implicit transaction, so without the lock two replicas can both decide to create the
-        // table. Held for the transaction, so it is released by the commit either way.
+        // Every replica runs this at startup and IF OBJECT_ID ... CREATE TABLE isn't atomic, hence the lock.
         var script = MssqlQueueSchema.CreateScript(new MssqlStorageOptions());
 
         await Assert.That(script).Contains("BEGIN TRANSACTION");
@@ -110,8 +100,6 @@ public sealed class MssqlQueueSchemaTests
         // A lock that timed out must not be mistaken for one that was granted.
         await Assert.That(script).Contains("IF @lockResult < 0");
     }
-
-    // ------------------------------------------------------------------------ identifiers ---
 
     [Test]
     [Arguments("SpinneretQueue", true)]
@@ -134,7 +122,7 @@ public sealed class MssqlQueueSchemaTests
     [Test]
     public async Task Identifier_quoting_escapes_closing_brackets()
     {
-        // Defense in depth: validation rejects brackets, but quoting must still be correct.
+        // Validation rejects brackets, but quoting must still be correct.
         await Assert.That(MssqlQueueDialect.Instance.QuoteIdentifier("a]b")).IsEqualTo("[a]]b]");
     }
 

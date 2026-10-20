@@ -10,11 +10,7 @@ using Spinneret.Queue.Sql;
 
 namespace Spinneret.Sql.Conformance;
 
-// ---------------------------------------------------------------------------------------------
-// Test command types scanned by QueueTypeRegistry from the test assembly, with mediator handlers
-// recording deliveries into the DeliveryLog. All timing-relevant policies use millisecond
-// backoffs so retry scenarios complete in test time.
-// ---------------------------------------------------------------------------------------------
+// Retry policies use millisecond backoffs so retry scenarios complete in test time.
 
 public sealed record PingCommand(string Name) : IRequest<Unit>;
 
@@ -28,31 +24,20 @@ public sealed record PermanentFailCommand(string Key) : IRequest<Unit>;
 
 public sealed record DeferOnceCommand(string Key) : IRequest<Unit>;
 
-/// <summary>Writes a row to <paramref name="Table"/> on the ambient transaction, then fails permanently.</summary>
 public sealed record WriteThenFailCommand(string Table) : IRequest<Unit>;
 
 public sealed record WriteCommand(string Table) : IRequest<Unit>;
 
-/// <summary>
-/// Writes a row to <paramref name="Table"/>, then runs a statement that fails — a NOT NULL
-/// violation — and catches the error itself before returning normally. On SQL Server the failed
-/// statement alone is undone; on Postgres the whole transaction is aborted. Either way the delivery
-/// must not be acknowledged with the handler's write silently gone.
-/// </summary>
+// Swallows a failed statement: SQL Server undoes only that statement, Postgres aborts the transaction.
 [QueuePolicy(MaxAttempts = 2, MinBackoff = "00:00:00.050", MaxBackoff = "00:00:00.100")]
 public sealed record SwallowSqlErrorCommand(string Table) : IRequest<Unit>;
 
-/// <summary>Enqueues a <see cref="PingCommand"/> and then fails permanently.</summary>
 public sealed record CascadeThenFailCommand(string Key) : IRequest<Unit>;
 
 public sealed record CascadeCommand(string Key) : IRequest<Unit>;
 
 [QueuePolicy(Channel = "bulk")]
 public sealed record BulkChannelCommand(string Name) : IRequest<Unit>;
-
-// ---------------------------------------------------------------------------------------------
-// Handlers.
-// ---------------------------------------------------------------------------------------------
 
 public sealed class PingHandler(DeliveryLog log) : IRequestHandler<PingCommand, Unit>
 {
@@ -180,14 +165,6 @@ internal static class SideEffects
         transactions.Current ?? throw new InvalidOperationException("Expected the delivery's ambient transaction.");
 }
 
-// ---------------------------------------------------------------------------------------------
-// Host harness.
-// ---------------------------------------------------------------------------------------------
-
-/// <summary>
-/// A running queue host: DI container with the dialect's SQL storage registered and all hosted
-/// services started, plus SQL helpers scoped to this test's unique tables.
-/// </summary>
 public sealed class QueueTestHost : IAsyncDisposable
 {
     private readonly ServiceProvider _provider;
@@ -213,7 +190,7 @@ public sealed class QueueTestHost : IAsyncDisposable
     public ISqlTransactionalQueue TransactionalQueue => _provider.GetRequiredService<ISqlTransactionalQueue>();
     public ISqlTransactionProvider Transactions => _provider.GetRequiredService<ISqlTransactionProvider>();
 
-    /// <summary>Config pinning a host to a given pair of tables, so several hosts can share them.</summary>
+    // Pins a host to a given pair of tables, so several hosts can share them.
     public static Dictionary<string, string?> Tables(SqlTestDialect dialect, string suffix) => new()
     {
         [$"{dialect.StorageSection}:QueueTableName"] = $"Q_{suffix}",
@@ -262,8 +239,6 @@ public sealed class QueueTestHost : IAsyncDisposable
 
         return new QueueTestHost(provider, hostedServices, dialect, suffix);
     }
-
-    // ------------------------------------------------------------------------- SQL helpers ---
 
     public string QueueTable => Options.QueueTableName;
     public string DeadLetterTable => Options.DeadLetterTableName;

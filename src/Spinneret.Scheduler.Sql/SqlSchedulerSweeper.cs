@@ -5,15 +5,8 @@ using Spinneret.Queue.Sql;
 
 namespace Spinneret.Scheduler.Sql;
 
-/// <summary>
-/// Sweeps for due scheduled jobs and enqueues them. Each job dispatches in its own unit of work: the
-/// claim (a locking read plus the booking) and the queue insert commit together, so a run can
-/// neither be lost nor double-enqueued — competing hosts' sweeps skip locked rows and dispatch other
-/// due jobs in parallel. A dispatch failure compensates in a fresh unit of work: a one-shot job is
-/// deleted in the same transaction that records its dead letter; a recurring job dead-letters the
-/// occurrence but keeps the schedule armed, because recurrence is owned by the job, not by any single
-/// run.
-/// </summary>
+// Each job's claim, booking and enqueue commit in one transaction, so a run is never lost or
+// double-enqueued. A failure compensates in a fresh one; a recurring job stays armed.
 internal sealed class SqlSchedulerSweeper(
     SqlSchedulerStorage storage,
     SqlUnitOfWorkFactory unitOfWork,
@@ -26,22 +19,13 @@ internal sealed class SqlSchedulerSweeper(
     ILogger<SqlSchedulerSweeper> logger)
     : ISchedulerSweep
 {
-    /// <summary>How far an unreadable job is pushed out before the sweep sees it again.</summary>
     private static readonly TimeSpan QuarantineDelay = TimeSpan.FromMinutes(5);
 
     private SqlSchedulerStatements Sql => storage.Statements;
     private SqlQueueDialect Timestamps => storage.Queue.Dialect;
 
-    /// <summary>
-    /// Drains everything currently due, one job per transaction. Draining rather than taking a
-    /// fixed batch is safe because each job commits on its own and competing hosts skip locked rows,
-    /// so a backlog clears at full speed instead of one job per tick.
-    /// </summary>
-    /// <remarks>
-    /// Returns as soon as a job cannot be booked, deliberately: continuing would re-claim the same
-    /// still-due job in a tight loop. The caller's interval is what backs that off — see
-    /// <c>Compensate</c>.
-    /// </remarks>
+    // Drains until nothing is due, but returns once a job cannot be booked: continuing would
+    // re-claim it in a tight loop, so the caller's interval provides the backoff.
     public async Task<SweepResult> SweepAsync(CancellationToken ct)
     {
         using var activity = SchedulerTracing.StartSweep();
@@ -54,13 +38,11 @@ internal sealed class SqlSchedulerSweeper(
         return SweepResult.Dispatched(dispatched);
     }
 
-    /// <summary>Claims and dispatches at most one due job; false means nothing (more) is due.</summary>
     private async Task<bool> TryDispatchNextDue(CancellationToken ct)
     {
         var attempt = await unitOfWork.ExecuteAsync((unit, token) => ClaimAndDispatch(unit, token), ct);
 
-        // Compensation runs only now, after the claim's transaction is gone: run inside it, its
-        // fresh transaction would wait on the row lock the claim still holds.
+        // Compensate after the claim's transaction ends, or it would wait on the claim's row lock.
         return attempt switch
         {
             DispatchAttempt.NothingDue => false,
@@ -83,11 +65,8 @@ internal sealed class SqlSchedulerSweeper(
 
         using var activity = SchedulerTracing.StartJob(claimed.JobKey);
 
-        // Parse the recurrence before doing any work. A row this host cannot parse (written by a
-        // newer version before a rollback, or corrupted) must not fail the sweep — that would
-        // starve every other due job forever, since the oldest-due poison row is re-selected on
-        // each pass. Instead, quarantine it: push its run out and dead-letter the occurrence,
-        // leaving the row in place so a host version that understands it can still pick it up.
+        // An unparseable row would be re-selected every pass and starve other jobs, so quarantine
+        // it, leaving the row for a host version that can read it.
         Schedule? schedule = null;
         if (claimed.ScheduleText is not null)
         {
@@ -111,9 +90,7 @@ internal sealed class SqlSchedulerSweeper(
 
         try
         {
-            // Book the outcome on the claim's transaction: a recurring job's next run advances, a
-            // one-shot is deleted. The booking and the enqueue below commit atomically, because the
-            // enqueue joins the same ambient transaction.
+            // The enqueue joins this ambient transaction, so booking and enqueue commit atomically.
             await using (var book = SqlConnectionSource.ConnectionOf(transaction)
                 .CreateCommand(transaction, schedule is null ? Sql.CompleteOneShot : Sql.AdvanceRecurring))
             {
@@ -141,16 +118,11 @@ internal sealed class SqlSchedulerSweeper(
         {
             logger.LogError(ex, "Scheduled job {JobKey} ({Type}) failed to enqueue", claimed.JobKey, claimed.RequestTypeName);
             activity.SetOutcome(SchedulerJobOutcome.Skipped, ex.Message);
-            // Returned uncommitted, so the unit rolls the claim back before compensation runs.
+            // Uncommitted, so the claim rolls back before compensation runs.
             return new DispatchAttempt.Failed(claimed, schedule, ex);
         }
     }
 
-    /// <summary>
-    /// Books an unreadable job out of the sweep's way on the claim's transaction: run pushed
-    /// forward, occurrence dead-lettered, row left in place so it recovers by itself once a
-    /// host that can parse it runs (or the row is repaired).
-    /// </summary>
     private async Task QuarantineUnreadable(
         IQueueUnitOfWork unit, DbTransaction transaction, ScheduledJobRow job,
         DateTimeOffset now, Exception failure, CancellationToken ct)
@@ -203,18 +175,8 @@ internal sealed class SqlSchedulerSweeper(
         await ResolvedRequestEnqueuer.Enqueue(queue, request, registered.ResponseType, ct);
     }
 
-    /// <summary>
-    /// After a failed dispatch: re-book the job in a fresh unit of work, guarded so a competing
-    /// sweep that claimed the job after our rollback wins and this becomes a no-op. Only when the
-    /// re-booking applied is the failure dead-lettered — otherwise the occurrence wasn't ours to
-    /// record. Returns false when even the compensation failed — the job is then still due, and
-    /// the caller must stop draining so the sweep interval provides the backoff.
-    /// </summary>
-    /// <remarks>
-    /// For a one-shot job the re-booking is a delete, and it shares this transaction with the
-    /// dead-letter write — so the row is only ever removed together with the record that replaces
-    /// it. A failure to write the dead letter rolls both back, leaving the job due to be retried.
-    /// </remarks>
+    // Guarded: if a competing sweep re-claimed the job, this is a no-op and nothing is
+    // dead-lettered. False means the job is still due and the caller must stop draining.
     private async Task<bool> Compensate(
         ScheduledJobRow job, Schedule? schedule, Exception failure, CancellationToken ct)
     {
@@ -238,8 +200,7 @@ internal sealed class SqlSchedulerSweeper(
 
                 if (booked == 1)
                 {
-                    // Each failed recurring occurrence is distinct, so suffix the key rather than
-                    // dedupe on the job key; a one-shot fails at most once, so its key suffices.
+                    // Each failed recurring occurrence is distinct; a one-shot fails at most once.
                     var idempotencyKey = schedule is null
                         ? job.JobKey
                         : $"{job.JobKey}:{now.UtcTicks}";
@@ -263,8 +224,7 @@ internal sealed class SqlSchedulerSweeper(
         }
         catch (Exception ex)
         {
-            // The job is still pending and due, so the next sweep retries it — compensation is
-            // about booking the failure, not about keeping the schedule alive.
+            // The job is still due, so the next sweep retries it.
             logger.LogCritical(ex,
                 "Failed to record dispatch failure for scheduled job {JobKey} ({Type}). Payload: {Payload}",
                 job.JobKey, job.RequestTypeName, job.PayloadJson);
@@ -274,7 +234,6 @@ internal sealed class SqlSchedulerSweeper(
 
     private sealed record ScheduledJobRow(string JobKey, string RequestTypeName, string PayloadJson, string? ScheduleText);
 
-    /// <summary>What one claim-and-dispatch pass came to, decided inside the claim's unit of work.</summary>
     private abstract record DispatchAttempt
     {
         public sealed record NothingDue : DispatchAttempt

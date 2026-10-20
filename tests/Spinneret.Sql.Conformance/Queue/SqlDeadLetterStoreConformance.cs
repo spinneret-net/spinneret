@@ -4,20 +4,13 @@ using Spinneret.Queue;
 
 namespace Spinneret.Sql.Conformance;
 
-/// <summary>
-/// The admin side against a real database: paging that stays correct while rows are deleted
-/// underneath it, and a resend whose enqueue and delete land in one transaction.
-/// </summary>
 public abstract class SqlDeadLetterStoreConformance(SqlTestDialect dialect)
 {
     protected SqlTestDialect Dialect => dialect;
 
     private static readonly DateTimeOffset Base = new(2026, 8, 15, 10, 0, 0, TimeSpan.Zero);
 
-    /// <summary>
-    /// Inserts a dead letter with an exact timestamp — the writer's own clock cannot produce the
-    /// ties and orderings these tests need.
-    /// </summary>
+    // Exact timestamps, which the writer's own clock can't produce for these tie and ordering cases.
     private async Task Seed(
         QueueTestHost host,
         string key,
@@ -58,13 +51,11 @@ public abstract class SqlDeadLetterStoreConformance(SqlTestDialect dialect)
     private static IDeadLetterResender Resender(QueueTestHost host) =>
         host.Services.GetRequiredService<IDeadLetterResender>();
 
-    /// <summary>The refusal a resend came back with, or null if it went through.</summary>
     private static async Task<ResendDeadLetterError?> ResendError(
         QueueTestHost host, string key, string? payloadJson = null) =>
         (await Resender(host).ResendAsync(key, payloadJson))
         .Match<ResendDeadLetterError?>(() => null, error => error);
 
-    /// <summary>Walks every page, returning the keys in order and guarding against a runaway loop.</summary>
     private static async Task<List<string>> PageThrough(IDeadLetterStore store, int pageSize)
     {
         var keys = new List<string>();
@@ -84,8 +75,6 @@ public abstract class SqlDeadLetterStoreConformance(SqlTestDialect dialect)
 
         return keys;
     }
-
-    // ------------------------------------------------------------------------------ reads ---
 
     [Test]
     public async Task Reads_back_every_field_that_was_stored()
@@ -108,8 +97,7 @@ public abstract class SqlDeadLetterStoreConformance(SqlTestDialect dialect)
     [Test]
     public async Task Reads_back_what_the_writer_itself_wrote()
     {
-        // The seeding helper above writes its own SQL; this proves the writer and the store agree
-        // without it in the middle.
+        // Seed writes its own SQL; this proves the writer and store agree without it.
         await using var host = await QueueTestHost.StartAsync(Dialect, worker: false);
         var writer = host.Services.GetRequiredService<IDeadLetterWriter>();
 
@@ -132,8 +120,7 @@ public abstract class SqlDeadLetterStoreConformance(SqlTestDialect dialect)
         await Assert.That(deadLetter.Description).IsEqualTo("from the writer");
         await Assert.That(deadLetter.Error).IsEqualTo("it broke");
         await Assert.That(deadLetter.Attempts).IsEqualTo(7);
-        // The store reads by ordinal, so a column inserted anywhere but last would shift every
-        // field after it and this would come back holding someone else's value.
+        // The store reads by ordinal, so a column inserted anywhere but last would shift this value.
         await Assert.That(deadLetter.TraceId).IsEqualTo("4bf92f3577b34da6a3ce929d0e0e4736");
     }
 
@@ -190,8 +177,7 @@ public abstract class SqlDeadLetterStoreConformance(SqlTestDialect dialect)
 
         var page = await Store(host).ListAsync(new DeadLetterQuery { PageSize = 2 });
 
-        // Exactly a full page, nothing behind it: paging has to stop on the null cursor rather than
-        // on a short page, or this returns an empty extra page every time.
+        // Paging must stop on the null cursor, not a short page, or this returns an empty extra page.
         await Assert.That(page.Items.Count).IsEqualTo(2);
         await Assert.That(page.NextCursor).IsNull();
     }
@@ -230,8 +216,7 @@ public abstract class SqlDeadLetterStoreConformance(SqlTestDialect dialect)
     [Test]
     public async Task Pages_through_entries_sharing_one_instant()
     {
-        // The whole reason the key is in the sort: entries dead-lettered in the same millisecond are
-        // ordered only by it, and without that a cursor landing inside the group skips or repeats.
+        // Same-millisecond entries are ordered only by key, so the cursor must resume inside the group.
         await using var host = await QueueTestHost.StartAsync(Dialect, worker: false);
         for (var i = 0; i < 5; i++)
             await Seed(host, $"tie-{i}", Base);
@@ -244,9 +229,7 @@ public abstract class SqlDeadLetterStoreConformance(SqlTestDialect dialect)
     [Test]
     public async Task Pages_through_entries_microseconds_apart()
     {
-        // Instants finer than a dialect stores: SQL Server rounds them into ties, Postgres keeps
-        // them apart. Either way the cursor the store hands out must be one it can resume from
-        // exactly — a cursor carrying more precision than the column would skip or repeat rows.
+        // SQL Server rounds these into ties, Postgres keeps them apart; the cursor must resume exactly.
         await using var host = await QueueTestHost.StartAsync(Dialect, worker: false);
         for (var i = 0; i < 6; i++)
             await Seed(host, $"close-{i}", Base.AddTicks(i * 10));
@@ -260,8 +243,7 @@ public abstract class SqlDeadLetterStoreConformance(SqlTestDialect dialect)
     [Test]
     public async Task Keeps_its_place_when_rows_are_deleted_behind_the_cursor()
     {
-        // The page exists so entries can be discarded from it, so the reader is always racing its
-        // own deletions. Keyset paging holds its position; an offset would slide by one per delete.
+        // An offset would slide by one per delete; keyset paging holds its position.
         await using var host = await QueueTestHost.StartAsync(Dialect, worker: false);
         for (var i = 0; i < 6; i++)
             await Seed(host, $"task-{i}", Base.AddMinutes(i));
@@ -289,8 +271,6 @@ public abstract class SqlDeadLetterStoreConformance(SqlTestDialect dialect)
             .Throws<ArgumentException>();
     }
 
-    // ---------------------------------------------------------------------------- deletes ---
-
     [Test]
     public async Task Deletes_an_entry_once()
     {
@@ -301,8 +281,6 @@ public abstract class SqlDeadLetterStoreConformance(SqlTestDialect dialect)
         await Assert.That(await Store(host).DeleteAsync("task-1")).IsFalse();
         await Assert.That(await host.DeadLetterRowCount()).IsEqualTo(0);
     }
-
-    // ----------------------------------------------------------------------------- resend ---
 
     [Test]
     public async Task Resend_enqueues_the_command_and_removes_the_entry()
@@ -331,9 +309,7 @@ public abstract class SqlDeadLetterStoreConformance(SqlTestDialect dialect)
     [Test]
     public async Task Resend_enqueues_and_deletes_in_one_transaction()
     {
-        // Both operations enlist in the caller's ambient transaction, so rolling it back has to undo
-        // the pair. That is the guarantee the transaction scope exists for, and the difference from
-        // the ordered-but-separate behaviour a transport without a shared database can offer.
+        // Both enlist in the ambient transaction, so rolling it back undoes the pair.
         await using var host = await QueueTestHost.StartAsync(Dialect, worker: false);
         await Seed(host, "task-1", Base);
 
@@ -359,8 +335,7 @@ public abstract class SqlDeadLetterStoreConformance(SqlTestDialect dialect)
     [Test]
     public async Task Resend_commits_both_halves_when_no_transaction_is_ambient()
     {
-        // The scope opens and commits its own transaction; with the worker off, the enqueued row
-        // stays put and can be counted.
+        // With the worker off, the enqueued row stays put and can be counted.
         await using var host = await QueueTestHost.StartAsync(Dialect, worker: false);
         await Seed(host, "task-1", Base);
 
@@ -397,13 +372,9 @@ public abstract class SqlDeadLetterStoreConformance(SqlTestDialect dialect)
         await Assert.That(await host.DeadLetterRowCount()).IsEqualTo(1);
     }
 
-    // --------------------------------------------------------------------- dead-letter flow ---
-
     [Test]
     public async Task A_dead_lettered_command_can_be_listed_and_resent()
     {
-        // The whole loop the admin page exists for, with nothing seeded by hand: a command exhausts
-        // its attempts, appears in the listing, and comes back to life on resend.
         await using var host = await QueueTestHost.StartAsync(Dialect);
 
         await host.Queue.Enqueue(new AlwaysFailCommand("doomed"));

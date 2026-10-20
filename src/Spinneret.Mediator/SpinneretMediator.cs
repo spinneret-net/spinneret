@@ -6,14 +6,8 @@ using Spinneret.Functional;
 
 namespace Spinneret.Mediator;
 
-/// <summary>
-/// Dispatches requests to their registered handler. Implemented by the library — inject and call.
-/// <para>
-/// Caching contract: when a request type carries <see cref="CacheAttribute"/>, the request
-/// object itself is the cache and coalescing key, so cached request types need value equality
-/// (records are the natural fit). A request type without value equality never hits the cache.
-/// </para>
-/// </summary>
+/// <summary>Dispatches requests to their registered handler.</summary>
+/// <remarks>For <see cref="CacheAttribute"/> requests the request object is the cache key, so they need value equality.</remarks>
 public interface ISpinneretMediator
 {
     /// <summary>Sends a request that produces no response.</summary>
@@ -24,9 +18,7 @@ public interface ISpinneretMediator
     Task<TResponse> Send<TResponse>(IRequest<TResponse> request, CancellationToken cancellationToken = default);
 }
 
-/// <summary>
-/// Controls the mediator's response cache. Implemented by the library — inject and call.
-/// </summary>
+/// <summary>Controls the mediator's response cache.</summary>
 public interface IMediatorCache
 {
     /// <summary>Removes every cached response.</summary>
@@ -73,9 +65,7 @@ internal sealed class SpinneretMediator(
         TResponse response;
         if (cacheAttr is not null && typeof(TResponse) != typeof(Unit))
         {
-            // Coalescing means a joiner awaits a task started under a different caller's
-            // activity, so the handler's work is attributed to whoever created it. Inherent to
-            // coalescing; the tag is what makes it legible.
+            // Coalesced: the shared handler runs under the first caller's activity, ignoring each caller's token.
             var dispatched = false;
             var sharedTask = cache.GetOrCreate(
                 request,
@@ -115,8 +105,7 @@ internal sealed class SpinneretMediator(
         }
         catch (TargetInvocationException e) when (e.InnerException is not null)
         {
-            // Unwrap so synchronously thrown handler exceptions surface like async ones,
-            // with the original stack trace preserved.
+            // Surface synchronous handler throws like async ones, keeping the stack trace.
             ExceptionDispatchInfo.Capture(e.InnerException).Throw();
             throw; // Unreachable.
         }

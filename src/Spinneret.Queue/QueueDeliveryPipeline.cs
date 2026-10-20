@@ -3,31 +3,18 @@ using Microsoft.Extensions.Logging;
 
 namespace Spinneret.Queue;
 
-/// <summary>
-/// The tail every delivery shares, whichever transport brought it: read the envelope, dead-letter
-/// it if it cannot be read, hand it to <see cref="IQueueDeliveryProcessor"/>, and commit the unit of
-/// work when the outcome is an acknowledge. The transport only translates the outcome — an HTTP
-/// status for Cloud Tasks, a commit or a reschedule for the in-host worker.
-/// </summary>
-/// <remarks>
-/// A non-acknowledged outcome is returned without committing, so the caller's unit rolls back: the
-/// processor could not book the outcome, and the transport is to redeliver the message as it was.
-/// </remarks>
+// Shared delivery tail for every transport. A non-ack outcome returns without committing,
+// so the unit rolls back and the message is redelivered as it was.
 internal sealed class QueueDeliveryPipeline(
     IQueueDeliveryProcessor processor,
     IDeadLetterWriter deadLetterWriter,
     ILogger<QueueDeliveryPipeline> logger)
 {
-    /// <summary>The CommandTypeName recorded for a message whose envelope could not be read.</summary>
     internal const string UnreadableEnvelopeTypeName = "<unreadable envelope>";
 
     private static readonly TimeSpan UnreadableEnvelopeRetryBackoff = TimeSpan.FromMinutes(1);
     private static readonly TimeSpan CommitFailureRetryBackoff = TimeSpan.FromSeconds(5);
 
-    /// <param name="unit">The unit of work the delivery runs in, opened by the transport.</param>
-    /// <param name="rawEnvelope">The message body as the transport received it.</param>
-    /// <param name="taskId">The transport's id for the message, stable across redeliveries.</param>
-    /// <param name="ct">Cancellation token.</param>
     public async Task<QueueDeliveryOutcome> DeliverAsync(
         IQueueUnitOfWork unit, string rawEnvelope, string taskId, CancellationToken ct)
     {
@@ -56,11 +43,7 @@ internal sealed class QueueDeliveryPipeline(
         }
     }
 
-    /// <summary>
-    /// A message whose envelope cannot even be read is permanently broken — no retry can repair the
-    /// bytes. Dead-letter the raw body for inspection instead of retrying or dropping it, and if even
-    /// that write fails, redeliver later: never drop a message without a trace.
-    /// </summary>
+    // No retry can fix unreadable bytes: dead-letter the raw body, and if that fails, redeliver rather than drop.
     private async Task<QueueDeliveryOutcome> DeadLetterUnreadableAsync(
         IQueueUnitOfWork unit, string rawEnvelope, string taskId, string error, CancellationToken ct)
     {
@@ -90,12 +73,7 @@ internal sealed class QueueDeliveryPipeline(
         }
     }
 
-    /// <summary>
-    /// Makes the acknowledged delivery durable. Not cancellable: the outcome is decided and its
-    /// writes are done, so stopping now would only throw that work away. A failed commit leaves
-    /// nothing behind — the handler's writes and the outcome's booking go with it — so the message
-    /// is redelivered as it was, without spending an attempt.
-    /// </summary>
+    // Not cancellable: the work is done. A failed commit discards everything, so redeliver without spending an attempt.
     private async Task<QueueDeliveryOutcome> CommitAsync(IQueueUnitOfWork unit, string requestType, string taskId)
     {
         try

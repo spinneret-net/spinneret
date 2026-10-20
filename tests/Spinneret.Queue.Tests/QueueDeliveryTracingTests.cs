@@ -3,17 +3,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Spinneret.Queue.Tests;
 
-/// <summary>
-/// Trace context has to survive the queue hop: a message's processing belongs to the trace of
-/// whatever enqueued it, however long ago and however many attempts later.
-/// </summary>
-/// <remarks>
-/// Propagation is asserted from the ambient activity the handler saw
-/// (<see cref="FakeDispatcher.ObservedContext"/>); the spans themselves come from a
-/// <see cref="SpanCollector"/>, which filters by the task id because an
-/// <see cref="ActivityListener"/> is process-global while TUnit runs a class's tests in parallel. The
-/// source is enabled for the assembly by <see cref="TracingTestListener"/>.
-/// </remarks>
 public class QueueDeliveryTracingTests
 {
     private static readonly DateTimeOffset Now = new(2026, 8, 10, 12, 0, 0, TimeSpan.Zero);
@@ -82,7 +71,7 @@ public class QueueDeliveryTracingTests
     [Arguments("00-00000000000000000000000000000000-00f067aa0ba902b7-01")]
     public async Task An_unusable_traceparent_still_dispatches(string? traceParent)
     {
-        // A malformed value is a diagnostics problem; losing the message would make it a business one.
+        // A malformed value is a diagnostics problem; losing the message would be a business one.
         var outcome = await CreateProcessor().ProcessAsync(
             Envelope<UnannotatedCommand>(traceParent), "task-1", CancellationToken.None);
 
@@ -99,7 +88,7 @@ public class QueueDeliveryTracingTests
         await CreateProcessor().ProcessAsync(
             Envelope<UnannotatedCommand>(traceParent), "task-1", CancellationToken.None);
 
-        // Not the failed attempt's context: every attempt of a task has to answer one trace query.
+        // Every attempt of a task has to answer one trace query.
         await Assert.That(Expect.Single(_envelopeQueue.Enqueued).Envelope.TraceParent).IsEqualTo(traceParent);
     }
 
@@ -125,7 +114,7 @@ public class QueueDeliveryTracingTests
             Envelope<UnannotatedCommand>(TraceParentFor(traceId, ActivitySpanId.CreateRandom())),
             "task-1", CancellationToken.None);
 
-        // The 32-hex trace id, not the traceparent: this is what an operator pastes into a log query.
+        // The trace id, not the traceparent: this is what an operator searches logs by.
         await Assert.That(Expect.Single(_deadLetters.Entries).TraceId).IsEqualTo(traceId.ToHexString());
     }
 
@@ -144,11 +133,7 @@ public class QueueDeliveryTracingTests
         await Assert.That(Expect.Single(_deadLetters.Entries).TraceId).IsEqualTo(ambient.TraceId.ToHexString());
     }
 
-    // -----------------------------------------------------------------------------------------
-    // The span's tags. Spelled as literals, not as the QueueTags/QueueOutcome consts the production
-    // code uses: docs/queue.md publishes these strings, so a rename has to fail here rather than
-    // follow along silently.
-    // -----------------------------------------------------------------------------------------
+    // Tags spelled as literals: docs/queue.md publishes them, so a rename must fail here.
 
     private async Task<Activity> ProcessAndCollect<TCommand>(string taskId, int priorFailures = 0)
     {
@@ -240,11 +225,8 @@ public class QueueDeliveryTracingTests
     [Test]
     public async Task An_unsampled_delivery_records_its_outcome_nowhere()
     {
-        // A host that never calls AddSource gets a null span for every delivery, and the outcome has
-        // to land on that span or nowhere: reaching for Activity.Current instead would mark the
-        // host's own request span failed for a delivery it merely carried. Asserted on SetOutcome
-        // directly because the span cannot be suppressed in-process — the test host registers a
-        // catch-all ActivityListener, so every source has a listener here.
+        // Reaching for Activity.Current would fail the host's own span. Asserted on SetOutcome directly
+        // because the test host's catch-all listener means the span can't be suppressed in-process.
         using var host = new Activity("host request");
         host.SetIdFormat(ActivityIdFormat.W3C);
         host.Start();

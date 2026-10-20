@@ -59,6 +59,5 @@ public abstract class BindableBase : INotifyPropertyChanged
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
     }
 
-    /// <summary>Lets a <see cref="RowCollection{TRow}"/> raise changes on the view model that owns it.</summary>
     internal void RaisePropertyChangedFor(string propertyName) => RaisePropertyChanged(propertyName);
 }

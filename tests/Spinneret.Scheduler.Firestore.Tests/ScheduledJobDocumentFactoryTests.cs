@@ -9,15 +9,13 @@ public class ScheduledJobDocumentFactoryTests
 
     private static QueueTypeRegistry Registry => new([typeof(TestRequest).Assembly]);
 
-    /// <summary>A fixed clock, so <c>createdAt</c> is an assertable value rather than "now".</summary>
+    /// <summary>Fixed, so <c>createdAt</c> is assertable.</summary>
     internal static readonly DateTimeOffset Now = new(2026, 8, 15, 9, 0, 0, TimeSpan.Zero);
 
     private static TimeProvider FixedClock => new FixedTimeProvider(Now);
 
     private static ScheduledJobDocumentFactory CreateFactory(FakePayloadSerializer? serializer = null) =>
         new(Registry, serializer ?? new FakePayloadSerializer(), FixedClock);
-
-    // ------------------------------------------------------------------------------- OneShot ---
 
     [Test]
     public async Task OneShot_maps_request_type_name_from_registry()
@@ -48,7 +46,7 @@ public class ScheduledJobDocumentFactoryTests
     [Test]
     public async Task OneShot_writes_no_status_field()
     {
-        // Existence is the status: a job is deleted once it has run, so there is nothing to record.
+        // Existence is the status: a job is deleted once it has run.
         var factory = CreateFactory();
 
         var doc = factory.OneShot(new TestRequest("x"), new DateTimeOffset(2030, 1, 2, 3, 4, 5, TimeSpan.Zero));
@@ -83,8 +81,6 @@ public class ScheduledJobDocumentFactoryTests
     [Test]
     public async Task OneShot_stamps_created_at_from_the_injected_clock()
     {
-        // Exact rather than a window: the factory takes a TimeProvider, so the value is determined
-        // by the caller's clock and not by whenever the test happened to run.
         var factory = CreateFactory();
 
         var doc = factory.OneShot(new TestRequest("x"), new DateTimeOffset(2030, 1, 2, 3, 4, 5, TimeSpan.Zero));
@@ -96,7 +92,6 @@ public class ScheduledJobDocumentFactoryTests
     [Test]
     public async Task OneShot_omits_schedule_marking_the_job_as_one_shot()
     {
-        // The dispatcher treats the absence of schedule as the one-shot marker.
         var factory = CreateFactory();
 
         var doc = factory.OneShot(new TestRequest("x"), new DateTimeOffset(2030, 1, 2, 3, 4, 5, TimeSpan.Zero));
@@ -116,8 +111,6 @@ public class ScheduledJobDocumentFactoryTests
             .Throws<InvalidOperationException>();
     }
 
-    // --------------------------------------------------------------------- RecurringDefinition ---
-
     [Test]
     public async Task RecurringDefinition_writes_the_canonical_schedule_string()
     {
@@ -132,8 +125,7 @@ public class ScheduledJobDocumentFactoryTests
     [Test]
     public async Task RecurringDefinition_writes_the_zone_with_the_expression()
     {
-        // The stored string is the whole schedule: a zone lost here would silently re-interpret every
-        // slot in UTC when the sweep rehydrates it.
+        // A lost zone would silently reinterpret every slot in UTC.
         var factory = CreateFactory();
 
         var doc = factory.RecurringDefinition(new TestRequest("x"), Schedule.Cron("0 1 * * *", Stockholm));
@@ -160,8 +152,7 @@ public class ScheduledJobDocumentFactoryTests
     [Test]
     public async Task RecurringDefinition_contains_only_definition_fields()
     {
-        // Status and run timestamps are owned by the caller's register-or-refresh logic — the
-        // definition must never carry them, or re-registering would disturb a live schedule.
+        // Run state belongs to register-or-refresh; carrying it would disturb a live schedule.
         var factory = CreateFactory();
 
         var doc = factory.RecurringDefinition(new TestRequest("x"), Schedule.Cron("* * * * *", Stockholm));

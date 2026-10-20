@@ -4,10 +4,7 @@ using Spinneret.Mediator;
 namespace Spinneret.Queue;
 
 /// <summary>
-/// Resolves queue payload type names to the actual <see cref="IRequest{TResponse}"/> CLR types
-/// they were enqueued as. Built once at startup by scanning the registered assemblies.
-/// Stores types by <see cref="Type.FullName"/> — never assembly-qualified — so the dispatcher
-/// cannot be coerced into instantiating arbitrary types.
+/// Maps wire type names to registered <see cref="IRequest{TResponse}"/> types; keyed by <see cref="Type.FullName"/> so no arbitrary type can be loaded.
 /// </summary>
 public sealed class QueueTypeRegistry
 {
@@ -62,10 +59,7 @@ public sealed class QueueTypeRegistry
             .ToArray();
     }
 
-    /// <summary>
-    /// Every non-default channel declared by a registered command's [QueuePolicy], for transports to
-    /// validate their channel→queue configuration at startup.
-    /// </summary>
+    /// <summary>Every non-default channel declared by a registered command, for transports to validate.</summary>
     public IReadOnlyCollection<string> DeclaredChannels { get; }
 
     public string GetName(Type requestType)

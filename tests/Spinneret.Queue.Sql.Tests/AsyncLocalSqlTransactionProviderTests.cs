@@ -47,7 +47,7 @@ public sealed class AsyncLocalSqlTransactionProviderTests
 
         await Assert.That(await flowA).IsSameReferenceAs(a);
         await Assert.That(await flowB).IsSameReferenceAs(b);
-        // The outer flow never set one, and children cannot leak upward.
+        // Children cannot leak upward.
         await Assert.That(provider.Current).IsNull();
     }
 }

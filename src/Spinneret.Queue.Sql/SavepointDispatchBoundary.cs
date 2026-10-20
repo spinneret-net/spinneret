@@ -2,13 +2,8 @@ using Microsoft.Extensions.Logging;
 
 namespace Spinneret.Queue.Sql;
 
-/// <summary>
-/// Wraps each handler invocation in a transaction savepoint. A failed handler's partial writes —
-/// including any cascade enqueues it made — are rolled back to the savepoint, while the delivery
-/// transaction survives so the processor can still book the retry or dead-letter atomically with the
-/// acknowledge. Without this, either a failed handler's half-finished writes would commit alongside
-/// the retry booking, or the whole delivery would roll back and lose the attempt accounting.
-/// </summary>
+// A savepoint per handler lets a failure discard its writes while the delivery transaction survives
+// to book the retry or dead-letter atomically with the acknowledge.
 internal sealed class SavepointDispatchBoundary(
     SqlQueueStorage storage,
     ISqlTransactionProvider transactions,
@@ -19,8 +14,6 @@ internal sealed class SavepointDispatchBoundary(
 
     public async Task ExecuteAsync(QueueDeliveryContext context, Func<Task> dispatch, CancellationToken ct)
     {
-        // No ambient transaction: nothing to bracket. Only a delivery's unit of work publishes one
-        // around the processor.
         if (transactions.Current is not { } transaction)
         {
             await dispatch();
@@ -32,11 +25,8 @@ internal sealed class SavepointDispatchBoundary(
         {
             await dispatch();
 
-            // A handler that caught a database error and returned normally can leave the transaction
-            // refusing all further work (Postgres aborts it on any error). Committing it would then
-            // silently roll back — the handler's writes and the acknowledge with it — while the
-            // delivery reported success. Treated as the failure it is, the savepoint below restores
-            // the transaction and the attempt is booked like any other.
+            // A handler that swallowed a database error can leave the transaction aborted (Postgres);
+            // committing it would silently roll back the acknowledge too.
             if (await storage.Dialect.IsAbortedAsync(transaction, ct))
                 throw new InvalidOperationException(
                     $"The handler for {context.Envelope.RequestTypeName} returned normally, but a database error "
@@ -52,10 +42,8 @@ internal sealed class SavepointDispatchBoundary(
             }
             catch (Exception rollbackEx)
             {
-                // The transaction itself is dead (e.g. this delivery was a deadlock victim). The
-                // processor's booking will fail on the same dead transaction and fall back to
-                // transport redelivery, which is exactly the safe outcome — so log, don't mask the
-                // handler's exception.
+                // The transaction is dead (e.g. deadlock victim); booking will fail too and fall back
+                // to redelivery, so log rather than mask the handler's exception.
                 logger.LogWarning(rollbackEx,
                     "Savepoint rollback failed for {RequestType}; the delivery transaction is no longer usable",
                     context.Envelope.RequestTypeName);

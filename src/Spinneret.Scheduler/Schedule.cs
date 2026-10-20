@@ -4,14 +4,10 @@ using Cronos;
 namespace Spinneret.Scheduler;
 
 /// <summary>
-/// When a recurring job runs: a cron expression evaluated in a fixed time zone, so a schedule keeps
-/// its wall-clock slot across DST transitions. Providers persist a schedule as the canonical string
-/// form (<see cref="ToString"/> / <see cref="Parse"/>) and rehydrate every stored schedule through
-/// <see cref="Parse"/>, which is also how an application reads a schedule out of configuration.
+/// A cron expression evaluated in a fixed IANA time zone, keeping its wall-clock slot across DST.
 /// </summary>
 /// <remarks>
-/// Occurrences are only as prompt as the provider's dispatch sweep: a slot finer than the sweep's
-/// period is reached on the following sweep rather than at the slot itself.
+/// Occurrences are only as prompt as the dispatch sweep's interval.
 /// </remarks>
 public sealed record Schedule
 {
@@ -33,14 +29,12 @@ public sealed record Schedule
     public string Expression { get; }
 
     /// <summary>
-    /// A run at every occurrence of <paramref name="expression"/> — five cron fields, or six when
-    /// the first is seconds — in local time in the zone named by <paramref name="timeZoneId"/>.
+    /// Runs at every occurrence of <paramref name="expression"/> in local time in <paramref name="timeZoneId"/>.
     /// </summary>
-    /// <param name="expression">The cron expression, e.g. <c>0 3 * * *</c>.</param>
+    /// <param name="expression">Five cron fields, or six when the first is seconds, e.g. <c>0 3 * * *</c>.</param>
     /// <param name="timeZoneId">An IANA time zone id, e.g. <c>Europe/Stockholm</c>.</param>
     /// <exception cref="ArgumentException">
-    /// The expression is not valid cron, describes a date that never occurs, or the id is not an
-    /// IANA zone this host can resolve.
+    /// Invalid cron, a date that never occurs, or an unresolvable IANA zone.
     /// </exception>
     public static Schedule Cron(string expression, string timeZoneId)
     {
@@ -50,17 +44,14 @@ public sealed record Schedule
     }
 
     /// <summary>
-    /// A run at every occurrence of <paramref name="expression"/> in local time in
-    /// <paramref name="zone"/>, which must be an IANA zone — see <see cref="Cron(string, string)"/>.
+    /// Runs at every occurrence of <paramref name="expression"/> in <paramref name="zone"/>, which must be an IANA zone.
     /// </summary>
     public static Schedule Cron(string expression, TimeZoneInfo zone)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(expression);
         ArgumentNullException.ThrowIfNull(zone);
 
-        // Only the zone id is persisted, and Parse rehydrates it by id on whichever host runs the
-        // dispatch sweep. Windows ids resolve on Windows but nowhere else, so a schedule registered
-        // with one would be unreadable to a Linux sweep — reject it here, where the caller sees it.
+        // Only the id is persisted; a Windows id would be unreadable to a sweep on Linux.
         if (!zone.HasIanaId)
             throw new ArgumentException(
                 $"Time zone '{zone.Id}' is not an IANA zone. Schedules persist only the zone id and "
@@ -89,10 +80,7 @@ public sealed record Schedule
             throw new ArgumentException($"Invalid cron expression '{expression}': {ex.Message}", nameof(expression), ex);
         }
 
-        // A syntactically valid expression can still describe a date that never arrives (31 February).
-        // Reject it here, where the registering code sees it, rather than letting it reach a job
-        // document that no sweep can ever advance. Impossible dates are impossible at every instant,
-        // so probing from the current one is enough to tell them apart.
+        // Reject dates that never arrive (31 February), which no sweep could ever advance.
         if (parsed.GetNextOccurrence(DateTimeOffset.UtcNow, zone) is null)
             throw new ArgumentException(
                 $"Cron expression '{normalized}' has no future occurrence in '{zone.Id}'.", nameof(expression));
@@ -100,11 +88,7 @@ public sealed record Schedule
         return new Schedule(zone, parsed, normalized);
     }
 
-    /// <summary>
-    /// The next run strictly after <paramref name="now"/>. Strictness is what makes a dispatch
-    /// sweep's lease-by-advancing-the-run-time terminate: a NextRun that could return
-    /// <paramref name="now"/> itself would re-select the job forever.
-    /// </summary>
+    /// <summary>The next run strictly after <paramref name="now"/>.</summary>
     public DateTimeOffset NextRun(DateTimeOffset now) =>
         _expression.GetNextOccurrence(now, _zone)
         ?? throw new InvalidOperationException($"No next run found for '{this}' after {now:O}.");
@@ -120,9 +104,6 @@ public sealed record Schedule
 
         var parts = text.Split(':', 3);
 
-        // Pre-cron schedules named their form in the same position, so say what to do about them
-        // instead of reporting them as gibberish — a stored one surfaces through the sweep, far from
-        // whoever wrote it.
         if (parts[0] is "every" or "daily")
             throw new FormatException(
                 $"Schedule '{text}' is in the pre-cron form. Re-register the job to replace it with "
@@ -147,16 +128,12 @@ public sealed record Schedule
         }
         catch (ArgumentException ex)
         {
-            // Parse promises FormatException for any non-canonical text — a well-formed wrapper
-            // around an expression the schedule rejects is still non-canonical.
+            // Parse promises FormatException for any non-canonical text.
             throw new FormatException($"Invalid schedule '{text}': {ex.Message}", ex);
         }
     }
 
-    /// <summary>
-    /// Non-throwing counterpart of <see cref="Parse"/>, for probing text whose origin makes
-    /// invalidity an expected case (user input, external configuration).
-    /// </summary>
+    /// <summary>Non-throwing counterpart of <see cref="Parse"/>.</summary>
     public static bool TryParse(string? text, [NotNullWhen(true)] out Schedule? schedule)
     {
         schedule = null;
@@ -179,11 +156,7 @@ public sealed record Schedule
 
     public override int GetHashCode() => HashCode.Combine(TimeZoneId, Expression);
 
-    /// <summary>
-    /// Single-spaced and upper-cased, so expressions that differ only in whitespace or in the case
-    /// of a name (<c>MON</c>, <c>JAN</c>) produce one canonical string — providers compare the
-    /// stored string to decide whether a schedule changed.
-    /// </summary>
+    // Canonical form matters: providers compare the stored string to detect a schedule change.
     private static string Normalize(string expression) =>
         string.Join(' ', expression.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries))
             .ToUpperInvariant();

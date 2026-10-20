@@ -2,7 +2,6 @@ using Spinneret.Queue.Mssql;
 
 namespace Spinneret.Scheduler.Mssql.Tests;
 
-/// <summary>What the SQL Server scheduler script says; what running it does is the conformance suites' job.</summary>
 public sealed class MssqlSchedulerSchemaTests
 {
     [Test]

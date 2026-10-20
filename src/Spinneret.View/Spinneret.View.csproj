@@ -5,17 +5,12 @@
         <Nullable>enable</Nullable>
         <ImplicitUsings>enable</ImplicitUsings>
         <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
-        <!-- RS0041: the Razor source generator emits DynamicView.BuildRenderTree with
-             nullability-oblivious parameters; our own code is fully annotated. -->
+        <!-- RS0041: Razor-generated BuildRenderTree is nullability-oblivious. -->
         <NoWarn>$(NoWarn);CS8524;RS0041</NoWarn>
     </PropertyGroup>
 
     <ItemGroup>
-        <!-- A package reference, never a Microsoft.AspNetCore.App framework reference: framework
-             references flow transitively into the consuming app, and the shared framework has no
-             runtime pack for the browser-wasm RID, so one here would make this package impossible
-             to restore from a Blazor WebAssembly app. Anything needing the shared framework —
-             HttpContext and friends — belongs in Spinneret.View.Server instead. -->
+        <!-- Never a framework reference: it flows to consumers and breaks WebAssembly restore. -->
         <PackageReference Include="Microsoft.AspNetCore.Components.Web" Version="10.0.13" />
     </ItemGroup>
 

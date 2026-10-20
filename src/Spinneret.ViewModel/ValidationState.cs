@@ -2,15 +2,10 @@ using System.ComponentModel;
 
 namespace Spinneret.ViewModel;
 
-/// <summary>One validation error: the property path it is keyed on and its display text.</summary>
+/// <summary>A validation error: its property path and display text.</summary>
 public readonly record struct ValidationError(string Key, string Error);
 
-/// <summary>
-/// The error bag of a view model: errors keyed by property path, split into those a bound
-/// input surfaces itself (<see cref="BoundErrors"/>) and those the page must render in a
-/// summary (<see cref="UnboundErrors"/>). Implemented by the library — consume via
-/// <see cref="IValidationStateProvider"/>.
-/// </summary>
+/// <summary>Errors keyed by property path, split into <see cref="BoundErrors"/> (shown by an input) and <see cref="UnboundErrors"/>.</summary>
 public interface IValidationState : INotifyPropertyChanged
 {
     void RegisterBoundProperty(string key);

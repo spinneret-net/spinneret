@@ -3,8 +3,7 @@ using Spinneret.Scheduler.Sql;
 namespace Spinneret.Scheduler.Postgres;
 
 /// <summary>
-/// The PostgreSQL scheduler's table, bound from the <c>Scheduler:Postgres</c> section. Connection,
-/// schema name and schema creation follow the queue's <c>Queue:Postgres</c> options.
+/// The PostgreSQL scheduler's table, bound from <c>Scheduler:Postgres</c>; connection and schema follow <c>Queue:Postgres</c>.
 /// </summary>
 public sealed class PostgresSchedulerOptions : SqlSchedulerOptions
 {

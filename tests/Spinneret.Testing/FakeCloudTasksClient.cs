@@ -7,16 +7,7 @@ using Task = System.Threading.Tasks.Task;
 
 namespace Spinneret.Testing;
 
-/// <summary>
-/// Hand-rolled <see cref="CloudTasksClient"/> capturing task creation. All convenience overloads of
-/// CreateTaskAsync funnel into the (CreateTaskRequest, CallSettings) overload, so overriding it
-/// captures every enqueue the library performs.
-/// </summary>
-/// <remarks>
-/// Behaves like Cloud Tasks where the library depends on it: a named task is remembered, and creating
-/// another with the same name answers <see cref="StatusCode.AlreadyExists"/> — the deduplication the
-/// relay's idempotent forwarding rests on.
-/// </remarks>
+/// <summary>Captures task creation; like Cloud Tasks, a reused task name answers <see cref="StatusCode.AlreadyExists"/>.</summary>
 public sealed class FakeCloudTasksClient : CloudTasksClient
 {
     private readonly ConcurrentQueue<CreateTaskRequest> _requests = new();
@@ -24,7 +15,7 @@ public sealed class FakeCloudTasksClient : CloudTasksClient
     private int _failNext;
     private int _loseNextResponse;
 
-    /// <summary>Every task created, in order. Duplicates refused as already existing are not included.</summary>
+    /// <summary>Every task created, in order, excluding refused duplicates.</summary>
     public List<CreateTaskRequest> Requests => [.. _requests];
 
     /// <summary>Queue resources created through <c>CreateQueueAsync</c>, in call order.</summary>
@@ -33,10 +24,7 @@ public sealed class FakeCloudTasksClient : CloudTasksClient
     /// <summary>Every <c>CreateQueueAsync</c> call, including the ones made to fail.</summary>
     public int CreateQueueAttempts { get; private set; }
 
-    /// <summary>
-    /// Leading <c>CreateQueueAsync</c> calls that fail as an emulator that is not listening yet
-    /// does, after which creation succeeds — an emulator container starting alongside the host.
-    /// </summary>
+    /// <summary>Leading <c>CreateQueueAsync</c> calls that fail, as a still-starting emulator does.</summary>
     public int TransientCreateQueueFailures { get; set; }
 
     /// <summary>Thrown by every <c>CreateTaskAsync</c> while set.</summary>
@@ -44,13 +32,10 @@ public sealed class FakeCloudTasksClient : CloudTasksClient
 
     public Exception? ThrowOnCreateQueue { get; set; }
 
-    /// <summary>Makes the next <paramref name="count"/> task creations fail as an outage would, creating nothing.</summary>
+    /// <summary>Fails the next <paramref name="count"/> task creations, creating nothing.</summary>
     public void FailNextCreateTasks(int count) => Interlocked.Exchange(ref _failNext, count);
 
-    /// <summary>
-    /// Makes the next <paramref name="count"/> task creations succeed but answer with an error, as
-    /// when the response is lost on the way back — the caller cannot tell the task now exists.
-    /// </summary>
+    /// <summary>The next <paramref name="count"/> task creations succeed but report an error, as a lost response would.</summary>
     public void LoseNextCreateTaskResponses(int count) => Interlocked.Exchange(ref _loseNextResponse, count);
 
     public CreateTaskRequest SingleRequest => Requests.Single();

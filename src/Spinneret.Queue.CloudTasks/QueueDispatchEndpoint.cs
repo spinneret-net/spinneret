@@ -5,23 +5,14 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Spinneret.Queue.CloudTasks;
 
-/// <summary>
-/// HTTP adapter between Cloud Tasks and <see cref="IQueueDeliveryProcessor"/>. The processor owns every
-/// decision; this endpoint only translates its outcome to the transport: acknowledge as 200, retry as
-/// 429 with a <c>Retry-After</c> header Cloud Tasks honors for the backoff. The queue's own retry
-/// config is an effectively unlimited backstop, so a task ends only when this endpoint returns 200.
-/// </summary>
+// Translates the processor's outcome: ack is 200, retry is 429 with Retry-After.
+// The queue's own retry config is an unlimited backstop, so a task ends only on 200.
 internal static class QueueDispatchEndpoint
 {
     internal const string DefaultRoutePattern = "/internal/queue/dispatch";
 
-    /// <summary>
-    /// Maps the route. Deliberately neither named after the public entry point nor an extension
-    /// method: an extension called <c>MapCloudTasksDispatch</c> in this namespace is reached by
-    /// enclosing-namespace lookup from any assembly that sits under <c>Spinneret.Queue.CloudTasks</c> and
-    /// sees its internals — the test assembly does — where it wins over the public one and silently
-    /// skips the route/<c>DispatcherUrl</c> agreement check that exists to be unskippable.
-    /// </summary>
+    // Not an extension named MapCloudTasksDispatch: from inside this namespace it would shadow the
+    // public one and skip the DispatcherUrl check.
     public static IEndpointRouteBuilder Map(IEndpointRouteBuilder endpoints, string pattern)
     {
         endpoints
@@ -41,14 +32,10 @@ internal static class QueueDispatchEndpoint
         using (var reader = new StreamReader(httpContext.Request.Body))
             body = await reader.ReadToEndAsync(ct);
 
-        // The task name is the delivery's stable identity — what its dead letter is filed under, so
-        // a redelivered write lands on the entry it already wrote. Cloud Tasks always sends it;
-        // a request without one did not come from Cloud Tasks.
+        // The dead-letter key; Cloud Tasks always sends it.
         if (ReadTaskId(httpContext) is not { } taskId)
             return Results.BadRequest("Missing X-CloudTasks-TaskName header.");
 
-        // The unit of work is the storage's: with SQL storage the delivery's writes, bookings and
-        // dead letter commit together before the 200, and a failed commit becomes a redelivery.
         var pipeline = services.GetRequiredService<QueueDeliveryPipeline>();
         var outcome = await services.GetRequiredService<IQueueUnitOfWorkFactory>().ExecuteAsync(
             (unit, token) => pipeline.DeliverAsync(unit, body, taskId, token), ct);
@@ -63,8 +50,7 @@ internal static class QueueDispatchEndpoint
         return Results.StatusCode(StatusCodes.Status429TooManyRequests);
     }
 
-    // Cloud Tasks task name format: projects/{project}/locations/{location}/queues/{queue}/tasks/{id}
-    // Slashes are not valid in Firestore document IDs, so we take only the final segment.
+    // Last segment only: slashes are invalid in Firestore document ids.
     private static string? ReadTaskId(HttpContext httpContext)
     {
         var taskName = httpContext.Request.Headers["X-CloudTasks-TaskName"].FirstOrDefault();

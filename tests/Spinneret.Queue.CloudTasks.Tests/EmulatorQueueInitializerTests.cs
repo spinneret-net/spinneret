@@ -9,21 +9,12 @@ using Task = System.Threading.Tasks.Task;
 
 namespace Spinneret.Queue.CloudTasks.Tests;
 
-/// <summary>
-/// The initializer exists so the emulator's queues and <c>Queue:CloudTasks:Channels</c> cannot drift apart
-/// in local development. It must stay inert against real Cloud Tasks, where queues are owned by
-/// infrastructure-as-code — and it must never fail a host, since one boots with an emulator
-/// configured long before any emulator is listening.
-/// </summary>
 public sealed class EmulatorQueueInitializerTests
 {
     private static readonly RpcException Unavailable =
         new(new Status(StatusCode.Unavailable, "no emulator is listening"));
 
-    /// <summary>
-    /// Runs the registered hosted services to completion. Queue creation is background work, so
-    /// <c>StartAsync</c> returns as soon as it is under way rather than when it is finished.
-    /// </summary>
+    // Queue creation is background work, so StartAsync returns before it finishes.
     private static async Task<FakeCloudTasksClient> Start(
         bool emulator, Exception? throwOnCreateQueue = null)
     {
@@ -42,12 +33,7 @@ public sealed class EmulatorQueueInitializerTests
         return client;
     }
 
-    /// <summary>
-    /// An initializer whose backoff is instant, so a test drives the retry loop at full speed. The
-    /// loop retries indefinitely, so <paramref name="maxRounds"/> ends it the way a shutdown does —
-    /// the delay throws, exactly as <c>Task.Delay</c> does when the stopping token fires — letting a
-    /// test assert on a permanently absent emulator without spinning forever.
-    /// </summary>
+    // Instant backoff; maxRounds ends the indefinite retry loop the way a shutdown would.
     private static (EmulatorQueueInitializer Initializer, List<TimeSpan> Delays) CreateInitializer(
         IServiceProvider provider, int maxRounds = 20)
     {
@@ -66,14 +52,11 @@ public sealed class EmulatorQueueInitializerTests
         return (initializer, delays);
     }
 
-    /// <summary>Starts the initializer and waits for its background work to finish.</summary>
     private static async Task RunAsync(EmulatorQueueInitializer initializer)
     {
         await initializer.StartAsync(CancellationToken.None);
         await initializer.ExecuteTask!;
     }
-
-    // ------------------------------------------------------------------------------ creating ---
 
     [Test]
     public async Task Creates_a_queue_for_every_configured_channel_against_the_emulator()
@@ -108,9 +91,7 @@ public sealed class EmulatorQueueInitializerTests
     [Test]
     public async Task Without_an_emulator_it_never_resolves_the_cloud_tasks_client()
     {
-        // Building a real client resolves Application Default Credentials, and a host that only
-        // receives dispatches has no reason to hold any. Resolving it at host start would make every
-        // production host need credentials just to boot — so the emulator check must come first.
+        // Building a real client resolves credentials, which a dispatch-only host shouldn't need to boot.
         var resolved = false;
         var services = new ServiceCollection();
         services.AddLogging();
@@ -133,7 +114,6 @@ public sealed class EmulatorQueueInitializerTests
     [Test]
     public async Task An_already_existing_queue_is_not_an_error()
     {
-        // Restarting against a warm emulator is the normal case, not a failure.
         var client = await Start(
             emulator: true,
             throwOnCreateQueue: new RpcException(new Status(StatusCode.AlreadyExists, "exists")));
@@ -144,8 +124,7 @@ public sealed class EmulatorQueueInitializerTests
     [Test]
     public async Task An_emulator_without_queue_creation_support_is_not_retried()
     {
-        // Some emulator builds only serve queues declared with -queue flags. Retrying cannot change
-        // that answer, so it is a warning and the loop is done — not a queue pending forever.
+        // Some emulator builds only serve queues declared with -queue flags; retrying can't change that.
         var client = new FakeCloudTasksClient
         {
             ThrowOnCreateQueue = new RpcException(new Status(StatusCode.Unimplemented, "nope")),
@@ -159,15 +138,10 @@ public sealed class EmulatorQueueInitializerTests
         await Assert.That(delays).IsEmpty();
     }
 
-    // ------------------------------------------------------------------------------- retrying ---
-
     [Test]
     public async Task An_unreachable_emulator_does_not_fail_the_host()
     {
-        // The reason the work is off the startup path at all: a missing emulator is a local
-        // development condition, and the hosts that boot with one configured include test hosts
-        // that have none. Failing here would take a whole application down over queues that only
-        // ever exist on a developer's machine.
+        // Hosts with an emulator configured include test hosts that have none.
         var client = new FakeCloudTasksClient { ThrowOnCreateQueue = Unavailable };
         var provider = TestSetup.BuildProvider(TestSetup.EmulatorConfig(), client);
         var (initializer, _) = CreateInitializer(provider, maxRounds: 3);
@@ -180,8 +154,7 @@ public sealed class EmulatorQueueInitializerTests
     [Test]
     public async Task Keeps_retrying_until_the_emulator_answers()
     {
-        // An emulator container coming up alongside the host; one started minutes later takes the
-        // same path, which is why giving up would leave the queues missing until the next restart.
+        // Giving up would leave the queues missing until the next restart.
         var client = new FakeCloudTasksClient { TransientCreateQueueFailures = 2 };
         var provider = TestSetup.BuildProvider(TestSetup.EmulatorConfig(), client);
         var (initializer, delays) = CreateInitializer(provider);
@@ -195,9 +168,7 @@ public sealed class EmulatorQueueInitializerTests
     [Test]
     public async Task Backs_off_once_per_round_rather_than_once_per_queue()
     {
-        // The channels share one attempt budget: four rounds against two channels means eight
-        // attempts and four waits. Per-queue budgets would multiply the wait by the number of
-        // channels every time an emulator was slow to start.
+        // Channels share one attempt budget: four rounds over two channels is eight attempts, four waits.
         var client = new FakeCloudTasksClient { ThrowOnCreateQueue = Unavailable };
         var provider = TestSetup.BuildProvider(TestSetup.EmulatorConfig(), client);
         var (initializer, delays) = CreateInitializer(provider, maxRounds: 3);
@@ -211,19 +182,16 @@ public sealed class EmulatorQueueInitializerTests
     [Test]
     public async Task A_queue_that_was_created_is_not_attempted_again_on_a_later_round()
     {
-        // Only what is still pending is retried, so a queue already created is left alone.
         var client = new FakeCloudTasksClient { TransientCreateQueueFailures = 1 };
         var provider = TestSetup.BuildProvider(TestSetup.EmulatorConfig(), client);
         var (initializer, _) = CreateInitializer(provider);
 
         await RunAsync(initializer);
 
-        // Two channels: the first fails and is retried, the second succeeds straight away.
+        // Two channels: the first fails and is retried, the second succeeds.
         await Assert.That(client.CreateQueueAttempts).IsEqualTo(3);
         await Assert.That(client.CreatedQueues.Count).IsEqualTo(2);
     }
-
-    // -------------------------------------------------------------------------------- backoff ---
 
     [Test]
     public async Task Backoff_doubles_from_the_base_delay()
@@ -242,8 +210,7 @@ public sealed class EmulatorQueueInitializerTests
     [Arguments(100_000)]
     public async Task Backoff_is_capped_and_never_overflows(int attempt)
     {
-        // Retrying is indefinite, so the cap is what bounds an emulator that never arrives to about
-        // one log line a minute — and the attempt counter climbs without limit on a long-lived host.
+        // Retrying is indefinite, so the cap bounds the delay and the attempt counter grows unbounded.
         await Assert.That(EmulatorQueueInitializer.BaseDelayForAttempt(attempt))
             .IsEqualTo(EmulatorQueueInitializer.MaxRetryDelay);
     }
@@ -251,7 +218,7 @@ public sealed class EmulatorQueueInitializerTests
     [Test]
     public async Task Actual_delays_stay_within_the_jitter_band_of_their_attempt()
     {
-        // Equal jitter: half the computed delay plus a random share of the other half.
+        // Equal jitter: half the delay plus a random share of the other half.
         var client = new FakeCloudTasksClient { ThrowOnCreateQueue = Unavailable };
         var provider = TestSetup.BuildProvider(TestSetup.EmulatorConfig(), client);
         var (initializer, delays) = CreateInitializer(provider, maxRounds: 6);

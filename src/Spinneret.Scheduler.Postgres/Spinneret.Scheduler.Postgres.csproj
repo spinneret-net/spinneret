@@ -17,8 +17,6 @@
     <ItemGroup>
         <ProjectReference Include="..\Spinneret.Scheduler\Spinneret.Scheduler.csproj" />
         <ProjectReference Include="..\Spinneret.Scheduler.Sql\Spinneret.Scheduler.Sql.csproj" />
-        <!-- PostgresSchedulerSchema.CreateScript exposes PostgresStorageOptions, and the dialect
-             follows the queue dialect's identifier rules. -->
         <ProjectReference Include="..\Spinneret.Queue.Postgres\Spinneret.Queue.Postgres.csproj" />
         <ProjectReference Include="..\Spinneret.Queue.Sql\Spinneret.Queue.Sql.csproj" />
         <ProjectReference Include="..\Spinneret.Queue\Spinneret.Queue.csproj" />

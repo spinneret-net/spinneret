@@ -3,22 +3,14 @@ using Spinneret.Parsing;
 
 namespace Spinneret.ViewModel;
 
-/// <summary>
-/// The outcome of parsing a view model: whether it was valid, and the parsed value.
-/// <see cref="Value"/> can be null for a valid view model whose parse function chose to
-/// produce nothing — only <see cref="IsValid"/> distinguishes the two.
-/// </summary>
+/// <summary>The outcome of parsing a view model; <see cref="Value"/> may be null even when <see cref="IsValid"/>.</summary>
 public sealed record ViewModelParseResult<TParsed>
 {
     public required bool IsValid { get; init; }
     public TParsed? Value { get; init; }
 }
 
-/// <summary>
-/// Parses a view model with the same parse-don't-validate machinery as the HTTP boundary,
-/// binding each error to the view-model property that caused it. Implemented by the library —
-/// register with AddViewModelParser and inject.
-/// </summary>
+/// <summary>Parses a view model, binding each error to the property that caused it.</summary>
 public interface IViewModelParser<TParseError> where TParseError : ILocalizable
 {
     TParsed? Parse<TViewModel, TParsed>(
@@ -28,12 +20,7 @@ public interface IViewModelParser<TParseError> where TParseError : ILocalizable
         where TViewModel : IValidationStateProvider =>
         ParseChecked(viewModel, propertiesToValidate, parseFn).Value;
 
-    /// <summary>
-    /// Parses, and reports whether the view model held a value the parser rejected. A parse
-    /// function is free to return <c>null</c> for a well-formed view model that has nothing to
-    /// send — a null value therefore does not mean invalid, and only this overload can tell
-    /// the two apart.
-    /// </summary>
+    /// <summary>Parses and reports validity separately, since a valid view model may parse to null.</summary>
     ViewModelParseResult<TParsed> ParseChecked<TViewModel, TParsed>(
         TViewModel viewModel,
         ICollection<string>? propertiesToValidate,
@@ -82,12 +69,7 @@ public sealed class ViewModelParser<TParseError>(IStringLocalizer localizer, TPa
         return new ViewModelParseResult<TParsed> { IsValid = false };
     }
 
-    /// <summary>
-    /// A parsed property is relevant when a changed property is it or a descendant of it, so that a
-    /// change to e.g. "Text.ValueEn" revalidates the parsed "Text". This is found by expanding each
-    /// changed property into its self-and-ancestor paths once and matching parsed properties against
-    /// that set, giving O(1) lookups while respecting path-segment boundaries.
-    /// </summary>
+    // A change to "Text.ValueEn" also revalidates the parsed "Text".
     private static ICollection<string> GetRelevantProperties(
         List<string> parsedProperties,
         ICollection<string>? propertiesToValidate)

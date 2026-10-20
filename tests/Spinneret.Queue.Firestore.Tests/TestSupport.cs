@@ -11,24 +11,10 @@ using TUnit.Core.Interfaces;
 
 namespace Spinneret.Queue.Firestore.Tests;
 
-// ---------------------------------------------------------------------------------------------
-// Request types scanned by QueueTypeRegistry from this assembly, plus hand-rolled fakes for the
-// queue and the serializer. No mocking library is used.
-// ---------------------------------------------------------------------------------------------
-
 public sealed record PingCommand(string Name) : IRequest<Unit>;
 
 public sealed record ReportCommand(string Name) : IRequest<string>;
 
-// ---------------------------------------------------------------------------------------------
-// Docker fixture and host harness.
-// ---------------------------------------------------------------------------------------------
-
-/// <summary>
-/// A DI container with the Firestore dead-letter writer and store registered against a collection
-/// unique to one test, plus helpers that read the collection raw so what actually landed in
-/// Firestore can be asserted rather than what the store says landed.
-/// </summary>
 public sealed class DeadLetterTestHost : IAsyncDisposable
 {
     private readonly ServiceProvider _provider;
@@ -70,13 +56,10 @@ public sealed class DeadLetterTestHost : IAsyncDisposable
         return new DeadLetterTestHost(services.BuildServiceProvider(), db, collection);
     }
 
-    // ------------------------------------------------------------------- Firestore helpers ---
-
     public CollectionReference Documents => Db.Collection(Collection);
 
     public DocumentReference Document(string id) => Documents.Document(id);
 
-    /// <summary>The raw stored fields, so the document shape can be asserted independently of the reader.</summary>
     public async Task<IReadOnlyDictionary<string, object>?> RawFields(string id)
     {
         var snapshot = await Document(id).GetSnapshotAsync();
@@ -85,10 +68,7 @@ public sealed class DeadLetterTestHost : IAsyncDisposable
 
     public async Task<int> DocumentCount() => (await Documents.GetSnapshotAsync()).Count;
 
-    /// <summary>
-    /// Writes a dead-letter document with an exact instant. The writer's own clock cannot produce
-    /// the ties and orderings the paging tests need, so those are seeded straight into Firestore.
-    /// </summary>
+    // Seeds an exact instant, which the writer's own clock can't produce for paging ties.
     public Task Seed(
         string key,
         DateTimeOffset deadLetteredAt,
@@ -98,10 +78,7 @@ public sealed class DeadLetterTestHost : IAsyncDisposable
         bool withDescription = true) =>
         Document(key).CreateAsync(new Dictionary<string, object?>
         {
-            // Spelled the way the library persists it. DeadLetterStorage.FormatSource is internal to
-            // Spinneret.Queue and not visible here, and stating the spelling literally is the point:
-            // it is a data contract, so a test that derived it from the same helper the writer uses
-            // could not catch the writer changing it.
+            // Not via the writer's helper: this is a data contract, so the test states it independently.
             [DeadLetterDocument.Fields.Source] = source.ToString(),
             [DeadLetterDocument.Fields.CommandTypeName] = commandTypeName ?? typeof(PingCommand).FullName!,
             [DeadLetterDocument.Fields.Description] = withDescription ? $"seeded {key}" : null,
@@ -111,7 +88,6 @@ public sealed class DeadLetterTestHost : IAsyncDisposable
             [DeadLetterDocument.Fields.DeadLetteredAt] = Timestamp.FromDateTimeOffset(deadLetteredAt),
         });
 
-    /// <summary>Walks every page, returning the keys in order and guarding against a runaway loop.</summary>
     public async Task<List<string>> PageThrough(int pageSize)
     {
         var keys = new List<string>();
@@ -137,10 +113,6 @@ public sealed class DeadLetterTestHost : IAsyncDisposable
 
 internal static class TestRegistration
 {
-    /// <summary>
-    /// Registers only the dead-letter role a builder call chose, as <c>AddQueue</c> would — so the
-    /// store's own registrations are assertable without composing a whole queue around them.
-    /// </summary>
     public static IServiceCollection AddDeadLetters(this IServiceCollection services, Func<QueueBuilder, QueueBuilder> use)
     {
         use(new QueueBuilder(services)).DeadLetters!.Register(services);

@@ -4,10 +4,6 @@ using Spinneret.Scheduler.Sql;
 
 namespace Spinneret.Scheduler.Sql.Tests;
 
-/// <summary>
-/// The scheduler's pairing with the queue storage, and its options validation — what every dialect
-/// inherits, tested against stand-in dialects with no database.
-/// </summary>
 public sealed class SqlSchedulerStorageTests
 {
     [Test]

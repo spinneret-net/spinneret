@@ -4,11 +4,7 @@ using Microsoft.Extensions.Options;
 
 namespace Spinneret.Queue.CloudTasks;
 
-/// <summary>
-/// Serializes mediator request payloads using the host's configured
-/// <see cref="JsonSerializerOptions"/> so converters such as the NodaTime, Input, and
-/// ValueArray ones round-trip identically to how the wire APIs handle them.
-/// </summary>
+// ASP.NET's JSON options, so payloads round-trip with the same converters as the host's APIs.
 internal sealed class HostJsonPayloadSerializer(IOptions<JsonOptions> jsonOptions) : IQueuePayloadSerializer
 {
     public string Serialize(object request, Type requestType)

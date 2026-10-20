@@ -24,7 +24,7 @@ public sealed class RecordingQueue : IQueue
 {
     private readonly ConcurrentQueue<object> _enqueued = new();
 
-    /// <summary>Set to make every enqueue fail, for the compensation and "entry left in place" paths.</summary>
+    /// <summary>Set to make every enqueue fail.</summary>
     public Exception? FailWith { get; set; }
 
     public IReadOnlyCollection<object> Enqueued => [.. _enqueued];
@@ -40,10 +40,7 @@ public sealed class RecordingQueue : IQueue
     }
 }
 
-/// <summary>
-/// Records dead letters in memory. <see cref="FailWith"/> covers the branches where a caller must
-/// keep its own copy because the write that would have preserved the payload did not land.
-/// </summary>
+/// <summary>Records dead letters; <see cref="FailWith"/> makes the write fail.</summary>
 public sealed class RecordingDeadLetterWriter : IDeadLetterWriter
 {
     private readonly ConcurrentQueue<DeadLetterEntry> _entries = new();
@@ -62,10 +59,7 @@ public sealed class RecordingDeadLetterWriter : IDeadLetterWriter
     }
 }
 
-/// <summary>
-/// A real JSON serializer rather than a stub: stored payloads are read back into requests, and only
-/// a real round trip proves what was written is still deserializable.
-/// </summary>
+// A real serializer: only a real round trip proves stored payloads deserialize.
 public sealed class JsonPayloadSerializer : IQueuePayloadSerializer
 {
     private static readonly JsonSerializerOptions Options = new(JsonSerializerDefaults.Web);
@@ -75,7 +69,7 @@ public sealed class JsonPayloadSerializer : IQueuePayloadSerializer
     public object? Deserialize(string json, Type requestType) => JsonSerializer.Deserialize(json, requestType, Options);
 }
 
-/// <summary>A clock frozen at a known instant, so stored timestamps are assertable. Settable to advance it.</summary>
+/// <summary>A clock frozen at a known, settable instant.</summary>
 public sealed class FixedTimeProvider(DateTimeOffset now) : TimeProvider
 {
     public DateTimeOffset Now { get; set; } = now;

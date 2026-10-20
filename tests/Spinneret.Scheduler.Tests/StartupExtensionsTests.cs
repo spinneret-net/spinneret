@@ -10,16 +10,13 @@ public class StartupExtensionsTests
 
     private static readonly Schedule EveryFiveMinutes = Schedule.Cron("*/5 * * * *", Stockholm);
 
-    // ------------------------------------------------------------------- AddRecurringJob ---
-
     [Test]
     public async Task AddRecurringJob_registers_a_recurring_job_with_the_given_definition()
     {
         var services = new ServiceCollection();
 
         services.AddRecurringJob("update-projections", EveryFiveMinutes, () => new TestRequest("x"));
-        // Registered under the non-generic IRecurringJob the installer collects; the typed
-        // interface is what carries CreateRequest.
+        // Collected by the installer as non-generic IRecurringJob; the typed interface carries CreateRequest.
         var job = (IRecurringJob<Unit>)services.BuildServiceProvider().GetRequiredService<IRecurringJob>();
 
         await Assert.That(job.Key).IsEqualTo("update-projections");
@@ -88,8 +85,6 @@ public class StartupExtensionsTests
             .Throws<ArgumentNullException>();
     }
 
-    // --------------------------------------------------------------- RetireRecurringJob ---
-
     [Test]
     public async Task RetireRecurringJob_registers_the_retired_key()
     {
@@ -124,13 +119,9 @@ public class StartupExtensionsTests
         await Assert.That(() => services.RetireRecurringJob(key!)).Throws<ArgumentException>();
     }
 
-    // ------------------------------------------------------- schedules from configuration ---
-
     [Test]
     public async Task AddRecurringJob_takes_a_schedule_read_from_configuration()
     {
-        // The supported way to vary cadence per environment: the job's declaration is still the one
-        // place the schedule is decided, and the configuration read is visible right beside it.
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection([new KeyValuePair<string, string?>("Jobs:MonthClose", "cron:Europe/Stockholm:0 3 * * *")])
             .Build();

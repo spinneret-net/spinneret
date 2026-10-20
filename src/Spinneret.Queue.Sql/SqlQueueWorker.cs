@@ -6,15 +6,7 @@ using Microsoft.Extensions.Options;
 
 namespace Spinneret.Queue.Sql;
 
-/// <summary>
-/// In-host delivery: polls the queue table and delivers messages to the
-/// <see cref="QueueDeliveryPipeline"/>, one polling loop per (channel × configured parallelism).
-/// Each delivery runs in its own unit of work (<see cref="SqlUnitOfWorkFactory"/>): the destructive
-/// dequeue is the lock, the transaction is the ambient one so the handler's writes, cascade
-/// enqueues, retry bookings and dead-letters join it, and the commit the pipeline makes on
-/// acknowledge makes the whole delivery atomic. A crash or rollback puts the message back as-is —
-/// the transport-redelivery path that deliberately does not spend the attempt budget.
-/// </summary>
+// The destructive dequeue is the lock; a crash or rollback restores the message without spending an attempt.
 internal sealed class SqlQueueWorker(
     IOptions<InHostDeliveryOptions> options,
     SqlQueueStorage storage,
@@ -58,8 +50,7 @@ internal sealed class SqlQueueWorker(
             }
             catch (Exception ex)
             {
-                // A poll failure (connection loss, timeout) must never kill the loop: the message —
-                // if one was claimed — rolled back and will be redelivered.
+                // Never kill the loop: a claimed message rolled back and will be redelivered.
                 logger.LogError(ex,
                     "Queue delivery on channel {Channel} failed; polling continues", channel);
                 delivered = false;
@@ -81,7 +72,6 @@ internal sealed class SqlQueueWorker(
         logger.LogInformation("Queue worker stopped for channel {Channel}", channel);
     }
 
-    /// <summary>Claims and processes at most one message; false means the channel was empty.</summary>
     private async Task<bool> TryDeliverOne(string channel, CancellationToken ct)
     {
         var delivery = await unitOfWork.ExecuteAsync(async (unit, token) =>
@@ -93,9 +83,6 @@ internal sealed class SqlQueueWorker(
             if (claimed is not var (id, messageId, envelopeJson))
                 return (Claimed: false, Id: 0L, Outcome: QueueDeliveryOutcome.Acked);
 
-            // From here on the message is ours until the unit commits or rolls back. Scope per
-            // message, like the Cloud Tasks endpoint gets a scope per request; the ambient transaction
-            // makes every SQL-touching service in the scope join this delivery.
             using var scope = scopeFactory.CreateScope();
             var pipeline = scope.ServiceProvider.GetRequiredService<QueueDeliveryPipeline>();
             var outcome = await pipeline.DeliverAsync(unit, envelopeJson, messageId.ToString("N"), token);
@@ -105,9 +92,7 @@ internal sealed class SqlQueueWorker(
         if (!delivery.Claimed)
             return false;
 
-        // Not acknowledged: the outcome could not be booked, so the unit rolled the claim back. Push
-        // the message's visibility out so the redelivery honors the delay, without spending the
-        // attempt budget. If even that fails the message just reappears immediately.
+        // Not acknowledged, so the claim rolled back; delay the redelivery without spending an attempt.
         if (delivery.Outcome.RetryAfter is { } retryAfter)
             await Reschedule(delivery.Id, retryAfter);
 
@@ -129,11 +114,7 @@ internal sealed class SqlQueueWorker(
         return (reader.GetInt64(0), reader.GetGuid(1), reader.GetString(2));
     }
 
-    /// <summary>
-    /// Best-effort visibility push on a fresh connection, after the delivery transaction rolled
-    /// back. Uses no cancellation token: this is shutdown-safe cleanup, and skipping it only costs
-    /// an immediate redelivery.
-    /// </summary>
+    // Best effort and uncancellable: failing only costs an immediate redelivery.
     private async Task Reschedule(long id, TimeSpan delay)
     {
         try

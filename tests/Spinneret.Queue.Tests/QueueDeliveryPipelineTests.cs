@@ -33,8 +33,7 @@ public class QueueDeliveryPipelineTests
     [Test]
     public async Task Unacknowledged_delivery_is_returned_without_committing()
     {
-        // The processor could not book the outcome: the transport is to redeliver the message as it
-        // was, which needs the unit rolled back rather than half of the delivery made durable.
+        // The transport redelivers the message as it was, so nothing of the delivery may become durable.
         _processor.Outcome = QueueDeliveryOutcome.RetryIn(TimeSpan.FromSeconds(30));
 
         var outcome = await CreatePipeline().DeliverAsync(_unit, EnvelopeJson(), "task-1", CancellationToken.None);

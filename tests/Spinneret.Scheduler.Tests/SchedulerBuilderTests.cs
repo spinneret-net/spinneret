@@ -13,8 +13,7 @@ public class SchedulerBuilderTests
     [Test]
     public async Task AddScheduler_registers_the_recurring_job_installer_after_the_storage()
     {
-        // Hosted services start in registration order, and the installer writes into whatever the
-        // storage's own hosted services (schema initializers) create.
+        // Hosted services start in order, and the installer needs the storage's schema initializers first.
         var services = new ServiceCollection();
         services.AddScheduler(s => s.UseStorage(new SchedulerStorageRole("UseTestStorage", sv =>
         {

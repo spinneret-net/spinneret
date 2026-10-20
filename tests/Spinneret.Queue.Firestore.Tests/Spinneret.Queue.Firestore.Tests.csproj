@@ -1,11 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
-    <!-- The package itself needs only the DI abstractions; building a provider to assert what the
-         Add* call registered is a test-only concern. -->
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.13" />
-    <!-- The Firestore emulator, so the store's query, cursors and preconditions are exercised
-         against a real Firestore rather than argued from the source. -->
     <PackageReference Include="Testcontainers.Firestore" Version="4.16.0" />
   </ItemGroup>
 

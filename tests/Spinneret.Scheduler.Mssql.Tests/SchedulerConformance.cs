@@ -2,8 +2,7 @@ using Spinneret.Sql.Conformance;
 
 namespace Spinneret.Scheduler.Mssql.Tests;
 
-// The shared conformance suites (tests/Spinneret.Sql.Conformance/Scheduler), run on Mssql.
-// Each class only binds a suite to this database; the scenarios live in the base class.
+// Binds the shared scheduler conformance suites to SQL Server.
 
 [InheritsTests]
 [ClassDataSource<MssqlContainerFixture>(Shared = SharedType.PerTestSession)]

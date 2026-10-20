@@ -5,15 +5,6 @@ using Microsoft.Extensions.Options;
 
 namespace Spinneret.Scheduler;
 
-/// <summary>
-/// Drives <see cref="ISchedulerSweep"/> on a timer. The clock, and nothing else: where jobs are
-/// stored and how a pass claims them belongs to the provider behind the interface.
-/// </summary>
-/// <remarks>
-/// Suits a host that is always running. A host that scales to zero has no thread to tick, so it
-/// wants the HTTP trigger in <c>Spinneret.Scheduler.AspNetCore</c> and an external cron instead — same
-/// sweep, different clock.
-/// </remarks>
 internal sealed class InHostSweeperService(
     IServiceScopeFactory scopeFactory,
     IOptions<SchedulerOptions> options,
@@ -22,8 +13,7 @@ internal sealed class InHostSweeperService(
 {
     public override Task StartAsync(CancellationToken ct)
     {
-        // A sweeper with nothing to sweep is a silent no-op that looks healthy — fail on the
-        // startup path instead, the way the recurring-job installer validates its declarations.
+        // Without a storage the sweeper would be a silent no-op that looks healthy.
         using var scope = scopeFactory.CreateScope();
         if (scope.ServiceProvider.GetService<ISchedulerSweep>() is null)
             throw new InvalidOperationException(
@@ -43,9 +33,6 @@ internal sealed class InHostSweeperService(
         {
             try
             {
-                // A fresh scope per sweep. Both in-tree providers register a singleton, so today this
-                // resolves the same instance every tick — it is here so a provider that needs
-                // per-pass state has somewhere to put it, not because anything currently relies on it.
                 using var scope = scopeFactory.CreateScope();
                 var result = await scope.ServiceProvider
                     .GetRequiredService<ISchedulerSweep>().SweepAsync(stoppingToken);
@@ -59,18 +46,13 @@ internal sealed class InHostSweeperService(
             }
             catch (Exception ex)
             {
-                // The sweep itself failed — a store still starting up alongside this host, a
-                // transient outage. Never fatal: the next tick tries again.
+                // Never fatal: the next tick tries again.
                 logger.LogError(ex, "Scheduler sweep failed; next sweep continues");
             }
 
             try
             {
-                // Load-bearing, not merely a schedule. A provider that cannot make progress returns
-                // instead of spinning, and this delay is what stops that becoming a hot loop.
-                // Awaiting it also means this loop never overlaps its own sweeps — but that is not a
-                // guarantee providers may rely on, since an HTTP trigger can call the same sweep at
-                // any moment, including mid-tick.
+                // Load-bearing: a provider that cannot make progress returns, and this stops a hot loop.
                 await Task.Delay(interval, stoppingToken);
             }
             catch (OperationCanceledException)

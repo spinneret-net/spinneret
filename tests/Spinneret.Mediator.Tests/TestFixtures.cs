@@ -5,8 +5,6 @@ namespace Spinneret.Mediator.Tests;
 
 internal enum CacheTag { Alpha, Beta, Gamma }
 
-// --- Plain (uncached) requests -------------------------------------------------
-
 internal sealed record EchoQuery(int Value) : IRequest<int>;
 
 internal sealed class EchoHandler : IRequestHandler<EchoQuery, int>
@@ -72,15 +70,12 @@ internal sealed class SyncThrowingHandler : IRequestHandler<SyncThrowingQuery, i
 
 internal sealed record NoHandlerQuery : IRequest<int>;
 
-// Open-generic handler type definition: assembly scanning must skip it, since an
-// open generic implementation cannot be registered against a closed service type.
+// Open generic: assembly scanning must skip it.
 internal sealed class OpenGenericEchoHandler<T> : IRequestHandler<EchoQuery, int>
 {
     public Task<int> Handle(EchoQuery request, CancellationToken cancellationToken)
         => Task.FromResult(request.Value);
 }
-
-// --- Cached requests -----------------------------------------------------------
 
 [Cache(60, CacheTag.Alpha)]
 internal sealed record CachedQuery(int Id) : IRequest<int>;
@@ -134,10 +129,6 @@ internal sealed class ReferenceKeyHandler : IRequestHandler<ReferenceKeyQuery, i
     }
 }
 
-/// <summary>
-/// Handler for all cached int queries. Counts invocations, can be gated on a
-/// TaskCompletionSource, can throw on demand, and can have its result overridden.
-/// </summary>
 internal sealed class CountingHandler :
     IRequestHandler<CachedQuery, int>,
     IRequestHandler<MultiTagQuery, int>,
@@ -176,8 +167,6 @@ internal sealed class CountingHandler :
     public Task<int> Handle(ShortLivedQuery request, CancellationToken cancellationToken) => HandleCore(request.Id);
 }
 
-// --- Invalidating requests -----------------------------------------------------
-
 [InvalidateCache(CacheTag.Alpha)]
 internal sealed record InvalidateAlphaCommand : IRequest<Unit>;
 
@@ -204,8 +193,6 @@ internal sealed class InvalidateAlphaQueryHandler : IRequestHandler<InvalidateAl
     public Task<int> Handle(InvalidateAlphaQuery request, CancellationToken cancellationToken)
         => Task.FromResult(123);
 }
-
-// --- Composition helpers -------------------------------------------------------
 
 internal static class TestServices
 {

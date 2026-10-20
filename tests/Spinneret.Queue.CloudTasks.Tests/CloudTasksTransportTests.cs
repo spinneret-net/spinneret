@@ -168,14 +168,11 @@ public sealed class CloudTasksQueueTests
         var envelope = ReadEnvelope(client.SingleRequest);
         await Assert.That(envelope.Description).IsEqualTo("widget sync");
 
-        // The trace is what must survive the hop, not one particular span: when a listener records
-        // the publish span, that span - not the caller's activity - is current at capture, so the
-        // envelope points at the publish. Asserting the exact id would encode "no listener present".
+        // Assert the trace, not the span: with a listener, the publish span is what gets captured.
         await Assert.That(ActivityContext.TryParse(envelope.TraceParent, null, out var captured)).IsTrue();
         await Assert.That(captured.TraceId).IsEqualTo(activity.TraceId);
 
-        // The same context rides the delivery request in-band, so the dispatch endpoint's own server
-        // span joins this trace instead of starting a fresh root.
+        // The same context rides the request, so the dispatch endpoint's span joins this trace.
         await Assert.That(client.SingleRequest.Task.HttpRequest.Headers["traceparent"])
             .IsEqualTo(envelope.TraceParent);
     }
@@ -194,7 +191,7 @@ public sealed class CloudTasksQueueTests
     [Test]
     public async Task Enqueue_unregistered_request_type_throws()
     {
-        // Registry built from Spinneret.Queue itself, which contains no IRequest<> types.
+        // Spinneret.Queue contains no IRequest<> types.
         var (queue, _, _) = CreateQueue(requestAssembly: typeof(QueueEnvelope).Assembly);
 
         var ex = await Assert.ThrowsAsync<InvalidOperationException>(

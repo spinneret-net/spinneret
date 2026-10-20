@@ -9,10 +9,6 @@ using Spinneret.Scheduler.Sql;
 
 namespace Spinneret.Sql.Conformance;
 
-/// <summary>
-/// What a SQL scheduler registers, how it binds and validates its options, and the startup check
-/// that it shares the queue's database — the same for every dialect. No database needed.
-/// </summary>
 public abstract class SqlSchedulerRegistrationConformance(SqlTestDialect dialect)
 {
     protected SqlTestDialect Dialect => dialect;
@@ -86,8 +82,7 @@ public abstract class SqlSchedulerRegistrationConformance(SqlTestDialect dialect
             .Where(d => d.ServiceType == typeof(IHostedService))
             .Select(d => d.ImplementationType)
             .ToArray();
-        // The installer is shared with the other storages, so it is named rather than typed: it is
-        // internal to Spinneret.Scheduler.
+        // Named rather than typed: the installer is internal to Spinneret.Scheduler.
         await Assert.That(hostedTypes.Select(t => t?.FullName))
             .Contains("Spinneret.Scheduler.RecurringJobInstaller");
         await Assert.That(hostedTypes).Contains(typeof(SqlSchedulerSchemaInitializer));
@@ -97,8 +92,7 @@ public abstract class SqlSchedulerRegistrationConformance(SqlTestDialect dialect
     [Test]
     public async Task Scheduler_registers_the_sweep_engine_but_not_a_trigger()
     {
-        // The engine is always available; what drives it is the host's choice — a timer via
-        // UseInHostSweeper(), or the HTTP endpoint in Spinneret.Scheduler.AspNetCore.
+        // The engine is always registered; UseInHostSweeper() or the AspNetCore endpoint drives it.
         var configuration = Configuration();
         var services = ServicesWithQueue(configuration);
 

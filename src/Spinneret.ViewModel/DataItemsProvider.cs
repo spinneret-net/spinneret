@@ -9,18 +9,15 @@ public enum SortDirection
     Descending = 2,
 }
 
-/// <summary>
-/// One page request against a data source. New capabilities (multi-column sort, grouping)
-/// are added as optional init-only properties, so provider implementations keep compiling.
-/// </summary>
+/// <summary>One page request against a data source.</summary>
 public sealed record DataItemsRequest<TItem>
 {
-    /// <summary>Property selector to sort by; null for the source's natural order.</summary>
+    /// <summary>Property to sort by; null for the source's natural order.</summary>
     public Expression<Func<TItem, object?>>? SortBy { get; init; }
 
     public SortDirection SortDirection { get; init; } = SortDirection.None;
 
-    /// <summary>Free-text filter; null when the user has not searched.</summary>
+    /// <summary>Free-text filter; null when not searching.</summary>
     public string? Query { get; init; }
 
     /// <summary>Items to skip before the page starts.</summary>
@@ -37,11 +34,7 @@ public sealed record DataItemsResult<TItem>
     public required int TotalItemCount { get; init; }
 }
 
-/// <summary>
-/// Supplies pages of items to a data-bound table. Implemented by consumers — back it with a
-/// database query, an API call, or <see cref="InMemoryDataItemsProvider{TItem}"/> for
-/// already-materialized collections.
-/// </summary>
+/// <summary>Supplies pages of items to a data-bound table.</summary>
 public interface IDataItemsProvider<TItem>
 {
     Task<DataItemsResult<TItem>> GetItems(DataItemsRequest<TItem> request, CancellationToken cancellationToken = default);

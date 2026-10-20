@@ -2,16 +2,12 @@ using System.Reflection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Spinneret.Queue;
 
-// ReSharper disable once CheckNamespace — deliberate: registration extensions live in the
-// DI namespace so every Add* call is discoverable without a using directive.
+// ReSharper disable once CheckNamespace — DI namespace, for discoverability.
 namespace Microsoft.Extensions.DependencyInjection;
 
 public static class QueueServiceCollectionExtensions
 {
-    /// <summary>
-    /// Registers the queue, composed in <paramref name="configure"/> from the request assemblies, a
-    /// storage, a delivery and optionally a separate dead-letter store — see <see cref="QueueBuilder"/>.
-    /// </summary>
+    /// <summary>Registers the queue composed in <paramref name="configure"/>.</summary>
     /// <example>
     /// <code>
     /// services.AddQueue(q => q
@@ -20,11 +16,7 @@ public static class QueueServiceCollectionExtensions
     ///     .UseInHostDelivery());
     /// </code>
     /// </example>
-    /// <exception cref="InvalidOperationException">
-    /// The composition is incomplete or contradictory — no request assemblies, nowhere to put
-    /// messages, two choices for one role, a delivery the storage cannot feed, or invalid provider
-    /// configuration. Thrown here rather than at the first enqueue.
-    /// </exception>
+    /// <exception cref="InvalidOperationException">The composition is incomplete, contradictory or misconfigured.</exception>
     public static IServiceCollection AddQueue(this IServiceCollection services, Action<QueueBuilder> configure)
     {
         ArgumentNullException.ThrowIfNull(services);
@@ -36,12 +28,7 @@ public static class QueueServiceCollectionExtensions
         return services;
     }
 
-    /// <summary>
-    /// Registers transport-agnostic queue infrastructure: the type registry, the dispatcher, the
-    /// delivery processor and pipeline, the resender, and the pass-through defaults for the seams a
-    /// storage can do better at. Called last by <see cref="QueueBuilder"/>, so whatever the storage
-    /// and delivery registered wins.
-    /// </summary>
+    // Called last by QueueBuilder, so storage and delivery registrations win.
     internal static IServiceCollection AddQueueCore(
         this IServiceCollection services, IReadOnlyCollection<Assembly> requestAssemblies)
     {
@@ -62,9 +49,7 @@ public static class QueueServiceCollectionExtensions
         services.TryAddSingleton<QueueEnvelopeFactory>();
         services.TryAddSingleton(TimeProvider.System);
 
-        // Resend is transport-agnostic, so it belongs here beside the dispatcher rather than being
-        // repeated by every store package. It resolves only once something asks for it, which keeps
-        // a host that registered no IDeadLetterStore — because it has no admin page — working.
+        // Resolved lazily, so hosts without an IDeadLetterStore still work.
         services.TryAddSingleton<IQueueUnitOfWorkFactory, PassThroughQueueUnitOfWorkFactory>();
         services.TryAddSingleton<IDeadLetterResender, DeadLetterResender>();
         return services;

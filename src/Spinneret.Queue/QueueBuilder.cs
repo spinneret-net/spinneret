@@ -4,19 +4,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Spinneret.Queue;
 
-/// <summary>
-/// Composes the queue a host runs, inside <c>services.AddQueue(q => ...)</c>. A queue is assembled
-/// from up to three independent choices, each made by a provider package's <c>Use*</c> extension:
-/// <list type="bullet">
-/// <item><b>Storage</b> — where messages wait: a SQL outbox in the application database
-/// (<c>UseMssqlStorage</c>, <c>UsePostgresStorage</c>). With storage, every enqueue joins the caller's transaction.</item>
-/// <item><b>Delivery</b> — how they reach a handler: the in-host worker draining that table
-/// (<c>UseInHostDelivery</c>), or a push transport (<c>UseCloudTasksDelivery</c>).</item>
-/// <item><b>Dead letters</b> — where exhausted work is kept, when not in the storage itself
-/// (<c>UseFirestoreDeadLetters</c>).</item>
-/// </list>
-/// Each choice is made at most once, and the combination is checked when <c>AddQueue</c> returns.
-/// </summary>
+/// <summary>Composes the host's queue from a storage, a delivery and a dead-letter store.</summary>
 public sealed class QueueBuilder
 {
     private readonly List<Assembly> _requestAssemblies = [];
@@ -31,13 +19,9 @@ public sealed class QueueBuilder
     internal QueueDeliveryRole? Delivery { get; private set; }
     internal QueueDeadLetterRole? DeadLetters { get; private set; }
 
-    /// <summary>
-    /// Adds assemblies scanned for the <c>IRequest&lt;&gt;</c> command types this queue can carry —
-    /// every role, producer and consumer alike, reads the same registry. At least one is required.
-    /// </summary>
+    /// <summary>Adds assemblies scanned for queueable <c>IRequest&lt;&gt;</c> types; at least one is required.</summary>
     /// <remarks>
-    /// Types are registered by <see cref="Type.FullName"/>, which is the name on the wire, so
-    /// renaming or moving a queued command type breaks messages already in flight.
+    /// Types are registered by <see cref="Type.FullName"/>, so renaming or moving one breaks messages in flight.
     /// </remarks>
     public QueueBuilder AddRequestAssemblies(params Assembly[] assemblies)
     {
@@ -47,10 +31,7 @@ public sealed class QueueBuilder
     }
 
     /// <summary>
-    /// Serializes command payloads with <typeparamref name="TSerializer"/> instead of the default:
-    /// the delivery's own choice when it has one (Cloud Tasks uses ASP.NET's JSON options), else
-    /// the <see cref="System.Text.Json.JsonSerializerOptions"/> registered in DI, else the defaults.
-    /// Every host sharing a queue must serialize the same way.
+    /// Serializes payloads with <typeparamref name="TSerializer"/>; every host sharing a queue must use the same.
     /// </summary>
     public QueueBuilder UsePayloadSerializer<TSerializer>() where TSerializer : class, IQueuePayloadSerializer
     {
@@ -85,13 +66,7 @@ public sealed class QueueBuilder
         return role;
     }
 
-    /// <summary>
-    /// Checks the combination and registers it. Registration order is the priority order — an
-    /// explicit dead-letter store, then the storage's relay and the storage, then the delivery, then
-    /// the core defaults — and
-    /// everything is added with <c>TryAdd</c>, so the first to register a service wins and a service
-    /// the host registered itself before <c>AddQueue</c> wins over all of them.
-    /// </summary>
+    // Registration order is priority order: everything uses TryAdd, so the first registration wins.
     internal void Build()
     {
         if (_requestAssemblies.Count == 0)
@@ -130,8 +105,7 @@ public sealed class QueueBuilder
             Services.TryAddSingleton(typeof(IQueuePayloadSerializer), _serializer);
 
         DeadLetters?.Register(Services);
-        // The relay ahead of the storage it belongs to, so what it brings (forwarding on commit)
-        // wins over the storage's quieter defaults.
+        // Relay before storage, so its registrations (forwarding on commit) win over the storage defaults.
         if (Storage is not null && Delivery is { ProvidesTransport: true })
             Storage.RegisterRelay!(Services, registry);
         Storage?.Register(Services, registry);
@@ -141,8 +115,6 @@ public sealed class QueueBuilder
             Services.TryAddSingleton(typeof(IQueuePayloadSerializer), suggested);
         Services.TryAddSingleton<IQueuePayloadSerializer, DefaultJsonPayloadSerializer>();
 
-        // No storage means a push transport with nothing in front of it: each enqueue is a call to
-        // the transport.
         if (Storage is null)
         {
             Services.TryAddSingleton<DirectQueue>();
@@ -153,46 +125,27 @@ public sealed class QueueBuilder
         Services.AddQueueCore(registry);
     }
 
-    /// <summary>Marks a collection AddQueue has composed, so a second call fails instead of half-overriding the first.</summary>
     private sealed class QueueRegistered;
 }
 
-/// <summary>A choice a provider package makes on the builder. <see cref="Name"/> is how errors refer to it.</summary>
 internal abstract record QueueRole(string Name);
 
-/// <summary>Where messages wait.</summary>
-/// <param name="Name">How errors refer to this choice, e.g. <c>UseMssqlStorage</c>.</param>
-/// <param name="Register">
-/// Registers the storage: <see cref="IQueue"/> and <see cref="IEnvelopeQueue"/> over its table, its
-/// unit of work and dispatch boundary, and its dead-letter writer and store (with <c>TryAdd</c>, so
-/// an explicit dead-letter store wins).
-/// </param>
 internal sealed record QueueStorageRole(string Name, Action<IServiceCollection, QueueTypeRegistry> Register)
     : QueueRole(Name)
 {
-    /// <summary>Whether messages can be claimed straight from the storage, which in-host delivery needs.</summary>
     public bool Claimable { get; init; }
 
-    /// <summary>
-    /// Registers what forwards the storage's messages to a push transport, when the delivery is one.
-    /// Null for storage that cannot.
-    /// </summary>
     public Action<IServiceCollection, QueueTypeRegistry>? RegisterRelay { get; init; }
 }
 
-/// <summary>How messages reach their handlers.</summary>
 internal sealed record QueueDeliveryRole(string Name, Action<IServiceCollection, QueueTypeRegistry> Register)
     : QueueRole(Name)
 {
-    /// <summary>Whether delivery drains the storage directly, which needs claimable storage.</summary>
     public bool RequiresClaimableStorage { get; init; }
 
-    /// <summary>Whether delivery registers an <see cref="IQueueTransport"/> messages are pushed onto.</summary>
     public bool ProvidesTransport { get; init; }
 
-    /// <summary>The payload serializer this delivery defaults to when the host chose none.</summary>
     public Type? SuggestedSerializer { get; init; }
 }
 
-/// <summary>Where exhausted work is kept, overriding the storage's own dead-letter table.</summary>
 internal sealed record QueueDeadLetterRole(string Name, Action<IServiceCollection> Register) : QueueRole(Name);

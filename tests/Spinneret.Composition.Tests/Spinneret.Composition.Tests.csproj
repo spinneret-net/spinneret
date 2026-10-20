@@ -1,7 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <!-- Compositions across packages: the guarantees that only exist once a storage, a delivery and a
-       scheduler are put together — Cloud Tasks over a SQL outbox above all, on every SQL dialect. -->
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.TestHost" Version="10.0.13" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="10.0.13" />
@@ -19,8 +17,7 @@
     <Using Include="Spinneret.Testing" />
   </ItemGroup>
 
-  <!-- The composition conformance suites, compiled into this assembly; Conformance.cs runs them on
-       SQL Server and on PostgreSQL. -->
+  <!-- Shared composition suites; Conformance.cs runs them per dialect. -->
   <ItemGroup>
     <Compile Include="..\Spinneret.Sql.Conformance\SqlTestDialect.cs" LinkBase="Conformance" />
     <Compile Include="..\Spinneret.Sql.Conformance\Dialects\*.cs" LinkBase="Conformance" />

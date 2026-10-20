@@ -4,10 +4,6 @@ using Spinneret.Scheduler.Sql;
 
 namespace Spinneret.Scheduler.Mssql;
 
-/// <summary>
-/// The SQL Server spelling of the scheduled-jobs table — the single source of truth for every
-/// statement and the DDL, built from the configured names so the two can never drift apart.
-/// </summary>
 internal sealed class MssqlSchedulerDialect : SqlSchedulerDialect
 {
     public static readonly MssqlSchedulerDialect Instance = new();
@@ -30,11 +26,8 @@ internal sealed class MssqlSchedulerDialect : SqlSchedulerDialect
 
         return new SqlSchedulerStatements
         {
-            // MERGE with HOLDLOCK is SQL Server's single-statement upsert: the key-range lock covers
-            // a not-yet-existing key, so racing registrations serialize instead of both inserting.
-            // The schedule comparison is binary so it is ordinal, like the schedule text itself; a
-            // one-shot row under the same key (Schedule NULL) is taken over and armed. SET reads the
-            // pre-update values, so the CASE sees the old schedule whatever the column order.
+            // HOLDLOCK's key-range lock serializes racing registrations of a not-yet-existing key.
+            // BIN2 makes the schedule comparison ordinal; SET reads pre-update values.
             UpsertRecurring = $"""
                 MERGE {table} WITH (HOLDLOCK) AS target
                 USING (SELECT @JobKey AS JobKey) AS source
@@ -60,9 +53,7 @@ internal sealed class MssqlSchedulerDialect : SqlSchedulerDialect
                 VALUES (@JobKey, @RequestTypeName, @PayloadJson, NULL, @NextExecuteAt, @CreatedAt);
                 """,
 
-            // UPDLOCK holds the row until the sweep's transaction commits — that lock is the lease —
-            // and READPAST lets a competing host's sweep skip straight to the next due job instead
-            // of blocking, so hosts sweep in parallel without double-dispatching.
+            // UPDLOCK held to commit is the lease; READPAST lets competing sweeps skip it instead of blocking.
             ClaimNextDue = $"""
                 SELECT TOP(1) JobKey, RequestTypeName, PayloadJson, Schedule
                 FROM {table} WITH (UPDLOCK, READPAST, ROWLOCK)
@@ -76,8 +67,6 @@ internal sealed class MssqlSchedulerDialect : SqlSchedulerDialect
                 WHERE JobKey = @JobKey;
                 """,
 
-            // Runs on the claim's transaction, so the row disappears in the same commit that makes
-            // the queue message durable — the message is the record from then on.
             CompleteOneShot = $"""
                 DELETE FROM {table}
                 WHERE JobKey = @JobKey;
@@ -94,16 +83,13 @@ internal sealed class MssqlSchedulerDialect : SqlSchedulerDialect
                 WHERE JobKey = @JobKey AND NextExecuteAt <= @Now;
                 """,
 
-            // The Schedule NOT NULL guard is what keeps a one-shot job safe: one-shot handles live in
-            // the same JobKey namespace and are the rows with no schedule.
+            // Guard: one-shot rows share the key namespace and have no schedule.
             DeleteRecurring = $"""
                 DELETE FROM {table}
                 WHERE JobKey = @JobKey AND Schedule IS NOT NULL;
                 """,
 
-            // The Schedule IS NULL guard mirrors DeleteRecurring's: a backstop behind the
-            // handle-prefix check, so a cancel can never delete a recurring job's schedule. A job
-            // that already ran is simply gone, which makes this a no-op.
+            // Backstop behind the handle-prefix check: never deletes a recurring job.
             Cancel = $"""
                 DELETE FROM {table}
                 WHERE JobKey = @JobKey AND Schedule IS NULL;

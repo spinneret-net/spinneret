@@ -3,18 +3,11 @@ using Spinneret.Queue;
 
 namespace Spinneret.Sql.Conformance;
 
-/// <summary>
-/// End-to-end tests against a real database (Docker via Testcontainers): enqueue → poll →
-/// dispatch → handler, including the transactional guarantees the SQL storage exists for. Run once
-/// per dialect by a sealed subclass carrying <c>[InheritsTests]</c>.
-/// </summary>
 public abstract class SqlQueueDeliveryConformance(SqlTestDialect dialect)
 {
     protected SqlTestDialect Dialect => dialect;
 
     private string Q(string identifier) => dialect.Quote(identifier);
-
-    // ---------------------------------------------------------------------- happy path ---
 
     [Test]
     public async Task Enqueued_command_is_delivered_and_the_row_is_consumed()
@@ -67,8 +60,6 @@ public abstract class SqlQueueDeliveryConformance(SqlTestDialect dialect)
         await Assert.That(deliveries.Distinct().Count()).IsEqualTo(25);
     }
 
-    // ------------------------------------------------------------- transactional enqueue ---
-
     [Test]
     public async Task Enqueue_in_a_rolled_back_transaction_is_never_delivered()
     {
@@ -112,7 +103,7 @@ public abstract class SqlQueueDeliveryConformance(SqlTestDialect dialect)
             host.Transactions.Use(transaction);
             try
             {
-                // IQueue.Enqueue with no explicit transaction: must ride the ambient one.
+                // No explicit transaction: it must ride the ambient one.
                 await host.Queue.Enqueue(new PingCommand("ambient"));
                 await Assert.That(host.Log.DeliveryCount("ping:ambient")).IsEqualTo(0);
                 await transaction.RollbackAsync();
@@ -124,11 +115,8 @@ public abstract class SqlQueueDeliveryConformance(SqlTestDialect dialect)
         }
 
         await Task.Delay(400);
-        // Rolled back with the ambient transaction — never delivered.
         await Assert.That(host.Log.DeliveryCount("ping:ambient")).IsEqualTo(0);
     }
-
-    // ------------------------------------------------------------------------- deduping ---
 
     [Test]
     public async Task Dedupe_key_prevents_a_second_pending_enqueue()
@@ -152,8 +140,6 @@ public abstract class SqlQueueDeliveryConformance(SqlTestDialect dialect)
         await host.Queue.Enqueue(new PingCommand("second"), new QueueOptions { DedupeKey = "job-2" });
         await Wait.Until(() => host.Log.DeliveryCount("ping:second") == 1, "the second deduped message");
     }
-
-    // ------------------------------------------------------------------ retries & booking ---
 
     [Test]
     public async Task Transient_failures_are_retried_with_booked_attempts_until_success()
@@ -212,8 +198,6 @@ public abstract class SqlQueueDeliveryConformance(SqlTestDialect dialect)
         await Assert.That(await host.DeadLetterRowCount()).IsEqualTo(0);
     }
 
-    // ------------------------------------------------------------- savepoint atomicity ---
-
     [Test]
     public async Task Failed_handlers_partial_writes_are_rolled_back_while_the_failure_is_booked()
     {
@@ -224,8 +208,7 @@ public abstract class SqlQueueDeliveryConformance(SqlTestDialect dialect)
         await host.Queue.Enqueue(new WriteThenFailCommand(sideTable));
 
         await Wait.Until(async () => await host.DeadLetterRowCount() == 1, "the failure to be dead-lettered");
-        // The write happened on the delivery transaction before the failure — the savepoint must
-        // have rolled it back even though the delete + dead-letter committed.
+        // The savepoint must roll back the handler's write even though the dead-letter committed.
         await Assert.That(await host.ScalarAsync<int>($"SELECT COUNT(*) FROM {Q(sideTable)}")).IsEqualTo(0);
         await Assert.That(await host.QueueRowCount()).IsEqualTo(0);
     }
@@ -253,7 +236,7 @@ public abstract class SqlQueueDeliveryConformance(SqlTestDialect dialect)
 
         await Wait.Until(async () => await host.DeadLetterRowCount() == 1, "the failure to be dead-lettered");
         await Task.Delay(400);
-        // The cascade enqueue rode the rolled-back savepoint — its ping must never run.
+        // The cascade enqueue rode the rolled-back savepoint.
         await Assert.That(host.Log.DeliveryCount("ping:cascade-cf")).IsEqualTo(0);
     }
 
@@ -266,8 +249,6 @@ public abstract class SqlQueueDeliveryConformance(SqlTestDialect dialect)
 
         await Wait.Until(() => host.Log.DeliveryCount("ping:cascade-cs") == 1, "the cascade ping to be delivered");
     }
-
-    // ------------------------------------------------------------------ poisoned rows ---
 
     [Test]
     public async Task Unreadable_envelope_is_dead_lettered_with_the_raw_content()
@@ -288,13 +269,10 @@ public abstract class SqlQueueDeliveryConformance(SqlTestDialect dialect)
         await Assert.That(await host.QueueRowCount()).IsEqualTo(0);
     }
 
-    // ----------------------------------------------- guarantees a dialect must not bend ---
-
     [Test]
     public async Task A_dedupe_conflict_inside_a_callers_transaction_leaves_the_transaction_usable()
     {
-        // The duplicate must be reported, not raised: on a database that aborts a transaction on
-        // any error, a raised violation would take the caller's business writes down with it.
+        // A raised violation would abort the caller's transaction on Postgres.
         await using var host = await QueueTestHost.StartAsync(Dialect, worker: false);
         var sideTable = $"Side_{host.Suffix}";
         await Dialect.CreateSideTable(sideTable);
@@ -316,9 +294,7 @@ public abstract class SqlQueueDeliveryConformance(SqlTestDialect dialect)
     [Test]
     public async Task A_redelivered_dead_letter_is_recorded_once_without_failing_the_delivery()
     {
-        // A dead letter is keyed by the message, so writing it again — a redelivery after a lost
-        // commit acknowledgement — is a no-op inside the delivery's transaction, not an error that
-        // would roll the acknowledge back.
+        // A redelivery after a lost commit ack rewrites the dead letter; erroring would roll the ack back.
         await using var host = await QueueTestHost.StartAsync(Dialect, worker: false);
         var writer = host.Services.GetRequiredService<IDeadLetterWriter>();
         var entry = new DeadLetterEntry
@@ -372,12 +348,8 @@ public abstract class SqlQueueDeliveryConformance(SqlTestDialect dialect)
     [Test]
     public async Task A_handler_that_swallows_a_sql_error_is_never_acknowledged_with_its_writes_lost()
     {
-        // The handler writes, then catches a failing statement and returns normally. Where the
-        // failed statement leaves the transaction usable (SQL Server), the delivery commits with the
-        // write. Where it aborts the transaction (Postgres), committing would silently roll back the
-        // write and the acknowledge alike while reporting success — so the delivery must be failed
-        // instead, its attempt booked, and in the end dead-lettered. What may never happen is the
-        // message gone with no write and no dead letter.
+        // SQL Server keeps the transaction usable, so the delivery commits; Postgres aborts it, so it
+        // must fail and dead-letter. The message must never vanish with no write and no dead letter.
         await using var host = await QueueTestHost.StartAsync(Dialect);
         var sideTable = $"Side_{host.Suffix}";
         await Dialect.CreateSideTable(sideTable);
@@ -387,7 +359,7 @@ public abstract class SqlQueueDeliveryConformance(SqlTestDialect dialect)
         await Wait.Until(
             async () => await host.QueueRowCount() == 0,
             "the message to be acknowledged or dead-lettered");
-        // The dead-letter path commits after the attempt's own rollback; give it a beat.
+        // The dead-letter path commits after the attempt's rollback; give it a beat.
         await Task.Delay(200);
 
         var written = await Dialect.CountAsync(sideTable, "Value IS NOT NULL");

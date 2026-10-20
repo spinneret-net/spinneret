@@ -5,24 +5,12 @@ using Spinneret.Mediator;
 
 namespace Spinneret.Queue.Sql;
 
-/// <summary>
-/// Enqueues onto an explicitly supplied transaction, for call sites that hold their unit of work
-/// as a value rather than publishing it through <see cref="ISqlTransactionProvider"/>. The
-/// message insert commits — or rolls back — atomically with the caller's other writes.
-/// <see cref="IQueue"/> is the same operation against the ambient transaction (or a standalone
-/// auto-committed insert when none is active).
-/// </summary>
+/// <summary>Enqueues within an explicitly supplied transaction, committing atomically with the caller's writes.</summary>
 public interface ISqlTransactionalQueue
 {
     Task Enqueue<TResponse>(IRequest<TResponse> request, DbTransaction transaction, QueueOptions? options = null, CancellationToken ct = default);
 }
 
-/// <summary>
-/// The queue as a table in the application database — an outbox. Every enqueue is an insert that
-/// joins the ambient (or supplied) transaction, so it is atomic with the business write that caused
-/// it; whoever drains the table — the in-host worker, or the relay to a push transport — picks it up
-/// once that transaction commits.
-/// </summary>
 internal sealed class SqlOutboxQueue(
     SqlQueueStorage storage,
     SqlConnectionSource connections,
@@ -43,9 +31,7 @@ internal sealed class SqlOutboxQueue(
         return EnqueueCore(envelopes.Create(request, options), options?.Delay, options?.DedupeKey, transaction, ct);
     }
 
-    // IEnvelopeQueue: booked retries and deferrals from the delivery processor. These join the
-    // ambient transaction — the delivery's unit of work — so the retry generation is inserted
-    // atomically with the acknowledge of the generation that failed.
+    // Retries join the delivery's transaction, committing atomically with the failed attempt's acknowledge.
     public Task Enqueue(QueueEnvelope envelope, TimeSpan? delay = null, CancellationToken ct = default)
         => EnqueueCore(envelope, delay, dedupeKey: null, transactions.Current, ct);
 
@@ -59,7 +45,7 @@ internal sealed class SqlOutboxQueue(
 
         var now = timeProvider.GetUtcNow();
         var visibleAt = delay is { } d && d > TimeSpan.Zero ? now + d : now;
-        // The envelope itself uses default serialization; only PayloadJson uses the host serializer.
+        // Default serialization; only PayloadJson uses the host serializer.
         var envelopeJson = JsonSerializer.Serialize(envelope);
 
         if (transaction is not null)
@@ -85,7 +71,7 @@ internal sealed class SqlOutboxQueue(
         command.AddParameter("@DedupeKey", dedupeKey);
         command.AddParameter("@Envelope", envelopeJson);
 
-        // No row at all is how a dialect that absorbs the conflict in the statement itself reports it.
+        // No row means the dialect absorbed the dedupe conflict in the statement.
         var result = await command.ExecuteScalarAsync(ct);
         var inserted = result is not null and not DBNull && Convert.ToBoolean(result);
 

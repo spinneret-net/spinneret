@@ -5,9 +5,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- An in-memory server, so the endpoint can be exercised over a real ASP.NET pipeline:
-         authorization is middleware, and only a request through it proves the route is guarded
-         rather than merely annotated. -->
+    <!-- In-memory server, to test authorization through a real pipeline. -->
     <PackageReference Include="Microsoft.AspNetCore.TestHost" Version="10.0.13" />
   </ItemGroup>
 

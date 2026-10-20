@@ -19,23 +19,16 @@ internal sealed class FirestoreSchedulerDispatcher(
     private string Collection => options.Value.Collection;
     private TimeSpan OneShotLeaseWindow => options.Value.OneShotLeaseWindow;
 
-    /// <summary>How far a job with an unreadable schedule is pushed out before the sweep sees it again.</summary>
     private static readonly TimeSpan QuarantineWindow = TimeSpan.FromMinutes(5);
 
-    /// <summary>
-    /// Dispatches the jobs due as of one query snapshot. Unlike the SQL sweep, which drains until
-    /// nothing is left, anything falling due mid-pass waits for the next sweep — so the trigger's
-    /// interval bounds how late a job can run.
-    /// </summary>
+    // One query snapshot per pass; jobs falling due mid-pass wait for the next sweep.
     public async Task<SweepResult> SweepAsync(CancellationToken ct)
     {
         using var activity = SchedulerTracing.StartSweep();
 
         var dispatched = 0;
         var now = Timestamp.FromDateTimeOffset(timeProvider.GetUtcNow());
-        // No status filter: a document exists only while it is still work to do, so being due is the
-        // whole predicate. That also keeps this to a single-field index, which Firestore maintains
-        // automatically — no composite index to provision.
+        // Documents exist only while they are work, so due-ness is the whole predicate (no composite index).
         var snapshot = await db.Collection(Collection)
             .WhereLessThanOrEqualTo(ScheduledJob.Fields.NextExecuteAt, now)
             .GetSnapshotAsync(ct);
@@ -53,8 +46,7 @@ internal sealed class FirestoreSchedulerDispatcher(
             }
             catch (Exception ex)
             {
-                // One bad document must never abort the sweep — the jobs after it in this
-                // snapshot are still due and every future sweep would hit the same document first.
+                // One bad document must not abort the sweep, or it would block every future pass.
                 logger.LogError(ex, "Scheduled job {JobId} failed to dispatch; sweep continues", doc.Id);
             }
         }
@@ -63,7 +55,6 @@ internal sealed class FirestoreSchedulerDispatcher(
         return SweepResult.Dispatched(dispatched);
     }
 
-    /// <summary>True when the job was handed to the queue; false when it was skipped or quarantined.</summary>
     private async Task<bool> EnqueueJobAsync(DocumentSnapshot doc, CancellationToken ct)
     {
         using var activity = SchedulerTracing.StartJob(doc.Id);
@@ -75,9 +66,7 @@ internal sealed class FirestoreSchedulerDispatcher(
         }
         catch (FormatException ex)
         {
-            // Written by a newer version before a rollback, or corrupted. Quarantine instead of
-            // failing: push the run out and dead-letter the occurrence, leaving the document in
-            // place so a host version that understands it can still pick it up.
+            // Quarantine, keeping the document for a host version that can read it.
             activity.SetOutcome(SchedulerJobOutcome.Quarantined, ex.Message);
             return await QuarantineUnreadableAsync(doc, ex, ct);
         }
@@ -99,13 +88,11 @@ internal sealed class FirestoreSchedulerDispatcher(
             "Scheduled job {JobId} has an unreadable schedule; quarantining for {Quarantine}",
             doc.Id, QuarantineWindow);
 
-        // The lease doubles as the multi-node guard: only the sweep that wins it books the
-        // dead letter, so competing sweeps don't record the same occurrence.
+        // Only the sweep that wins the lease records the dead letter.
         if (!await TryLeaseAsync(doc.Reference, now => now + QuarantineWindow, ct))
             return false;
 
-        // The document is deliberately kept whatever the dead-letter write does: it is unreadable,
-        // not finished.
+        // Kept regardless: the document is unreadable, not finished.
         var requestTypeName = doc.GetValue<string>(ScheduledJob.Fields.RequestTypeName);
         var payloadJson = doc.GetValue<string>(ScheduledJob.Fields.PayloadJson);
         await WriteDeadLetterAsync(
@@ -113,7 +100,6 @@ internal sealed class FirestoreSchedulerDispatcher(
         return false;
     }
 
-    /// <summary>The job's recurrence, read from the canonical schedule field; null for a one-shot job.</summary>
     private static Schedule? ResolveSchedule(DocumentSnapshot doc) =>
         doc.ContainsField(ScheduledJob.Fields.Schedule)
             ? Schedule.Parse(doc.GetValue<string>(ScheduledJob.Fields.Schedule))
@@ -121,10 +107,7 @@ internal sealed class FirestoreSchedulerDispatcher(
 
     private async Task<bool> EnqueueOneShotJobAsync(DocumentSnapshot doc, CancellationToken ct)
     {
-        // Lease the job by hiding it for a visibility window rather than deleting it up front: if the
-        // dispatcher crashes mid-dispatch the lease lapses and a later sweep retries it, so a one-shot
-        // job can never get permanently stuck. Downstream commands are idempotent, so the resulting
-        // at-least-once delivery is safe.
+        // Lease rather than delete up front, so a crash mid-dispatch is retried (at-least-once).
         if (!await TryLeaseAsync(doc.Reference, now => now + OneShotLeaseWindow, ct))
             return false;
 
@@ -134,8 +117,6 @@ internal sealed class FirestoreSchedulerDispatcher(
         try
         {
             await EnqueueAsync(requestTypeName, payloadJson, ct);
-            // A one-shot job runs once, so the document has served its purpose. Deleting rather than
-            // flagging it is what keeps the collection bounded — the queue message is now the record.
             await doc.Reference.DeleteAsync(cancellationToken: ct);
 
             logger.LogInformation("Scheduled job {JobId} ({Type}) enqueued", doc.Id, requestTypeName);
@@ -145,9 +126,7 @@ internal sealed class FirestoreSchedulerDispatcher(
         {
             logger.LogError(ex, "Scheduled job {JobId} ({Type}) failed to enqueue", doc.Id, requestTypeName);
 
-            // Delete only once the payload is safe in the dead-letter store. If that write failed the
-            // document is all that is left of the job, so keep it: the lease lapses and a later sweep
-            // retries, which also recovers the job outright if the failure was transient.
+            // Delete only once the dead letter is written; otherwise the document is the only copy.
             if (await WriteDeadLetterAsync(doc.Id, doc.Id, requestTypeName, payloadJson, ex.Message, ct))
                 await doc.Reference.DeleteAsync(cancellationToken: ct);
 
@@ -157,10 +136,7 @@ internal sealed class FirestoreSchedulerDispatcher(
 
     private async Task<bool> EnqueueRecurringJobAsync(DocumentSnapshot doc, Schedule schedule, CancellationToken ct)
     {
-        // Lease the next scheduled run before doing any work. The advanced NextExecuteAt is the
-        // lock: a competing or subsequent sweep won't re-select the job until that run is due, and
-        // the document is never removed — so recurrence never gets stuck after a crash, and a
-        // failed occurrence never stops future runs.
+        // Advancing NextExecuteAt is the lease, so a crash or failed run never stops future runs.
         if (!await TryLeaseAsync(doc.Reference, schedule.NextRun, ct))
             return false;
 
@@ -177,11 +153,10 @@ internal sealed class FirestoreSchedulerDispatcher(
         }
         catch (Exception ex)
         {
-            // Dead-letter this occurrence but leave the schedule armed — the next slot still runs.
             logger.LogError(ex,
                 "Recurring job {JobId} ({Type}) failed to enqueue; schedule remains active",
                 doc.Id, requestTypeName);
-            // Each failed occurrence is distinct, so suffix the key rather than dedupe on the job id.
+            // Each failed occurrence is distinct, so suffix the key.
             await WriteDeadLetterAsync($"{doc.Id}:{timeProvider.GetUtcNow().Ticks}", doc.Id, requestTypeName, payloadJson, ex.Message, ct);
             return false;
         }
@@ -196,14 +171,8 @@ internal sealed class FirestoreSchedulerDispatcher(
         await ResolvedRequestEnqueuer.Enqueue(queue, request, registered.ResponseType, ct);
     }
 
-    /// <summary>
-    /// Atomically leases a due job by pushing its next run into the future (computed by
-    /// <paramref name="nextRunFrom"/>) while leaving it Pending. The advanced timestamp is the
-    /// lock: it hides the job from concurrent and subsequent sweeps without any terminal
-    /// "executing" state, so a crash before the work completes never strands the job — the lease
-    /// lapses and a later sweep retries it. Returns false if another sweep already leased it (or
-    /// it is no longer pending).
-    /// </summary>
+    // The advanced timestamp is the lock: no "executing" state, so a crash never strands the job.
+    // False if another sweep already leased or finished it.
     private async Task<bool> TryLeaseAsync(
         DocumentReference docRef, Func<DateTimeOffset, DateTimeOffset> nextRunFrom, CancellationToken ct)
     {
@@ -214,13 +183,10 @@ internal sealed class FirestoreSchedulerDispatcher(
         {
             return await db.RunTransactionAsync(async tx =>
             {
-                // Gone means another sweep already finished it — there is no terminal state to check
-                // for beyond the document's own existence.
                 var snapshot = await tx.GetSnapshotAsync(docRef, ct);
                 if (!snapshot.Exists)
                     return false;
 
-                // A competing sweep already leased it past now.
                 if (snapshot.GetValue<Timestamp>(ScheduledJob.Fields.NextExecuteAt).ToDateTimeOffset() > now)
                     return false;
 
@@ -239,10 +205,7 @@ internal sealed class FirestoreSchedulerDispatcher(
         }
     }
 
-    /// <summary>
-    /// Records a dead letter. Returns false if it could not be written — the caller must then keep
-    /// the job document, because it is the only remaining copy of the payload.
-    /// </summary>
+    // False means the caller must keep the job document: it is the only copy of the payload.
     private async Task<bool> WriteDeadLetterAsync(
         string idempotencyKey, string jobId, string requestTypeName, string payloadJson, string error, CancellationToken ct)
     {

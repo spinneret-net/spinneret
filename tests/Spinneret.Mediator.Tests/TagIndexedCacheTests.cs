@@ -1,9 +1,5 @@
 namespace Spinneret.Mediator.Tests;
 
-/// <summary>
-/// Tag-based invalidation behavior of the internal TagIndexedCache, exercised
-/// through the public mediator API (CacheAttribute + InvalidateCacheAttribute).
-/// </summary>
 public class TagIndexedCacheTests
 {
     [Test]

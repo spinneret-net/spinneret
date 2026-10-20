@@ -2,11 +2,7 @@ using System.Reflection;
 
 namespace Spinneret.Queue.Tests;
 
-/// <summary>
-/// <see cref="DeadLetter"/> restates <see cref="DeadLetterEntry"/> rather than wrapping it, so that
-/// an admin page reads one flat record. This pins the two together: a field added to the write side
-/// has to be mirrored on the read side or stores will silently stop returning it.
-/// </summary>
+// DeadLetter restates DeadLetterEntry, so a field added to one must be mirrored on the other.
 public class DeadLetterContractTests
 {
     [Test]
@@ -34,17 +30,13 @@ public class DeadLetterContractTests
     }
 }
 
-/// <summary>
-/// <see cref="ResendDeadLetterError"/> is a closed union: applications switch over its cases, and an
-/// out-of-tree case would make every such switch silently non-exhaustive.
-/// </summary>
+// A closed union: an out-of-tree case would make application switches silently non-exhaustive.
 public class ResendDeadLetterErrorTests
 {
     [Test]
     public async Task Cannot_be_derived_from_outside_its_own_declaration()
     {
-        // The only non-copy constructor is private, so a derived record elsewhere has no base
-        // constructor to chain to and does not compile.
+        // With only a private constructor, a derived record elsewhere doesn't compile.
         var constructors = typeof(ResendDeadLetterError)
             .GetConstructors(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
             .Where(c => c.GetParameters() is not [{ ParameterType: var p }] || p != typeof(ResendDeadLetterError))
@@ -86,8 +78,7 @@ public class DeadLetterQueryTests
     [Arguments(DeadLetterQuery.MaxPageSize + 1)]
     public async Task Rejects_a_page_size_no_store_will_serve(int pageSize)
     {
-        // Thrown rather than clamped: a page size arriving from a query string is the application's
-        // to validate, and silently serving a different one hides that it never did.
+        // Thrown rather than clamped: validating a query-string page size is the application's job.
         await Assert.That(() => new DeadLetterQuery { PageSize = pageSize })
             .Throws<ArgumentOutOfRangeException>();
     }
@@ -122,8 +113,7 @@ public class DeadLetterStorageTests
     [Arguments("")]
     public async Task Rejects_a_value_that_names_no_source(string stored)
     {
-        // Case matters: the stored spelling is the member name, and accepting "queue" here would
-        // bless a store written by something other than this library.
+        // Case matters: accepting "queue" would bless a store this library didn't write.
         await Assert.That(() => DeadLetterStorage.ParseSource(stored)).Throws<InvalidOperationException>();
     }
 }

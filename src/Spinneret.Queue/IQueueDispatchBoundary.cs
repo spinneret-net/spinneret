@@ -1,22 +1,13 @@
 namespace Spinneret.Queue;
 
-/// <summary>
-/// Brackets the handler invocation of one queue delivery, between the transport handing the
-/// envelope to <see cref="IQueueDeliveryProcessor"/> and the processor booking the outcome.
-/// Storage uses this to scope transactional state to the handler alone — e.g. SQL storage sets a
-/// transaction savepoint here, so a failed handler's partial writes are rolled
-/// back while the delivery transaction stays usable for booking the retry or dead-letter
-/// atomically with the dequeue. The default implementation invokes the handler directly.
-/// </summary>
+// Brackets the handler call so storage can roll back its writes (e.g. a SQL savepoint)
+// while the delivery transaction stays usable for booking the outcome.
 internal interface IQueueDispatchBoundary
 {
-    /// <param name="context">The delivery being executed.</param>
-    /// <param name="dispatch">Invokes the handler; exceptions must propagate to the caller.</param>
-    /// <param name="ct"></param>
+    // dispatch's exceptions must propagate to the caller.
     Task ExecuteAsync(QueueDeliveryContext context, Func<Task> dispatch, CancellationToken ct);
 }
 
-/// <summary>The default pass-through boundary, for storage with no transaction to bracket.</summary>
 internal sealed class DirectDispatchBoundary : IQueueDispatchBoundary
 {
     public Task ExecuteAsync(QueueDeliveryContext context, Func<Task> dispatch, CancellationToken ct) => dispatch();

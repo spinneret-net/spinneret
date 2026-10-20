@@ -6,25 +6,8 @@ using Microsoft.Extensions.Logging;
 
 namespace Spinneret.Queue.Sql;
 
-/// <summary>
-/// Forwards the outbox to a push transport (Cloud Tasks): leases due rows, sends each under a stable
-/// name, and deletes it once the transport has it. The outbox is the source of truth throughout — a
-/// message leaves it only after the transport accepted it.
-/// </summary>
-/// <remarks>
-/// <para>
-/// Every message is sent under a name the transport deduplicates on: its dedupe key when the
-/// producer gave one, otherwise its <c>MessageId</c>. That is what makes forwarding idempotent. A
-/// relay that crashes between sending and deleting leaves the row leased; once the lease runs out a
-/// later pass sends it again, the transport answers "already exists", and the row is deleted. A
-/// duplicate is possible only if the row outlives the transport's memory of the name — about an hour
-/// after the task ran, for Cloud Tasks.
-/// </para>
-/// <para>
-/// A lease rather than a destructive claim: the send is a network call, which must not hold a
-/// transaction open, and a lease that runs out is what returns a stranded row to the pool.
-/// </para>
-/// </remarks>
+// Sends under a name the transport deduplicates on, so a resend after a crash is refused as a duplicate.
+// Leases rather than claims, because the network send must not hold a transaction open.
 internal sealed class SqlOutboxRelay(
     SqlQueueStorage storage,
     IQueueTransport transport,
@@ -34,10 +17,8 @@ internal sealed class SqlOutboxRelay(
     ILogger<SqlOutboxRelay> logger)
     : IQueueRelay
 {
-    /// <summary>How long a message that failed to send stays leased before a pass tries it again.</summary>
     private static readonly TimeSpan SendFailureBackoff = TimeSpan.FromSeconds(30);
 
-    /// <summary>Sends in flight at once within one leased batch.</summary>
     private const int SendParallelism = 8;
 
     public async Task<RelayResult> RelayAsync(CancellationToken ct)
@@ -64,8 +45,7 @@ internal sealed class SqlOutboxRelay(
             forwarded += sent;
             failed += batch.Count - sent;
 
-            // Drained, or the transport refuses everything: leave the rest to the next pass, so the
-            // trigger's interval is the backoff rather than a tight loop of failing sends.
+            // Stop when every send failed, so the trigger interval is the backoff, not a tight loop.
             if (batch.Count < settings.BatchSize || sent == 0)
                 break;
         }
@@ -75,11 +55,7 @@ internal sealed class SqlOutboxRelay(
             : new RelayResult { MessagesForwarded = forwarded, MessagesFailed = failed };
     }
 
-    /// <summary>
-    /// Forwards specific messages now — the ones a unit of work just committed — so they do not wait
-    /// for the next pass. Best effort: a message another relay already holds, or one due beyond the
-    /// forwarding horizon, is skipped, and one that fails is left for the passes to retry.
-    /// </summary>
+    // Best effort: held, not-yet-due or failed messages are left for the passes.
     public async Task ForwardAsync(IReadOnlyCollection<Guid> messageIds, CancellationToken ct)
     {
         foreach (var messageId in messageIds)
@@ -141,7 +117,6 @@ internal sealed class SqlOutboxRelay(
         return leased;
     }
 
-    /// <summary>Sends one leased message and removes it; true when the transport has it.</summary>
     private async Task<bool> SendAsync(LeasedMessage message, CancellationToken ct)
     {
         QueueEnvelope? envelope;
@@ -170,8 +145,6 @@ internal sealed class SqlOutboxRelay(
                     MessageName: message.DedupeKey ?? message.MessageId.ToString("N")), ct);
             }
 
-            // Sent, or already sent by an earlier pass whose delete did not land: either way the
-            // transport has it, so the outbox no longer needs to.
             await DeleteRelayed(message);
             return true;
         }
@@ -185,10 +158,6 @@ internal sealed class SqlOutboxRelay(
         }
     }
 
-    /// <summary>
-    /// A row whose envelope cannot be read can never be delivered: dead-letter the raw content, as the
-    /// in-host worker would, rather than retrying it forever.
-    /// </summary>
     private Task DeadLetterUnreadable(LeasedMessage message, CancellationToken ct)
     {
         logger.LogError("Queue message {MessageId} has an unreadable envelope; dead-lettering", message.MessageId);
@@ -203,10 +172,7 @@ internal sealed class SqlOutboxRelay(
         }, ct);
     }
 
-    /// <summary>
-    /// Not cancellable: the transport already has the message, so abandoning the delete only costs a
-    /// resend the transport will refuse as a duplicate — but finishing it costs nothing.
-    /// </summary>
+    // Not cancellable: the transport already has the message.
     private async Task DeleteRelayed(LeasedMessage message)
     {
         await using var connection = await storage.DataSource.OpenConnectionAsync(CancellationToken.None);
@@ -216,7 +182,7 @@ internal sealed class SqlOutboxRelay(
         await command.ExecuteNonQueryAsync(CancellationToken.None);
     }
 
-    /// <summary>Best effort: if the backoff cannot be recorded, the lease running out retries the row anyway.</summary>
+    // Best effort: an expiring lease retries the row anyway.
     private async Task TryReleaseLease(LeasedMessage message)
     {
         try
@@ -238,10 +204,6 @@ internal sealed class SqlOutboxRelay(
         long Id, Guid MessageId, string Channel, DateTimeOffset VisibleAt, string? DedupeKey, string Envelope, Guid LeaseToken);
 }
 
-/// <summary>
-/// Runs the relay on a timer in this host, unless the transport's settings leave it to an HTTP
-/// trigger (a host that scales to zero has no thread to tick).
-/// </summary>
 internal sealed class SqlOutboxRelayService(
     SqlOutboxRelay relay,
     QueueRelaySettings settings,
@@ -270,8 +232,7 @@ internal sealed class SqlOutboxRelayService(
             }
             catch (Exception ex)
             {
-                // The pass itself failed — the database still starting up, a transient outage. Never
-                // fatal: the next tick tries again.
+                // Never fatal: the next tick tries again.
                 logger.LogError(ex, "Queue relay pass failed; next pass continues");
             }
 
@@ -289,20 +250,12 @@ internal sealed class SqlOutboxRelayService(
     }
 }
 
-/// <summary>
-/// Hears about every outbox insert and every committed unit of work, so a relay can forward what was
-/// just committed instead of waiting for its next pass. The default hears nothing: with in-host
-/// delivery the worker picks rows up itself.
-/// </summary>
+// Lets a relay forward just-committed messages instead of waiting for its next pass.
 internal interface ISqlOutboxObserver
 {
-    /// <summary>
-    /// A message was inserted into the outbox — joining <paramref name="transaction"/>, or committed
-    /// on its own when that is null.
-    /// </summary>
+    // A null transaction means the insert auto-committed.
     Task InsertedAsync(Guid messageId, DbTransaction? transaction, CancellationToken ct);
 
-    /// <summary>A unit of work's own transaction committed.</summary>
     Task CommittedAsync(DbTransaction transaction);
 }
 
@@ -313,24 +266,14 @@ internal sealed class NoSqlOutboxObserver : ISqlOutboxObserver
     public Task CommittedAsync(DbTransaction transaction) => Task.CompletedTask;
 }
 
-/// <summary>
-/// Forwards messages to the transport as soon as they are durable: an auto-committed insert at once,
-/// one inside a unit of work when that unit commits. A host that is CPU-throttled outside requests
-/// (Cloud Run) would otherwise leave them for a relay pass that may not run until the next request,
-/// or the next external tick. Rows inserted into a transaction the application owns cannot be seen
-/// to commit, so those wait for the passes.
-/// </summary>
-/// <remarks>
-/// Best effort and bounded: forwarding never fails the operation that triggered it, and the passes
-/// remain the guarantee.
-/// </remarks>
+// Forwards on commit because a CPU-throttled host (Cloud Run) may not run a relay pass until the next
+// request. Best effort; the passes remain the guarantee.
 internal sealed class EagerForwardingObserver(SqlOutboxRelay relay, ILogger<EagerForwardingObserver> logger)
     : ISqlOutboxObserver
 {
     private static readonly TimeSpan ForwardTimeout = TimeSpan.FromSeconds(10);
 
-    // Weak, so pending ids of a transaction that is never seen to commit — the application's own —
-    // go away with it.
+    // Weak, so ids of a transaction never seen to commit (the application's own) are collected with it.
     private readonly ConditionalWeakTable<DbTransaction, List<Guid>> _pending = new();
 
     public Task InsertedAsync(Guid messageId, DbTransaction? transaction, CancellationToken ct)

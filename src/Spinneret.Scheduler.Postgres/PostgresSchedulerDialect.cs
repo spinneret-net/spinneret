@@ -4,12 +4,7 @@ using Spinneret.Scheduler.Sql;
 
 namespace Spinneret.Scheduler.Postgres;
 
-/// <summary>
-/// The PostgreSQL spelling of the scheduled-jobs table — the single source of truth for every
-/// statement and the DDL, built from the configured names so the two can never drift apart. Like
-/// the queue's dialect, no statement fails on an outcome the scheduler expects, so none can abort
-/// the transaction it runs in.
-/// </summary>
+// No statement fails on an expected outcome, since a Postgres error aborts the whole transaction.
 internal sealed class PostgresSchedulerDialect : SqlSchedulerDialect
 {
     public static readonly PostgresSchedulerDialect Instance = new();
@@ -32,11 +27,7 @@ internal sealed class PostgresSchedulerDialect : SqlSchedulerDialect
 
         return new SqlSchedulerStatements
         {
-            // INSERT … ON CONFLICT DO UPDATE is Postgres's single-statement upsert: racing
-            // registrations of a new key serialize on the primary key instead of both inserting. The
-            // schedule comparison uses the "C" collation so it is ordinal, like the schedule text
-            // itself; a one-shot row under the same key (schedule NULL) is taken over and armed. The
-            // CASE reads the row as it was before the update.
+            // Racing registrations serialize on the primary key. "C" collation makes the comparison ordinal.
             UpsertRecurring = $"""
                 INSERT INTO {table} AS target
                     (JobKey, RequestTypeName, PayloadJson, Schedule, NextExecuteAt, CreatedAt)
@@ -58,9 +49,7 @@ internal sealed class PostgresSchedulerDialect : SqlSchedulerDialect
                 VALUES (@JobKey, @RequestTypeName, @PayloadJson, NULL, @NextExecuteAt, @CreatedAt);
                 """,
 
-            // FOR UPDATE holds the row until the sweep's transaction commits — that lock is the
-            // lease — and SKIP LOCKED lets a competing host's sweep move straight to the next due
-            // job instead of blocking, so hosts sweep in parallel without double-dispatching.
+            // FOR UPDATE held to commit is the lease; SKIP LOCKED lets competing sweeps skip it instead of blocking.
             ClaimNextDue = $"""
                 SELECT JobKey, RequestTypeName, PayloadJson, Schedule
                 FROM {table}
@@ -76,8 +65,6 @@ internal sealed class PostgresSchedulerDialect : SqlSchedulerDialect
                 WHERE JobKey = @JobKey;
                 """,
 
-            // Runs on the claim's transaction, so the row disappears in the same commit that makes
-            // the queue message durable — the message is the record from then on.
             CompleteOneShot = $"""
                 DELETE FROM {table}
                 WHERE JobKey = @JobKey;
@@ -94,15 +81,13 @@ internal sealed class PostgresSchedulerDialect : SqlSchedulerDialect
                 WHERE JobKey = @JobKey AND NextExecuteAt <= @Now;
                 """,
 
-            // The Schedule NOT NULL guard is what keeps a one-shot job safe: one-shot handles live in
-            // the same JobKey namespace and are the rows with no schedule.
+            // Guard: one-shot rows share the key namespace and have no schedule.
             DeleteRecurring = $"""
                 DELETE FROM {table}
                 WHERE JobKey = @JobKey AND Schedule IS NOT NULL;
                 """,
 
-            // The mirror guard: a cancel can never delete a recurring job's schedule. A job that
-            // already ran is simply gone, which makes this a no-op.
+            // Backstop behind the handle-prefix check: never deletes a recurring job.
             Cancel = $"""
                 DELETE FROM {table}
                 WHERE JobKey = @JobKey AND Schedule IS NULL;

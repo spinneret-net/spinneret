@@ -10,17 +10,7 @@ using Microsoft.Extensions.Hosting;
 
 namespace Spinneret.Scheduler.AspNetCore.Tests;
 
-/// <summary>
-/// The sweep endpoint over a real ASP.NET pipeline rather than a fake route builder: that the route
-/// is reachable, that the authorization policy actually runs, and that the body an external
-/// scheduler reads is the one the sweep produced.
-/// </summary>
-/// <remarks>
-/// The companion suite asserts what <c>MapSchedulerSweep</c> registers — route pattern, metadata,
-/// map-time guards. This one asserts what a caller actually gets back, which endpoint metadata
-/// cannot show: authorization is a middleware, so only a request through the pipeline proves the
-/// endpoint is guarded rather than merely annotated.
-/// </remarks>
+// Through a real pipeline: only a request proves the authorization middleware runs.
 public class SchedulerSweepHostTests
 {
     private const string TestPolicy = "TestSweepPolicy";
@@ -41,10 +31,7 @@ public class SchedulerSweepHostTests
         }
     }
 
-    /// <summary>
-    /// Authenticates when the caller sends the agreed header, so the guarded endpoint can be
-    /// exercised from both sides without standing up a token issuer.
-    /// </summary>
+    /// <summary>Authenticates when the agreed header is sent, so no token issuer is needed.</summary>
     private sealed class HeaderSchemeHandler(
         Microsoft.Extensions.Options.IOptionsMonitor<AuthenticationSchemeOptions> options,
         Microsoft.Extensions.Logging.ILoggerFactory logger,
@@ -64,7 +51,6 @@ public class SchedulerSweepHostTests
         }
     }
 
-    /// <summary>A running host with the sweep endpoint mapped, reachable over an in-memory transport.</summary>
     private static async Task<IHost> StartHostAsync(ISchedulerSweep sweep, string? pattern = null)
     {
         var host = await new HostBuilder()
@@ -115,8 +101,6 @@ public class SchedulerSweepHostTests
     [Test]
     public async Task The_response_body_reports_what_the_sweep_dispatched()
     {
-        // An external scheduler is the only thing that knows a sweep happened, so what comes back
-        // is the difference between an observable cron job and one that reports success either way.
         using var host = await StartHostAsync(new FakeSweep { JobsDispatched = 7 });
 
         var result = await Authenticated(host)
@@ -129,8 +113,6 @@ public class SchedulerSweepHostTests
     [Test]
     public async Task An_unauthenticated_post_is_rejected_without_sweeping()
     {
-        // The sweep dispatches every due job, so an unguarded endpoint is the failure that matters.
-        // Only a request through the pipeline proves the policy runs — metadata alone would not.
         var sweep = new FakeSweep();
         using var host = await StartHostAsync(sweep);
 

@@ -6,12 +6,7 @@ using Spinneret.Functional;
 
 namespace Spinneret.ViewModel;
 
-/// <summary>
-/// A typed two-way binding between a string-based input and a view-model property, with
-/// conversion errors recorded in the target's <see cref="IValidationState"/>. Create bindings
-/// with the <see cref="Create{TViewModel}(TViewModel, Expression{Func{TViewModel, string}})"/>
-/// factories; bindings for the same target, expression and converters are cached and reused.
-/// </summary>
+/// <summary>A two-way binding between a string input and a view-model property, recording conversion errors in its <see cref="IValidationState"/>.</summary>
 public sealed class Binding
 {
     private static readonly ConditionalWeakTable<IValidationStateProvider, Dictionary<string, Binding>> Cache = new();
@@ -227,9 +222,7 @@ public sealed class Binding
 
         if (!IsWritableTarget(targetBody))
         {
-            // Defer the failure to call time rather than throwing while the binding is being created,
-            // so a read-only target is usable by consumers that only read (e.g. surfacing a validation
-            // error at a path). This mirrors the property-path branch, which only fails on a real set.
+            // Fail on set, not creation, so read-only targets still work for readers.
             return (_, _) => throw new InvalidOperationException($"Binding expression '{pathString}' is not writable.");
         }
 

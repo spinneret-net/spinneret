@@ -2,11 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Spinneret.Queue.Tests;
 
-/// <summary>
-/// The dispatch boundary brackets exactly the handler invocation — transports rely on it to scope
-/// transactional state (e.g. a savepoint) to the handler alone, with the processor's own booking
-/// happening outside the bracket.
-/// </summary>
+// Transports scope transactional state (e.g. a savepoint) to the handler alone via this boundary.
 public class QueueDispatchBoundaryTests
 {
     private static readonly DateTimeOffset Now = new(2026, 8, 10, 12, 0, 0, TimeSpan.Zero);
@@ -57,8 +53,7 @@ public class QueueDispatchBoundaryTests
         var outcome = await CreateProcessor().ProcessAsync(
             Envelope<UnannotatedCommand>(), "task-1", CancellationToken.None);
 
-        // The boundary observed the failure (its cue to roll back to a savepoint), and the
-        // processor still booked the retry — outside the bracket.
+        // The boundary saw the failure (its cue to roll back), and the retry was booked outside it.
         await Assert.That(outcome.Ack).IsTrue();
         await Assert.That(Expect.Single(_boundary.Observed)).IsSameReferenceAs(_dispatcher.Throw);
         await Assert.That(Expect.Single(_envelopeQueue.Enqueued).Envelope.PriorFailures).IsEqualTo(1);

@@ -8,25 +8,11 @@ using Spinneret.Queue.Sql;
 
 namespace Spinneret.Scheduler.Sql;
 
-/// <summary>
-/// A dialect package's scheduler storage, as the shared registration needs it: the <c>Use*</c>
-/// method name (for error messages), the options section, and the dialect.
-/// </summary>
 internal sealed record SqlSchedulerDescriptor(string MethodName, string SectionName, SqlSchedulerDialect Dialect);
 
-/// <summary>
-/// The service registrations every SQL scheduler dialect shares. A dialect package describes itself
-/// with a <see cref="SqlSchedulerDescriptor"/> and its options type; the queue storage the scheduler
-/// shares a database with comes from the SQL queue registration, in either order — it is only
-/// resolved when the scheduler is, which the schema initializer makes happen as the host starts.
-/// </summary>
+// The queue storage may be registered in either order; it is resolved only as the host starts.
 internal static class SqlSchedulerRegistration
 {
-    /// <summary>
-    /// Sets the scheduler's storage to a SQL dialect, binding <typeparamref name="TOptions"/> from
-    /// the descriptor's section of <paramref name="configuration"/> (when given), then
-    /// <paramref name="configure"/>; validated eagerly and again at host start.
-    /// </summary>
     public static SchedulerBuilder UseSqlStorage<TOptions>(
         this SchedulerBuilder scheduler,
         SqlSchedulerDescriptor descriptor,
@@ -46,8 +32,7 @@ internal static class SqlSchedulerRegistration
 
         return scheduler.UseStorage(new SchedulerStorageRole(descriptor.MethodName, services =>
         {
-            // Fail as early as possible on broken configuration; the options-pipeline validation
-            // re-validates at host start to also cover later Configure/PostConfigure changes.
+            // Fail early; ValidateOnStart re-checks later Configure/PostConfigure changes.
             var eagerlyBound = new TOptions();
             apply(eagerlyBound);
             validator.ValidateOrThrow(eagerlyBound);
@@ -75,14 +60,9 @@ internal static class SqlSchedulerRegistration
             table(sp)));
         services.TryAddSingleton<IRecurringJobScheduler, SqlScheduler>();
         services.TryAddSingleton<ISqlTransactionalScheduler, SqlTransactionalScheduler>();
-        // The sweep engine, not the trigger: registering it costs nothing until something drives it,
-        // and the host chooses that separately with UseInHostSweeper() or an HTTP trigger.
         services.TryAddSingleton<ISchedulerSweep, SqlSchedulerSweeper>();
-        // Before the recurring-job installer, which SchedulerBuilder adds after the storage: hosted
-        // services start in registration order, and the installer writes into this table. It is
-        // also what checks that the scheduler shares the queue's database: the scheduler and the
-        // queue register independently, in either order, so that can only be known once both are
-        // in — and the host resolves this initializer, and with it the storage, as it starts.
+        // Must start before the installer, which writes into this table. Resolving it at startup
+        // also checks that the scheduler shares the queue's database.
         services.AddHostedService<SqlSchedulerSchemaInitializer>();
 
         return services;
@@ -94,7 +74,7 @@ internal static class SqlSchedulerRegistration
         + "AddQueue(q => q.UseMssqlStorage(...)) or AddQueue(q => q.UsePostgresStorage(...)).";
 }
 
-/// <summary>Validates a dialect's <see cref="SqlSchedulerOptions"/>: a table name safe to splice into SQL.</summary>
+// The table name is spliced into SQL, so it must be a safe identifier.
 internal sealed class SqlSchedulerOptionsValidator<TOptions>(SqlSchedulerDialect dialect, string sectionName)
     : IValidateOptions<TOptions>
     where TOptions : SqlSchedulerOptions
@@ -119,10 +99,7 @@ internal sealed class SqlSchedulerOptionsValidator<TOptions>(SqlSchedulerDialect
     }
 }
 
-/// <summary>
-/// Creates the scheduled-jobs table idempotently at startup, gated by the queue storage's
-/// CreateSchema switch — one schema-ownership decision for both.
-/// </summary>
+// Gated by the queue's CreateSchema: one schema-ownership decision for both.
 internal sealed class SqlSchedulerSchemaInitializer(
     SqlSchedulerStorage storage,
     ILogger<SqlSchedulerSchemaInitializer> logger)

@@ -55,11 +55,7 @@ internal sealed class QueueDispatcher(
     }
 }
 
-/// <summary>
-/// Serializer abstraction so the queue can use whatever <see cref="JsonSerializerOptions"/>
-/// the host configured. Implemented by transports or hosts; register a custom one before the
-/// transport's Add* call. Additions to this interface ship as default interface members.
-/// </summary>
+/// <summary>Serializes command payloads; every host sharing a queue must serialize the same way.</summary>
 public interface IQueuePayloadSerializer
 {
     string Serialize(object request, Type requestType);

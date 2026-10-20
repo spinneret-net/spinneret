@@ -2,11 +2,7 @@ using System.Globalization;
 
 namespace Spinneret.Queue;
 
-/// <summary>
-/// How the transport treats a queued handler that returned a <c>Result</c> in error state. An error
-/// result is a deterministic business outcome — the same input yields the same error — which is why the
-/// default is to dead-letter immediately instead of spending retries on a decision that will not change.
-/// </summary>
+/// <summary>How a queued handler's error <c>Result</c> is treated; dead-lettered by default, since retrying can't change it.</summary>
 public enum ErrorResultAction
 {
     /// <summary>Write the task to the dead-letter store immediately (default).</summary>
@@ -19,13 +15,7 @@ public enum ErrorResultAction
     Discard = 2,
 }
 
-/// <summary>
-/// The terminal action when a task's retry budget is exhausted — <see cref="QueuePolicy.MaxAttempts"/>
-/// failures reached, or <see cref="QueuePolicy.MaxAge"/> exceeded on a failure or deferral. Distinct
-/// from permanent failures, which always dead-letter: exhaustion of a self-healing task (one a
-/// recurring sweep redoes anyway) is safe to discard, while a permanent failure is a defect worth
-/// surfacing regardless.
-/// </summary>
+/// <summary>What happens when a task exhausts its attempts or age; permanent failures always dead-letter.</summary>
 public enum ExhaustedAction
 {
     /// <summary>Write the task to the dead-letter store (default).</summary>
@@ -35,49 +25,32 @@ public enum ExhaustedAction
     Discard = 1,
 }
 
-/// <summary>
-/// Per-command retry policy, declared with <see cref="QueuePolicyAttribute"/> on the command type and
-/// resolved through <see cref="QueueTypeRegistry"/>. The application owns task termination: the transport
-/// is configured as an effectively unlimited backstop, and every delivery ends in an explicit decision
-/// here — acknowledge, retry after a computed backoff, or dead-letter.
-/// </summary>
+/// <summary>Per-command retry policy, declared with <see cref="QueuePolicyAttribute"/>.</summary>
 public sealed record QueuePolicy
 {
-    // 7 attempts at the default backoff spread ~10 minutes of retrying — matching the transport
-    // window this design replaced, so an outage short enough for the old queue config to absorb
-    // never bulk-dead-letters unannotated commands (notably every outbox delivery).
-    // static readonly, not const: a const default would be baked into every compiled consumer,
-    // so changing it here would leave mixed-version assemblies disagreeing about the default.
+    // 7 attempts at the default backoff span ~10 minutes, so a short outage doesn't bulk-dead-letter.
+    // static readonly, not const, so a changed default isn't baked into compiled consumers.
     public static readonly int DefaultMaxAttempts = 7;
     public static readonly string DefaultMaxAge = "1.00:00:00";
     public static readonly string DefaultMinBackoff = "00:00:10";
     public static readonly string DefaultMaxBackoff = "00:10:00";
 
-    /// <summary>The channel commands ride on when they declare none. A protocol constant.</summary>
+    /// <summary>The channel commands ride on when they declare none.</summary>
     public const string DefaultChannel = "default";
 
     public static QueuePolicy Default { get; } = new();
 
-    /// <summary>
-    /// Named transport channel this command rides on. Channels are logical names the transport maps
-    /// to physical queues (e.g. a rate-limited one); null resolves to <see cref="DefaultChannel"/>.
-    /// </summary>
+    /// <summary>Logical channel the transport maps to a physical queue; null means <see cref="DefaultChannel"/>.</summary>
     public string? Channel { get; init; }
 
     /// <summary>The channel to route to: the declared one, or <see cref="DefaultChannel"/>.</summary>
     public string ResolvedChannel => Channel ?? DefaultChannel;
 
-    /// <summary>
-    /// Maximum failed executions before the task is dead-lettered. Deferrals
-    /// (<see cref="QueueHandlerRetryAfterException"/>) do not count — they are bounded by
-    /// <see cref="MaxAge"/> instead.
-    /// </summary>
+    /// <summary>Maximum failed executions before giving up; deferrals don't count.</summary>
     public int MaxAttempts { get; init; } = DefaultMaxAttempts;
 
     /// <summary>
-    /// Maximum total lifetime of the task measured from <see cref="QueueEnvelope.EnqueuedAtUtc"/>,
-    /// spanning retries and deferrals alike. A task older than this is dead-lettered on its next
-    /// failure or deferral.
+    /// Maximum lifetime from <see cref="QueueEnvelope.EnqueuedAtUtc"/>; an older task gives up on its next failure or deferral.
     /// </summary>
     public TimeSpan MaxAge { get; init; } = TimeSpan.Parse(DefaultMaxAge, CultureInfo.InvariantCulture);
 
@@ -92,9 +65,7 @@ public sealed record QueuePolicy
     public ExhaustedAction OnExhausted { get; init; } = ExhaustedAction.DeadLetter;
 
     /// <summary>
-    /// The delay before redelivery after failed execution number <paramref name="attempt"/> (1-based),
-    /// capped at <see cref="MaxBackoff"/>. Returns the cap directly when doubling would overshoot it,
-    /// so no policy/attempt combination can overflow the underlying tick arithmetic.
+    /// The delay after failed execution number <paramref name="attempt"/> (1-based), capped at <see cref="MaxBackoff"/>.
     /// </summary>
     public TimeSpan BackoffFor(int attempt)
     {

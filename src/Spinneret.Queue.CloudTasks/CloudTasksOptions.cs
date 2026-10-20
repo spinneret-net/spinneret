@@ -6,49 +6,28 @@ public sealed class CloudTasksOptions
 
     public string ProjectId { get; set; } = string.Empty;
 
-    /// <summary>
-    /// How a SQL storage's outbox is forwarded to Cloud Tasks, when the queue has one. Bound from
-    /// <c>Queue:CloudTasks:Relay</c>.
-    /// </summary>
+    /// <summary>How a SQL storage's outbox is forwarded to Cloud Tasks, when the queue has one.</summary>
     public CloudTasksRelayOptions Relay { get; set; } = new();
     public string LocationId { get; set; } = string.Empty;
 
     /// <summary>
-    /// Channel → Cloud Tasks queue id. A command declares its channel via
-    /// <c>[QueuePolicy(Channel = ...)]</c> and rides <see cref="QueuePolicy.DefaultChannel"/> when it
-    /// declares none, so that entry is mandatory; every other declared channel must be mapped here too.
+    /// Channel to Cloud Tasks queue id; <see cref="QueuePolicy.DefaultChannel"/> and every declared channel must be mapped.
     /// </summary>
     public Dictionary<string, string> Channels { get; set; } = new(StringComparer.Ordinal);
 
-    /// <summary>
-    /// Absolute URL Cloud Tasks should POST to with each dispatched task.
-    /// </summary>
+    /// <summary>Absolute URL Cloud Tasks POSTs each task to.</summary>
     public string DispatcherUrl { get; set; } = string.Empty;
 
-    /// <summary>
-    /// Service account Cloud Tasks impersonates when minting the OIDC bearer token
-    /// for each dispatch. The dispatch endpoint validates the resulting JWT.
-    /// </summary>
+    /// <summary>Service account Cloud Tasks uses to mint each dispatch's OIDC token.</summary>
     public string ServiceAccountEmail { get; set; } = string.Empty;
 
-    /// <summary>
-    /// JWT audience claim required by the dispatch endpoint. Defaults to
-    /// <see cref="DispatcherUrl"/> when null.
-    /// </summary>
+    /// <summary>Required JWT audience; defaults to <see cref="DispatcherUrl"/>.</summary>
     public string? OidcAudience { get; set; }
 
-    /// <summary>
-    /// When set, the Cloud Tasks client targets the emulator at this gRPC endpoint
-    /// (e.g. <c>localhost:8123</c>) using insecure credentials. Production runs leave
-    /// this null.
-    /// </summary>
+    /// <summary>Emulator gRPC endpoint (e.g. <c>localhost:8123</c>); null in production.</summary>
     public string? EmulatorEndpoint { get; set; }
 
-    /// <summary>
-    /// OIDC issuer URL used by the dispatch endpoint's JwtBearer middleware to fetch
-    /// JWKS. In production this is <c>https://accounts.google.com</c> (the default
-    /// when null); in dev it matches the emulator's <c>-openid-issuer</c> flag.
-    /// </summary>
+    /// <summary>OIDC issuer URL; defaults to <c>https://accounts.google.com</c>, or the emulator's <c>-openid-issuer</c>.</summary>
     public string? OidcIssuer { get; set; }
 
     public bool UsesEmulator => !string.IsNullOrWhiteSpace(EmulatorEndpoint);

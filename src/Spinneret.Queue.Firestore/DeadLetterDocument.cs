@@ -3,16 +3,8 @@ using Google.Cloud.Firestore;
 
 namespace Spinneret.Queue.Firestore;
 
-/// <summary>
-/// The single source of truth for the dead-letter document shape. Field names are a data contract —
-/// readers (an admin page, a resend command) bind to them — so they are declared once here rather
-/// than spelled inline at the write site.
-/// </summary>
-/// <remarks>
-/// Both directions live here, and both are expressed over a plain field map rather than a
-/// <see cref="DocumentSnapshot"/>, so writing and reading are pinned against each other by a
-/// round-trip test without needing a live Firestore.
-/// </remarks>
+// Field names are a data contract shared by writer and readers. Works over plain field maps so
+// the round trip is testable without Firestore.
 internal static class DeadLetterDocument
 {
     internal static class Fields
@@ -27,15 +19,9 @@ internal static class DeadLetterDocument
         public const string DeadLetteredAt = "deadLetteredAt";
     }
 
-    /// <summary>
-    /// Field map for one dead letter. <paramref name="deadLetteredAt"/> is passed in rather than read
-    /// from the clock here so the caller owns the time source.
-    /// </summary>
     public static Dictionary<string, object?> From(DeadLetterEntry entry, DateTimeOffset deadLetteredAt) =>
         new()
         {
-            // The stored spelling matches the SQL writer's column value, so the same reader logic
-            // works whichever store a host uses. DeadLetterSource member names are a data contract.
             [Fields.Source] = DeadLetterStorage.FormatSource(entry.Source),
             [Fields.CommandTypeName] = entry.CommandTypeName,
             [Fields.Description] = entry.Description,
@@ -46,20 +32,11 @@ internal static class DeadLetterDocument
             [Fields.DeadLetteredAt] = Timestamp.FromDateTimeOffset(deadLetteredAt),
         };
 
-    /// <summary>Reads one document straight off a query or lookup result.</summary>
     public static DeadLetter ToDeadLetter(DocumentSnapshot snapshot) =>
-        // ToDictionary() is declared with non-null values while the map read below is declared to
-        // tolerate nulls — the same type at runtime, so the annotation difference is suppressed here.
+        // Same type at runtime; only the nullability annotations differ.
         ToDeadLetter(snapshot.Id, snapshot.ToDictionary()!);
 
-    /// <summary>
-    /// Reads a dead letter out of a document's fields. The document id carries the idempotency key —
-    /// it is what the writer files the document under, so it is never duplicated into a field.
-    /// </summary>
-    /// <exception cref="InvalidOperationException">
-    /// A required field is missing or holds the wrong type — a document not written by this library,
-    /// or one left behind by an older shape.
-    /// </exception>
+    // The document id is the idempotency key; it is never duplicated into a field.
     public static DeadLetter ToDeadLetter(string id, IReadOnlyDictionary<string, object?> fields) =>
         new()
         {
@@ -80,8 +57,7 @@ internal static class DeadLetterDocument
             : throw Missing(field, id, "a string");
 
     private static int ReadInt(IReadOnlyDictionary<string, object?> fields, string field, string id) =>
-        // Firestore stores every integer as a 64-bit value and hands it back as long, whatever width
-        // was written — so both widths are accepted rather than only the int that From() writes.
+        // Firestore returns every integer as long, whatever width was written.
         fields.GetValueOrDefault(field) switch
         {
             int value => value,

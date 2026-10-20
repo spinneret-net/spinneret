@@ -36,18 +36,11 @@ internal sealed class FirestoreScheduler(
                 return;
             }
 
-            // Idempotent refresh: update the definition in place. Re-arm only if the schedule itself
-            // changed; an unchanged schedule keeps its cadence so frequent restarts never reset it.
-            // A job that went terminal doesn't reach here at all — it was deleted, so the branch
-            // above re-creates it.
+            // Re-arm only on a schedule change, so restarts never reset the cadence.
             if (StoredSchedule(snapshot) != scheduleText)
                 definition[ScheduledJob.Fields.NextExecuteAt] = NextRunFromNow(schedule);
             else if (Matches(snapshot, definition))
-                // Already exactly this definition, which is the ordinary case: every instance
-                // re-asserts every job on every startup. Committing no writes leaves the document
-                // untouched, and Firestore bills a write for any commit that touches one — even
-                // one that sets identical values. It also keeps a rolling deploy's instances from
-                // contending on the same document while agreeing about it.
+                // Skip the write: Firestore bills identical writes, and instances would contend.
                 return;
 
             transaction.Update(docRef, definition);
@@ -65,19 +58,16 @@ internal sealed class FirestoreScheduler(
         {
             var snapshot = await transaction.GetSnapshotAsync(docRef, ct);
 
-            // Absent is a no-op, and so is a one-shot: one-shot handles live in this same
-            // collection, and only a recurring job carries a schedule field.
+            // One-shots share this collection; only a recurring job has a schedule field.
             if (snapshot.Exists && StoredSchedule(snapshot) is not null)
                 transaction.Delete(docRef);
         }, cancellationToken: ct);
     }
 
-    /// <summary>True when <paramref name="snapshot"/> already holds every field in <paramref name="definition"/>.</summary>
     private static bool Matches(DocumentSnapshot snapshot, Dictionary<string, object> definition) =>
         definition.All(field =>
             snapshot.TryGetValue<object>(field.Key, out var stored) && Equals(stored, field.Value));
 
-    /// <summary>The stored canonical schedule, or null if the document is a one-shot job.</summary>
     private static string? StoredSchedule(DocumentSnapshot snapshot) =>
         snapshot.ContainsField(ScheduledJob.Fields.Schedule)
             ? snapshot.GetValue<string>(ScheduledJob.Fields.Schedule)

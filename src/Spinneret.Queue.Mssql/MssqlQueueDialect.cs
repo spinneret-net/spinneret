@@ -5,21 +5,13 @@ using Spinneret.Queue.Sql;
 
 namespace Spinneret.Queue.Mssql;
 
-/// <summary>
-/// The SQL Server spelling of the queue's storage — the single source of truth for every statement
-/// and the DDL, built from the configured names so the schema and the statements can never drift.
-/// </summary>
 internal sealed class MssqlQueueDialect : SqlQueueDialect
 {
     public static readonly MssqlQueueDialect Instance = new();
 
     private const string DeadLetterColumns = SqlQueueStatements.DeadLetterColumns;
 
-    /// <summary>
-    /// The paging order, repeated by every dead-letter read. Descending on both columns, and the
-    /// idempotency key breaks ties so the order is total — without it a cursor sitting inside a
-    /// group of entries sharing a millisecond could skip or repeat rows.
-    /// </summary>
+    // The key breaks timestamp ties, so the keyset cursor never skips or repeats rows.
     private const string DeadLetterOrder = "ORDER BY DeadLetteredAt DESC, IdempotencyKey DESC";
 
     private MssqlQueueDialect()
@@ -35,10 +27,8 @@ internal sealed class MssqlQueueDialect : SqlQueueDialect
 
         return new SqlQueueStatements
         {
-            // The duplicate is detected by catching the unique-index violation rather than by a
-            // pre-check, so two racing producers cannot both slip past; with SQL Server's default
-            // XACT_ABORT OFF the violation is a statement-level error, leaving the caller's
-            // transaction intact.
+            // Catching the unique violation (not a pre-check) closes the race; with XACT_ABORT OFF it
+            // is a statement-level error that leaves the caller's transaction intact.
             Enqueue = $"""
                 BEGIN TRY
                     INSERT INTO {queueTable} (MessageId, Channel, VisibleAt, DedupeKey, Envelope)
@@ -53,10 +43,8 @@ internal sealed class MssqlQueueDialect : SqlQueueDialect
                 END CATCH
                 """,
 
-            // The DELETE inside the caller's transaction is the lock: the row is invisible to peers
-            // exactly while the delivery runs, a rollback puts it back, and READPAST lets concurrent
-            // workers skip claimed rows instead of blocking on them. A row a relay holds is being
-            // forwarded elsewhere, so it is not this worker's to deliver.
+            // The DELETE in the delivery transaction is the lock; a rollback restores the row, and
+            // READPAST skips rows other workers hold.
             Dequeue = $"""
                 WITH Due AS (
                     SELECT TOP(1) Id, MessageId, Envelope
@@ -69,10 +57,7 @@ internal sealed class MssqlQueueDialect : SqlQueueDialect
                 OUTPUT deleted.Id, deleted.MessageId, deleted.Envelope;
                 """,
 
-            // A lease rather than a destructive claim: the send is a network call, which must not
-            // hold a transaction open, and a relay that dies mid-send must leave the row to be
-            // re-leased once the lease runs out. UPDLOCK with READPAST makes concurrent relays skip
-            // each other's rows instead of leasing the same ones.
+            // UPDLOCK with READPAST makes concurrent relays skip each other's rows.
             LeaseForRelay = $"""
                 WITH Due AS (
                     SELECT TOP(@Batch) Id, MessageId, Channel, VisibleAt, DedupeKey, Envelope, LeasedUntil, LeaseToken
@@ -112,8 +97,7 @@ internal sealed class MssqlQueueDialect : SqlQueueDialect
                 WHERE Id = @Id;
                 """,
 
-            // A duplicate idempotency key means the entry was already recorded by an earlier
-            // delivery of the same task, which is success, not an error.
+            // A duplicate key was recorded by an earlier delivery: success, not an error.
             WriteDeadLetter = $"""
                 BEGIN TRY
                     INSERT INTO {deadLetterTable}
@@ -132,8 +116,6 @@ internal sealed class MssqlQueueDialect : SqlQueueDialect
                 {DeadLetterOrder};
                 """,
 
-            // The keyset form of "everything ordered after this row": strictly older, or the same
-            // instant with a lower key.
             ListDeadLettersAfter = $"""
                 SELECT TOP(@Take) {DeadLetterColumns}
                 FROM {deadLetterTable}
@@ -155,11 +137,7 @@ internal sealed class MssqlQueueDialect : SqlQueueDialect
         };
     }
 
-    /// <summary>
-    /// sysname is 128 characters. Configured names used to be capped at 116 — a temp-table limit
-    /// that never applied here — while the derived index names could still overflow; checking the
-    /// derived names against the real limit covers both.
-    /// </summary>
+    // sysname.
     public override int MaxIdentifierLength => 128;
 
     public override string QuoteIdentifier(string identifier) => $"[{identifier.Replace("]", "]]")}]";
@@ -309,12 +287,7 @@ internal sealed class MssqlQueueDialect : SqlQueueDialect
             """;
     }
 
-    /// <summary>
-    /// Adds a UTC instant as <c>datetime2</c>. The type must be stated: SqlClient infers the legacy
-    /// <c>datetime</c> from a <see cref="DateTime"/>, whose ~3.33 ms resolution cannot represent
-    /// every value a <c>DATETIME2(3)</c> column holds — which would round the value a keyset cursor
-    /// compares for equality, and skip or repeat rows across a page boundary.
-    /// </summary>
+    // Explicit DateTime2: SqlClient infers legacy datetime, whose rounding breaks keyset cursor equality.
     public override void AddTimestamp(DbCommand command, string name, DateTimeOffset utc)
     {
         var parameter = command.CreateParameter();
@@ -324,12 +297,11 @@ internal sealed class MssqlQueueDialect : SqlQueueDialect
         command.Parameters.Add(parameter);
     }
 
-    /// <summary>DATETIME2 comes back with an unspecified kind; the column holds UTC by construction.</summary>
+    // DATETIME2 reads back with unspecified kind; the column holds UTC.
     public override DateTimeOffset ReadTimestamp(DbDataReader reader, int ordinal) =>
         new(reader.GetDateTime(ordinal), TimeSpan.Zero);
 
-    // SqlClient's savepoints are the synchronous SqlTransaction.Save/Rollback(name); the async
-    // DbTransaction members are not guaranteed to reach them.
+    // The async DbTransaction savepoint members aren't guaranteed to reach SqlTransaction.Save/Rollback.
     public override Task SaveAsync(DbTransaction transaction, string savepoint, CancellationToken ct)
     {
         ((SqlTransaction)transaction).Save(savepoint);
@@ -343,10 +315,7 @@ internal sealed class MssqlQueueDialect : SqlQueueDialect
     }
 }
 
-/// <summary>
-/// The index and constraint names the DDL derives from the configured table names — in one place,
-/// so the script and the length validation can never disagree on them.
-/// </summary>
+// Shared by the DDL and the length validation, so they never disagree.
 internal readonly record struct DerivedNames(
     string QueuePrimaryKey,
     string ChannelIndex,

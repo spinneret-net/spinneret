@@ -8,11 +8,6 @@ using Spinneret.Sql.Conformance;
 
 namespace Spinneret.Queue.Postgres.Tests;
 
-/// <summary>
-/// What the PostgreSQL script and statements say — the properties that keep them safe on a
-/// database that aborts a transaction on any error. What running them does is the conformance
-/// suites' job.
-/// </summary>
 public sealed class PostgresQueueSchemaTests
 {
     private static readonly SqlQueueStatements Statements =
@@ -39,8 +34,7 @@ public sealed class PostgresQueueSchemaTests
 
         await Assert.That(script.TrimStart()).StartsWith("DO $spinneret$");
         await Assert.That(script.TrimEnd()).EndsWith("$spinneret$;");
-        // Transaction-scoped, so it is released with the block whatever happens — and works behind
-        // a transaction-pooling proxy, which session-level locks do not.
+        // Transaction-scoped, so it's always released and works behind a transaction-pooling proxy.
         await Assert.That(script).Contains("pg_advisory_xact_lock(hashtextextended('Spinneret:QueueSchema:\"public\".\"spinneret_queue\"', 0))");
     }
 
@@ -67,7 +61,7 @@ public sealed class PostgresQueueSchemaTests
     {
         var script = PostgresQueueSchema.CreateScript(new PostgresStorageOptions());
 
-        // Text, not jsonb: an envelope must come back byte for byte as it was written.
+        // Text, not jsonb: an envelope must come back byte for byte.
         await Assert.That(script).Contains("Envelope text NOT NULL");
         await Assert.That(script).DoesNotContain("jsonb");
         await Assert.That(script).DoesNotContain("timestamp NOT NULL");
@@ -90,8 +84,6 @@ public sealed class PostgresQueueSchemaTests
         await Assert.That(Statements.LeaseById).Contains("FOR UPDATE SKIP LOCKED");
     }
 
-    // ------------------------------------------------------------------------ identifiers ---
-
     [Test]
     [Arguments("spinneret_queue", true)]
     [Arguments("MixedCase", true)]
@@ -108,7 +100,7 @@ public sealed class PostgresQueueSchemaTests
     [Test]
     public async Task Identifier_quoting_escapes_double_quotes()
     {
-        // Defense in depth: validation rejects quotes, but quoting must still be correct.
+        // Validation rejects quotes, but quoting must still be correct.
         await Assert.That(PostgresQueueDialect.Instance.QuoteIdentifier("a\"b")).IsEqualTo("\"a\"\"b\"");
     }
 
@@ -119,8 +111,6 @@ public sealed class PostgresQueueSchemaTests
 
         await Assert.That(PostgresQueueDialect.Instance.DerivedIdentifiers(names).All(n => n.Length <= 63)).IsTrue();
     }
-
-    // ------------------------------------------------------------------- data source ---
 
     [Test]
     public async Task A_data_source_built_from_the_connection_string_is_disposed_with_the_container()
@@ -135,15 +125,13 @@ public sealed class PostgresQueueSchemaTests
 
         await provider.DisposeAsync();
 
-        // Opening is where a disposed data source refuses — before it would reach for the network.
+        // A disposed data source refuses on open, before reaching the network.
         await Assert.That(async () => await dataSource.OpenConnectionAsync()).Throws<ObjectDisposedException>();
     }
 
     [Test]
     public async Task A_host_data_source_survives_the_container()
     {
-        // The host owns it (and typically shares it with its own data access): the storage must
-        // use it as given and leave its lifetime to the host.
         await using var hostOwned = NpgsqlDataSource.Create(new PostgresTestDialect().SampleConnectionString);
         var services = new ServiceCollection();
         services.AddSingleton(typeof(ILogger<>), typeof(NullLogger<>));

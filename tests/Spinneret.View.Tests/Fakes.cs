@@ -3,10 +3,6 @@ using Spinneret.ViewModel;
 
 namespace Spinneret.View.Tests;
 
-/// <summary>
-/// Hand-rolled <see cref="IViewModel"/> that records every lifecycle interaction so tests can
-/// observe initialization, updates, event subscription and disposal.
-/// </summary>
 public sealed class FakeViewModel : IViewModel, IDisposable, IAsyncDisposable
 {
     private readonly object _gate = new();
@@ -89,10 +85,7 @@ public sealed class FakeViewModel : IViewModel, IDisposable, IAsyncDisposable
     }
 }
 
-/// <summary>
-/// A <see cref="ViewModelBase"/>-derived view model, used to observe behavior that
-/// <see cref="ViewBase{T}"/> applies only to that base class (exception service wiring).
-/// </summary>
+/// <summary>Observes behaviour <see cref="ViewBase{T}"/> applies only to <see cref="ViewModelBase"/>.</summary>
 public sealed class FakeViewModelBase : ViewModelBase;
 
 public sealed class FakeExceptionService : IViewModelExceptionService
@@ -107,10 +100,6 @@ public sealed class FakeRenderContext : IRenderContext
     public bool IsPrerendering { get; init; }
 }
 
-/// <summary>
-/// Hand-rolled <see cref="IViewRefreshCoordinator"/> that records subscriptions and lets a test
-/// broadcast refreshes and inspect or replay the registered handlers.
-/// </summary>
 public sealed class FakeRefreshCoordinator : IViewRefreshCoordinator
 {
     private readonly object _gate = new();
@@ -167,7 +156,6 @@ public sealed class FakeRefreshCoordinator : IViewRefreshCoordinator
 
 public static class TestWait
 {
-    /// <summary>Polls until <paramref name="condition"/> is true or the timeout elapses.</summary>
     public static async Task UntilAsync(Func<bool> condition, int timeoutMs = 5000)
     {
         var start = Environment.TickCount64;

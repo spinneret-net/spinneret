@@ -5,11 +5,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Spinneret.Scheduler.Tests;
 
-/// <summary>
-/// The sweeper is only a clock, but three of its properties are load-bearing for the providers
-/// behind it: it keeps ticking after a failed sweep, it never overlaps two sweeps, and it always
-/// waits between them — that delay is the backoff a provider relies on when it cannot make progress.
-/// </summary>
 public class InHostSweeperTests
 {
     private sealed class RecordingSweep : ISchedulerSweep
@@ -77,7 +72,7 @@ public class InHostSweeperTests
     [Test]
     public async Task Keeps_ticking_after_a_sweep_throws()
     {
-        // A store still warming up next to the host must cost a tick, not the sweeper.
+        // A store still warming up must cost a tick, not the sweeper.
         var sweep = new RecordingSweep
         {
             OnSweep = call => call <= 2 ? Task.FromException(new InvalidOperationException("boom")) : Task.CompletedTask,
@@ -106,13 +101,7 @@ public class InHostSweeperTests
     [Test]
     public async Task Waits_between_sweeps_rather_than_spinning()
     {
-        // The delay is the backoff a provider depends on when it cannot make progress; without it a
-        // permanently failing job would be retried in a tight loop.
-        //
-        // Deliberately generous: the assertion is "far fewer sweeps than a spin would produce",
-        // not an exact count. A tight margin here fails on a loaded CI agent for reasons that have
-        // nothing to do with the behaviour under test — a spin would run thousands of times, so a
-        // wide bound still catches the regression this guards against.
+        // Generous bound: a spin runs thousands of times, and a tight margin flakes on loaded CI.
         var sweep = new RecordingSweep();
         var sweeper = await StartSweeper(new ServiceCollection(), sweep, TimeSpan.FromSeconds(30));
 

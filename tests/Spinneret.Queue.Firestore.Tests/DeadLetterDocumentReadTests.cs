@@ -2,20 +2,11 @@ using Google.Cloud.Firestore;
 
 namespace Spinneret.Queue.Firestore.Tests;
 
-/// <summary>
-/// The read direction of the same data contract. Expressed over a field map rather than a live
-/// <c>DocumentSnapshot</c>, which is what lets the write and the read be pinned against each other
-/// without a Firestore to talk to.
-/// </summary>
 public class DeadLetterDocumentReadTests
 {
     private static readonly DateTimeOffset At = DeadLetterDocumentTests.At;
 
-    /// <summary>
-    /// What a document written by this library comes back as. Firestore returns every integer as a
-    /// 64-bit value whatever width was written, so the round trip is not a straight identity and
-    /// this models the widening rather than hiding it.
-    /// </summary>
+    // Models Firestore widening every integer to 64 bits on read.
     private static Dictionary<string, object?> AsStored(DeadLetterEntry entry, DateTimeOffset at)
     {
         var fields = DeadLetterDocument.From(entry, at);
@@ -66,7 +57,7 @@ public class DeadLetterDocumentReadTests
     [Test]
     public async Task Accepts_attempts_at_either_width()
     {
-        // int is what From() writes; long is what Firestore hands back. Both must read.
+        // int is what From() writes; long is what Firestore hands back.
         var fields = DeadLetterDocument.From(DeadLetterDocumentTests.Entry(), At);
 
         await Assert.That(DeadLetterDocument.ToDeadLetter("task-1", fields).Attempts).IsEqualTo(3);
@@ -78,7 +69,6 @@ public class DeadLetterDocumentReadTests
     [Test]
     public async Task Takes_the_idempotency_key_from_the_document_id()
     {
-        // The writer files the document under the key rather than duplicating it into a field.
         var read = DeadLetterDocument.ToDeadLetter("some-other-id", AsStored(DeadLetterDocumentTests.Entry(), At));
 
         await Assert.That(read.IdempotencyKey).IsEqualTo("some-other-id");

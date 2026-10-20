@@ -13,27 +13,10 @@ using TUnit.Core.Interfaces;
 
 namespace Spinneret.Scheduler.Firestore.Tests;
 
-// ---------------------------------------------------------------------------------------------
-// Recording doubles for the queue and the dead-letter writer, so what the sweep did is assertable
-// without standing up a transport. No mocking library is used.
-// ---------------------------------------------------------------------------------------------
-
-/// <summary>
-/// A request whose handler would return a value. A scheduled run discards it — the response type is
-/// here to prove a job is not restricted to <c>IRequest&lt;Unit&gt;</c>, and that the sweep can
-/// enqueue a stored job whose response type it only learns at runtime, by reflection.
-/// </summary>
+/// <summary>Has a non-Unit response, so the sweep must resolve the response type by reflection.</summary>
 public sealed record ReportRequest(string Name) : IRequest<string>;
 
-// ---------------------------------------------------------------------------------------------
-// Docker fixture and host harness.
-// ---------------------------------------------------------------------------------------------
-
-/// <summary>
-/// A running scheduler host: DI container with the Firestore scheduler registered against a
-/// collection unique to one test, hosted services started, plus helpers that read the job
-/// collection raw so what actually landed in Firestore can be asserted.
-/// </summary>
+/// <summary>A started scheduler host on a per-test collection, with raw Firestore read helpers.</summary>
 public sealed class SchedulerTestHost : IAsyncDisposable
 {
     private readonly ServiceProvider _provider;
@@ -61,10 +44,7 @@ public sealed class SchedulerTestHost : IAsyncDisposable
         _provider.GetRequiredService<IFirestoreTransactionalScheduler>();
     public ISchedulerSweep Sweep => _provider.GetRequiredService<ISchedulerSweep>();
 
-    /// <summary>
-    /// Starts a host. <paramref name="reuseCollection"/> puts a second host on the first host's
-    /// jobs, which is how the competing-sweep and parallel-installer cases are built.
-    /// </summary>
+    /// <summary><paramref name="reuseCollection"/> shares the first host's jobs, for competing hosts.</summary>
     public static async Task<SchedulerTestHost> StartAsync(
         FirestoreEmulatorFixture fixture,
         bool sweeper = false,
@@ -101,16 +81,11 @@ public sealed class SchedulerTestHost : IAsyncDisposable
         return new SchedulerTestHost(provider, hostedServices, db, collection);
     }
 
-    // ------------------------------------------------------------------- Firestore helpers ---
-
     public CollectionReference Jobs => Db.Collection(Collection);
 
     public DocumentReference Job(string key) => Jobs.Document(key);
 
-    /// <summary>
-    /// Whether the job is still outstanding work. There is no status field — a document is deleted
-    /// once it has run, been cancelled, or had its failure dead-lettered — so existence is the state.
-    /// </summary>
+    /// <summary>Documents are deleted when done, so existence is the state.</summary>
     public async Task<bool> JobExists(string key) => (await Job(key).GetSnapshotAsync()).Exists;
 
     public async Task<int> JobCount() => (await Jobs.GetSnapshotAsync()).Count;
@@ -122,10 +97,7 @@ public sealed class SchedulerTestHost : IAsyncDisposable
     public async Task<T> JobField<T>(string key, string field) =>
         (await Job(key).GetSnapshotAsync()).GetValue<T>(field);
 
-    /// <summary>
-    /// When the document was last written. Firestore only moves this on a commit that touches the
-    /// document, so it is how a test tells "wrote identical values" apart from "wrote nothing".
-    /// </summary>
+    /// <summary>Moves only on a real write, telling identical-value writes from no write.</summary>
     public async Task<Timestamp?> JobUpdateTime(string key) => (await Job(key).GetSnapshotAsync()).UpdateTime;
 
     /// <summary>Makes the job due now, so a sweep picks it up without waiting out its schedule.</summary>

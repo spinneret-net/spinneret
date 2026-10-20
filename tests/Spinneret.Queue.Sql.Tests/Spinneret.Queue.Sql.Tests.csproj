@@ -1,7 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <!-- The SQL storage's own logic, without a database: the ambient transaction, the savepoint
-       boundary, identifier and options validation, data-source ownership. -->
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Configuration" Version="10.0.13" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.13" />

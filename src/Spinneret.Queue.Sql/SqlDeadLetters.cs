@@ -2,12 +2,7 @@ using System.Data.Common;
 
 namespace Spinneret.Queue.Sql;
 
-/// <summary>
-/// Dead letters as rows in the application database. Joins the ambient transaction when one is
-/// active — during delivery that is the delivery's unit of work, so a dead-letter commits atomically
-/// with the acknowledge of the message it records. Duplicate idempotency keys are swallowed in SQL,
-/// keeping redelivered writes idempotent.
-/// </summary>
+// Joins the delivery's transaction, so a dead-letter commits atomically with the acknowledge.
 internal sealed class SqlDeadLetterWriter(
     SqlQueueStorage storage,
     SqlConnectionSource connections,
@@ -31,11 +26,7 @@ internal sealed class SqlDeadLetterWriter(
         }, ct);
 }
 
-/// <summary>
-/// Reads and removes the rows <see cref="SqlDeadLetterWriter"/> stored. Every statement goes through
-/// <see cref="SqlConnectionSource"/>, so a delete inside a caller's transaction — a resend wrapped by
-/// <see cref="SqlUnitOfWorkFactory"/> — commits with the enqueue that replaced it.
-/// </summary>
+// A delete inside a caller's transaction (a resend) commits with the enqueue that replaced it.
 internal sealed class SqlDeadLetterStore(SqlQueueStorage storage, SqlConnectionSource connections)
     : IDeadLetterStore
 {
@@ -51,8 +42,7 @@ internal sealed class SqlDeadLetterStore(SqlQueueStorage storage, SqlConnectionS
             await using var command = connection.CreateCommand(
                 transaction, position is null ? statements.ListDeadLetters : statements.ListDeadLettersAfter);
 
-            // One more than asked for: whether that extra row came back is what distinguishes a full
-            // last page from a full page with more behind it, without a second count query.
+            // One extra row tells whether another page exists, without a count query.
             command.AddParameter("@Take", query.PageSize + 1);
 
             if (position is { } after)
@@ -111,7 +101,7 @@ internal sealed class SqlDeadLetterStore(SqlQueueStorage storage, SqlConnectionS
         }, ct);
     }
 
-    /// <summary>Ordinals follow <see cref="SqlQueueStatements.DeadLetterColumns"/>.</summary>
+    // Ordinals follow SqlQueueStatements.DeadLetterColumns.
     private DeadLetter ReadDeadLetter(DbDataReader reader) =>
         new()
         {

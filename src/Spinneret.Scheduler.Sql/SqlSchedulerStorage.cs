@@ -2,10 +2,6 @@ using Spinneret.Queue.Sql;
 
 namespace Spinneret.Scheduler.Sql;
 
-/// <summary>
-/// The scheduler's half of the SQL storage: its dialect and table, beside the queue storage it
-/// shares a database — and a transaction — with.
-/// </summary>
 internal sealed class SqlSchedulerStorage
 {
     public SqlSchedulerStorage(SqlQueueStorage queue, SqlSchedulerDialect dialect, string table)
@@ -30,11 +26,8 @@ internal sealed class SqlSchedulerStorage
     public SqlSchedulerStatements Statements { get; }
 }
 
-/// <summary>
-/// One-shot job handles. One-shot handles and caller-chosen recurring keys share the JobKey
-/// namespace, so the prefix is what tells them apart without a read — it keeps a cancel from
-/// destroying a recurring job's schedule.
-/// </summary>
+// One-shot handles share the JobKey namespace with recurring keys; the prefix keeps a cancel
+// from destroying a recurring schedule.
 internal static class ScheduledJobHandle
 {
     public const string OneShotPrefix = "oneshot-";

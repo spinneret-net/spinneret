@@ -20,17 +20,12 @@ using Spinneret.Queue.Sql;
 
 namespace Spinneret.Sql.Conformance;
 
-// ---------------------------------------------------------------------------------------------
-// Commands and handlers. Side effects are written on the delivery's ambient transaction, so whether
-// they survive is what proves a delivery committed — or rolled back — as one unit.
-// ---------------------------------------------------------------------------------------------
+// Side effects ride the delivery's ambient transaction, so their survival proves it committed as one.
 
 public sealed record PingCommand(string Name) : IRequest<Unit>;
 
-/// <summary>Writes a row to <paramref name="Table"/>, then enqueues a <see cref="PingCommand"/>.</summary>
 public sealed record WriteAndCascadeCommand(string Table, string Name) : IRequest<Unit>;
 
-/// <summary>Writes a row to <paramref name="Table"/>, then fails permanently.</summary>
 public sealed record WriteThenFailCommand(string Table) : IRequest<Unit>;
 
 [QueuePolicy(MinBackoff = "00:00:00.050", MaxBackoff = "00:00:00.100")]
@@ -84,11 +79,8 @@ internal static class SideEffects
         transactions.Current ?? throw new InvalidOperationException("Expected the delivery's ambient transaction.");
 }
 
-// ---------------------------------------------------------------------------------------------
-// The host: Cloud Tasks delivery over the dialect's SQL storage, with a fake Cloud Tasks and the dispatch
-// endpoint served in memory. The relay never runs on its own here, so a test decides when a pass
-// happens; eager forwarding on commit still runs, as it would in production.
-// ---------------------------------------------------------------------------------------------
+// Cloud Tasks delivery over SQL storage, with a fake Cloud Tasks and an in-memory endpoint.
+// The relay never runs on its own, so tests decide when a pass happens.
 
 public sealed class CloudTasksOverSqlHost : IAsyncDisposable
 {
@@ -160,8 +152,7 @@ public sealed class CloudTasksOverSqlHost : IAsyncDisposable
                         .UseStorage(q.AddRequestAssemblies(typeof(CloudTasksOverSqlHost).Assembly), configuration)
                         .UseCloudTasksDelivery(configuration));
                     services.AddSingleton<CloudTasksClient>(tasks);
-                    // The dispatch endpoint's OIDC validation is covered by the Cloud Tasks suite;
-                    // here the request only has to reach the endpoint.
+                    // OIDC validation is covered by the Cloud Tasks suite.
                     services.PostConfigure<AuthorizationOptions>(o =>
                         o.AddPolicy(CloudTasksAuth.PolicyName, p => p.RequireAssertion(_ => true)));
                     configure?.Invoke(services, configuration);
@@ -178,7 +169,6 @@ public sealed class CloudTasksOverSqlHost : IAsyncDisposable
         return new CloudTasksOverSqlHost(host, dialect, suffix, tasks, clock);
     }
 
-    /// <summary>Delivers a task the way Cloud Tasks would: POSTs its body with its name.</summary>
     public async Task<HttpStatusCode> Deliver(CreateTaskRequest task)
     {
         using var client = _host.GetTestClient();
@@ -195,10 +185,7 @@ public sealed class CloudTasksOverSqlHost : IAsyncDisposable
     public static QueueEnvelope EnvelopeOf(CreateTaskRequest task) =>
         JsonSerializer.Deserialize<QueueEnvelope>(task.Task.HttpRequest.Body.ToByteArray())!;
 
-    /// <summary>The last segment of a task's name — the task id a delivery and its dead letter go by.</summary>
     public static string TaskIdOf(CreateTaskRequest task) => task.Task.Name[(task.Task.Name.LastIndexOf('/') + 1)..];
-
-    // ------------------------------------------------------------------------- SQL helpers ---
 
     public Task<System.Data.Common.DbConnection> OpenConnectionAsync() => Dialect.OpenConnectionAsync();
 
@@ -210,7 +197,6 @@ public sealed class CloudTasksOverSqlHost : IAsyncDisposable
 
     public Task<int> DeadLetterCount() => Dialect.CountAsync(DeadLetterTable);
 
-    /// <summary>A side-effect table unique to the calling test.</summary>
     public async Task<string> CreateSideTable()
     {
         var table = $"Side_{Suffix}_{Guid.NewGuid().ToString("N")[..6]}";

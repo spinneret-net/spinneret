@@ -57,8 +57,7 @@ public sealed class QueueDispatchEndpointTests
         {
             services.AddSingleton<IQueueDeliveryProcessor>(processor ?? new FakeProcessor());
             services.AddSingleton<IDeadLetterWriter>(deadLetters ?? new FakeDeadLetterWriter());
-            // The delivery pipeline and pass-through unit of work; the fakes above win over the
-            // core's TryAdd defaults.
+            // The fakes above win over the core's TryAdd defaults.
             services.AddQueueCore([typeof(PlainCommand).Assembly]);
         });
         builder.MapCloudTasksDispatch();
@@ -67,11 +66,6 @@ public sealed class QueueDispatchEndpointTests
         return (endpoint, builder.ServiceProvider);
     }
 
-    /// <summary>
-    /// A route builder whose container carries the dispatcher URL the endpoint derives its route
-    /// from. <see cref="TestSetup.DispatcherUrl"/>'s path is the conventional dispatch route, so
-    /// tests asserting that route also confirm the derivation lines up with the configured URL.
-    /// </summary>
     private static TestEndpointRouteBuilder RouteBuilder(
         Action<ServiceCollection>? configure = null, string? dispatcherUrl = null)
     {
@@ -178,8 +172,7 @@ public sealed class QueueDispatchEndpointTests
     [Test]
     public async Task MapCloudTasksDispatch_with_a_pattern_disagreeing_with_the_dispatcher_url_fails_at_map_time()
     {
-        // Left to run, every task would 404 and — against the queue's unlimited retry backstop —
-        // retry until it expired, with nothing in the app to show for it.
+        // Otherwise every task would 404 and retry until it expired.
         var builder = RouteBuilder(
             s => s.AddSingleton<IDeadLetterWriter, FakeDeadLetterWriter>(),
             dispatcherUrl: "https://worker.example.com/internal/queue/dispatch");
@@ -193,8 +186,7 @@ public sealed class QueueDispatchEndpointTests
     [Test]
     public async Task MapCloudTasksDispatch_without_a_configured_dispatcher_url_fails_at_map_time()
     {
-        // IOptions<T> is an open generic, so this resolves a default-constructed options object
-        // rather than null — the blank URL has to be caught explicitly.
+        // IOptions<T> resolves a default-constructed object, so a blank URL must be caught explicitly.
         var builder = RouteBuilder(
             s => s.AddSingleton<IDeadLetterWriter, FakeDeadLetterWriter>(),
             dispatcherUrl: "");
@@ -206,9 +198,7 @@ public sealed class QueueDispatchEndpointTests
 
     [Test]
     [Arguments("/internal/queue/dispatch")]
-    // Uri treats a leading slash as a file path on Unix, so the relative case above resolves to an
-    // absolute file:// URI there and only the scheme check rejects it. This spells that out so the
-    // guard is exercised identically on every platform.
+    // On Unix, Uri reads a leading slash as a file path; this pins the scheme check on every platform.
     [Arguments("file:///internal/queue/dispatch")]
     [Arguments("ftp://worker.example.com/dispatch")]
     public async Task MapCloudTasksDispatch_with_a_non_http_dispatcher_url_fails_at_map_time(string dispatcherUrl)
@@ -279,9 +269,7 @@ public sealed class QueueDispatchEndpointTests
     [Test]
     public async Task Handle_rejects_a_request_without_a_task_name()
     {
-        // The task name is the delivery's identity — what a dead letter is filed under, so a
-        // redelivered write lands on the entry it already wrote. Inventing one per request would
-        // file a duplicate for every redelivery.
+        // The task name is what a dead letter is filed under; inventing one would duplicate on redelivery.
         var processor = new FakeProcessor();
         var (endpoint, provider) = BuildEndpoint(processor);
 

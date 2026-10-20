@@ -2,7 +2,6 @@ using Spinneret.Queue.Sql;
 
 namespace Spinneret.Queue.Sql.Tests;
 
-/// <summary>The identifier rules and options validation every dialect inherits.</summary>
 public sealed class SqlStorageOptionsTests
 {
     [Test]

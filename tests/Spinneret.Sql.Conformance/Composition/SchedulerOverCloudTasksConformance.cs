@@ -4,11 +4,6 @@ using Spinneret.Scheduler.Sql;
 
 namespace Spinneret.Sql.Conformance;
 
-/// <summary>
-/// The SQL scheduler feeding Cloud Tasks: a due job's booking and its outbox insert commit together,
-/// and the relay takes it from there — the combination the SQL scheduler could not join before the
-/// queue had an outbox.
-/// </summary>
 public abstract class SchedulerOverCloudTasksConformance(SqlTestDialect dialect)
 {
     protected SqlTestDialect Dialect => dialect;
@@ -44,10 +39,7 @@ public abstract class SchedulerOverCloudTasksConformance(SqlTestDialect dialect)
         await Assert.That(await host.OutboxCount()).IsEqualTo(0);
     }
 
-    /// <summary>
-    /// The scheduler's table is created by its hosted initializer, which the web host started along
-    /// with everything else; this only waits for it to be there.
-    /// </summary>
+    // The hosted initializer creates the table; this only waits for it.
     private static Task WaitForSchedulerTable(CloudTasksOverSqlHost host) =>
         Wait.Until(() => host.Dialect.TableExists($"Jobs_{host.Suffix}"), "the scheduler table to exist");
 }

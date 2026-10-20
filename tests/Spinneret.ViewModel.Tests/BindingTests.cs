@@ -158,9 +158,7 @@ public class BindingTests
     [Test]
     public async Task Create_different_captured_contexts_with_the_same_index_produce_distinct_bindings()
     {
-        // Regression: two row contexts that currently evaluate to the same indexer path
-        // must not collide in the cache (removing a row would otherwise make a
-        // virtualization-scrolled-in row's field write to the wrong row).
+        // Otherwise removing a row would make a scrolled-in row write to the wrong row.
         var viewModel = new TestViewModel();
         var rowA = new RowContext { Index = 0 };
         var rowB = new RowContext { Index = 0 };
@@ -174,9 +172,7 @@ public class BindingTests
     [Test]
     public async Task Create_same_captured_context_across_calls_returns_the_cached_binding()
     {
-        // The cache must still work for the common case: the same row context across
-        // re-renders (each call creates a fresh compiler display class, so the cache
-        // key has to look through the display class at the captured value).
+        // Each call creates a fresh display class, so the key must look through it to the captured value.
         var viewModel = new TestViewModel();
         var context = new RowContext { Index = 1 };
 
@@ -189,8 +185,6 @@ public class BindingTests
     [Test]
     public async Task Create_new_context_at_a_previously_cached_index_writes_to_the_correct_row()
     {
-        // After a row is removed and a different context occupies a previously-cached
-        // index, a binding for the new context must write to the new context's row.
         var viewModel = new TestViewModel();
         viewModel.Options.Clear();
         for (var i = 0; i < 5; i++)
@@ -202,8 +196,7 @@ public class BindingTests
         _ = CreateBindingForRow(viewModel, rowB);
         _ = CreateBindingForRow(viewModel, rowC);
 
-        // Simulate removing rowB: the collection shifts, rowC's index updates, and a
-        // new rowD scrolls into view at the index rowC previously occupied.
+        // Remove rowB; rowD scrolls in at rowC's old index.
         viewModel.Options.RemoveAt(1);
         rowC.Index = 1;
         var rowD = new RowContext { Index = 2 };

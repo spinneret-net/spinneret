@@ -4,15 +4,9 @@ using Spinneret.Queue;
 
 namespace Spinneret.Scheduler.Firestore;
 
-/// <summary>
-/// Builds scheduled-job document field maps from a mediator request — the single place a job
-/// document is shaped, shared by the standalone <see cref="FirestoreScheduler"/> and the
-/// transaction-enlisted <see cref="FirestoreTransactionalScheduler"/>.
-/// </summary>
 internal sealed class ScheduledJobDocumentFactory(
     QueueTypeRegistry typeRegistry, IQueuePayloadSerializer serializer, TimeProvider timeProvider)
 {
-    /// <summary>Fields for a one-shot job that runs once at <paramref name="executeAt"/>.</summary>
     public Dictionary<string, object> OneShot<TResponse>(IRequest<TResponse> request, DateTimeOffset executeAt)
     {
         return new Dictionary<string, object>(Payload(request))
@@ -22,10 +16,7 @@ internal sealed class ScheduledJobDocumentFactory(
         };
     }
 
-    /// <summary>
-    /// The recurrence-defining fields (type, payload, schedule) for a recurring job. The run
-    /// timestamps are owned by the caller's idempotent register-or-refresh, not by this builder.
-    /// </summary>
+    // Run timestamps are left to the caller's register-or-refresh.
     public Dictionary<string, object> RecurringDefinition<TResponse>(IRequest<TResponse> request, Schedule schedule)
     {
         ArgumentNullException.ThrowIfNull(schedule);

@@ -16,8 +16,7 @@
     <Using Include="Spinneret.Testing" />
   </ItemGroup>
 
-  <!-- The queue conformance suites, compiled into this assembly so their commands are scanned from
-       it and its InternalsVisibleTo grants cover them; QueueConformance.cs runs them on SQL Server. -->
+  <!-- Compiled in, so their commands are scanned from this assembly and InternalsVisibleTo covers them. -->
   <ItemGroup>
     <Compile Include="..\Spinneret.Sql.Conformance\SqlTestDialect.cs" LinkBase="Conformance" />
     <Compile Include="..\Spinneret.Sql.Conformance\Dialects\MssqlTestDialect.cs" LinkBase="Conformance" />

@@ -20,7 +20,6 @@
         <ProjectReference Include="..\Spinneret.Scheduler\Spinneret.Scheduler.csproj" />
         <ProjectReference Include="..\Spinneret.Scheduler.Sql\Spinneret.Scheduler.Sql.csproj" />
         <ProjectReference Include="..\Spinneret.Queue.Mssql\Spinneret.Queue.Mssql.csproj" />
-        <!-- Used directly, and MssqlSchedulerSchema.CreateScript exposes MssqlStorageOptions. -->
         <ProjectReference Include="..\Spinneret.Queue\Spinneret.Queue.csproj" />
         <ProjectReference Include="..\Spinneret.Mediator\Spinneret.Mediator.csproj" />
         <ProjectReference Include="..\Spinneret.Functional\Spinneret.Functional.csproj" />

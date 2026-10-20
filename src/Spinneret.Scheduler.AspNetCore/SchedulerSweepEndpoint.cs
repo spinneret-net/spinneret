@@ -11,13 +11,8 @@ internal static class SchedulerSweepEndpoint
 {
     internal const string DefaultRoutePattern = "/internal/scheduler/sweep";
 
-    /// <summary>
-    /// Maps the route. Deliberately neither named after the public entry point nor an extension
-    /// method: an extension called <c>MapSchedulerSweep</c> in this namespace is reached by
-    /// enclosing-namespace lookup from any assembly that sits under <c>Spinneret.Scheduler.AspNetCore</c>
-    /// and sees its internals — the test assembly does — where it wins over the public one and
-    /// silently skips the guards that make an unswept or unguarded endpoint impossible to map.
-    /// </summary>
+    // Not an extension named MapSchedulerSweep: in this namespace it would shadow the public one
+    // for assemblies seeing internals (the tests), silently skipping its guards.
     public static IEndpointRouteBuilder Map(
         IEndpointRouteBuilder endpoints, string authorizationPolicy, string pattern)
     {
@@ -38,15 +33,11 @@ internal static class SchedulerSweepEndpoint
 
         try
         {
-            // The result travels back to the caller: an external scheduler is the only thing that
-            // knows a sweep happened, so telling it what the sweep did is the difference between an
-            // observable cron job and one that reports success either way.
             return Results.Ok(await sweep.SweepAsync(ct));
         }
         catch (Exception ex)
         {
-            // 500 rather than a swallowed error: the caller is a scheduler, and a non-success
-            // response is what makes it retry the tick.
+            // A non-success response makes the external scheduler retry the tick.
             logger.LogError(ex, "Scheduler sweep failed");
             return Results.StatusCode(StatusCodes.Status500InternalServerError);
         }

@@ -3,14 +3,10 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Spinneret.Scheduler;
 
 /// <summary>
-/// Composes the scheduler a host runs, inside <c>services.AddScheduler(s => ...)</c>: where jobs are
-/// stored (a provider's <c>Use*</c> extension, e.g. <c>UseMssqlStorage</c>, <c>UsePostgresStorage</c> or <c>UseFirestoreStorage</c>) and,
-/// optionally, a timer that dispatches them as they fall due (<see cref="UseInHostSweeper"/>).
+/// Composes the scheduler inside <c>services.AddScheduler(s => ...)</c>: a storage and, optionally, an in-host sweeper.
 /// </summary>
 /// <remarks>
-/// Due jobs are enqueued onto the host's queue, so the scheduler needs <c>AddQueue</c> as well — in
-/// either order. The storage determines how tightly a run's booking and its enqueue are bound: a SQL
-/// scheduler commits both in one transaction with a SQL queue storage.
+/// Due jobs are enqueued onto the host's queue, so <c>AddQueue</c> is also required, in either order.
 /// </remarks>
 public sealed class SchedulerBuilder
 {
@@ -28,12 +24,8 @@ public sealed class SchedulerBuilder
     /// Runs the storage's sweep on a timer in this host, dispatching jobs as they fall due.
     /// </summary>
     /// <remarks>
-    /// Opt-in per host, because a host that declares or schedules jobs is not necessarily one that
-    /// should dispatch them; sweeps race safely across hosts, so every instance may run one. A host
-    /// that scales to zero has no thread to tick: map <c>MapSchedulerSweep</c> from
-    /// <c>Spinneret.Scheduler.AspNetCore</c> instead and drive it from an external cron. To bind the
-    /// interval from configuration, call <c>services.Configure&lt;SchedulerOptions&gt;(section)</c> —
-    /// this package deliberately takes no dependency on the configuration binder.
+    /// Sweeps race safely, so every instance may run one. A host that scales to zero should map
+    /// <c>MapSchedulerSweep</c> from <c>Spinneret.Scheduler.AspNetCore</c> instead.
     /// </remarks>
     public SchedulerBuilder UseInHostSweeper(Action<SchedulerOptions>? configure = null)
     {
@@ -65,9 +57,7 @@ public sealed class SchedulerBuilder
 
         Services.AddSingleton<SchedulerRegistered>();
         Storage.Register(Services);
-        // After the storage: hosted services start in registration order, and the installer writes
-        // job definitions into tables a storage's schema initializer creates. The installer retries,
-        // so getting this order wrong would cost a backoff rather than the jobs.
+        // After the storage: hosted services start in order, and the schema initializer creates the tables.
         Services.AddHostedService<RecurringJobInstaller>();
 
         if (_useSweeper)
@@ -89,13 +79,7 @@ public sealed class SchedulerBuilder
         Services.AddHostedService<InHostSweeperService>();
     }
 
-    /// <summary>Marks a collection AddScheduler has composed, so a second call fails instead of half-overriding the first.</summary>
     private sealed class SchedulerRegistered;
 }
 
-/// <summary>
-/// Where the scheduler's jobs live. <paramref name="Register"/> adds the storage's
-/// <see cref="IRecurringJobScheduler"/>, its <see cref="ISchedulerSweep"/> engine, its transactional
-/// one-shot API and its schema initializer; the builder adds the installer and the optional timer.
-/// </summary>
 internal sealed record SchedulerStorageRole(string Name, Action<IServiceCollection> Register);

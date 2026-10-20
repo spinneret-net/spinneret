@@ -2,11 +2,7 @@ using Microsoft.Extensions.Options;
 
 namespace Spinneret.Queue.CloudTasks;
 
-/// <summary>
-/// Validates <see cref="CloudTasksOptions"/> against the command registry: required values are
-/// present and every channel a registered command declares is mapped to a queue, so a missing
-/// mapping fails the host at boot instead of throwing at first enqueue in some handler.
-/// </summary>
+// Fails the host at boot on a missing value or unmapped channel, rather than at first enqueue.
 internal sealed class CloudTasksOptionsValidator(QueueTypeRegistry registry) : IValidateOptions<CloudTasksOptions>
 {
     public ValidateOptionsResult Validate(string? name, CloudTasksOptions options)
@@ -62,11 +58,7 @@ internal sealed class CloudTasksOptionsValidator(QueueTypeRegistry registry) : I
                 + "Cloud Tasks does not accept a task scheduled further ahead than that.");
     }
 
-    /// <summary>
-    /// Cloud Tasks resolves this URL itself, so a malformed one fails at the first enqueue rather
-    /// than here — and a plain-http one fails at delivery, since Cloud Tasks will not mint an OIDC
-    /// token for an insecure target. Both are worth catching at boot instead.
-    /// </summary>
+    // Otherwise a malformed URL fails at first enqueue, and plain http at delivery (no OIDC token for http).
     private static void ValidateDispatcherUrl(CloudTasksOptions o)
     {
         if (!IsHttpUrl(o.DispatcherUrl, out var uri))
@@ -80,12 +72,7 @@ internal sealed class CloudTasksOptionsValidator(QueueTypeRegistry registry) : I
                 "when Queue:CloudTasks:EmulatorEndpoint is set.");
     }
 
-    /// <summary>
-    /// The emulator mints tokens from its own issuer, but issuer validation stays on regardless of
-    /// the emulator (only HTTPS metadata is relaxed). Leaving OidcIssuer unset there means the
-    /// dispatch endpoint keeps validating against accounts.google.com and rejects every emulator
-    /// token — a configuration that binds cleanly, starts cleanly, and then 401s forever.
-    /// </summary>
+    // Without OidcIssuer the emulator's tokens are validated against Google's issuer and every delivery 401s.
     private static void ValidateOidc(CloudTasksOptions o)
     {
         if (o.UsesEmulator && string.IsNullOrWhiteSpace(o.OidcIssuer))
@@ -95,24 +82,14 @@ internal sealed class CloudTasksOptionsValidator(QueueTypeRegistry registry) : I
                 "https://accounts.google.com and reject every delivery. Set it to the emulator's " +
                 "-openid-issuer value.");
 
-        // Deliberately not validating OidcAudience: a JWT 'aud' is an opaque string, and Cloud Tasks
-        // sends whatever is configured verbatim. Only the issuer must be a URL — it is fetched.
+        // OidcAudience is an opaque string; only the issuer must be a URL, since it is fetched.
         if (!string.IsNullOrWhiteSpace(o.OidcIssuer) && !IsHttpUrl(o.OidcIssuer, out _))
             throw new InvalidOperationException(
                 $"Queue:CloudTasks:OidcIssuer must be an absolute http(s) URL; got '{o.OidcIssuer}'. " +
                 "It is the authority the dispatch endpoint fetches OpenID metadata from.");
     }
 
-    /// <summary>
-    /// An absolute URL that is actually addressable over HTTP.
-    /// </summary>
-    /// <remarks>
-    /// The scheme check is what makes this platform-independent, and it is not optional: on Unix,
-    /// <see cref="Uri.TryCreate(string, UriKind, out Uri)"/> reads a leading slash as a file path and
-    /// happily produces an absolute <c>file://</c> URI, so a relative value like
-    /// <c>/internal/queue/dispatch</c> passes an absoluteness check on Linux while failing it on
-    /// Windows. Requiring http or https rejects it the same way everywhere.
-    /// </remarks>
+    // The scheme check is required: on Unix, Uri.TryCreate reads "/path" as an absolute file:// URI.
     internal static bool IsHttpUrl(string value, out Uri uri) =>
         Uri.TryCreate(value, UriKind.Absolute, out uri!)
         && uri.Scheme is var scheme

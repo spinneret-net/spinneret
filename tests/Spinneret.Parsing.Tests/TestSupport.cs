@@ -2,10 +2,7 @@ using Spinneret.Functional;
 
 namespace Spinneret.Parsing.Tests;
 
-/// <summary>
-/// Helpers to unwrap <see cref="Result{TOk,TError}"/> values in tests,
-/// failing the test with a clear message when the wrong branch is hit.
-/// </summary>
+/// <summary>Unwraps <see cref="Result{TOk,TError}"/> values, failing the test on the wrong branch.</summary>
 internal static class Expect
 {
     public static TOk Ok<TOk, TError>(Result<TOk, TError> result)

@@ -12,8 +12,6 @@
         <PackageReference Include="Microsoft.Data.SqlClient" Version="7.1.1" />
         <!-- SqlClient 7.1.1 still depends on a Pkcs with known advisories (GHSA-846f-f764-76mx). -->
         <PackageReference Include="System.Security.Cryptography.Pkcs" Version="10.0.13" />
-        <!-- Configuration.Binder is where ConfigurationBinder.Bind lives, which is what the
-             IConfiguration overloads of UseMssqlStorage call. -->
         <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="10.0.13" />
         <PackageReference Include="Microsoft.Extensions.Options" Version="10.0.13" />
     </ItemGroup>

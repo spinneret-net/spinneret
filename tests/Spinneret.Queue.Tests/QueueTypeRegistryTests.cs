@@ -157,8 +157,7 @@ public class QueueTypeRegistryTests
     [Test]
     public async Task Constructor_min_backoff_exceeding_max_backoff_fails_at_startup()
     {
-        // MinBackoff raised above the (default) MaxBackoff would silently cap every retry at the
-        // smaller value — the registry fails the host at boot instead.
+        // Otherwise every retry would be silently capped at the smaller MaxBackoff.
         var assembly = DynamicRequestAssembly.WithRequest("Dyn.InvertedBackoffCommand", ("MinBackoff", "00:30:00"));
 
         var ex = Assert.Throws<InvalidOperationException>(() => new QueueTypeRegistry([assembly]));
@@ -182,9 +181,6 @@ public class QueueTypeRegistryTests
     [Test]
     public async Task Constructor_command_with_two_request_interfaces_fails_at_startup()
     {
-        // A command implementing both IRequest<Unit> and IRequest<string> has an ambiguous
-        // response type; the registry rejects it at boot instead of registering whichever
-        // interface enumeration happens to yield last.
         var assembly = DynamicRequestAssembly.WithRequest(
             "Dyn.DualInterfaceCommand", [typeof(Spinneret.Functional.Unit), typeof(string)]);
 

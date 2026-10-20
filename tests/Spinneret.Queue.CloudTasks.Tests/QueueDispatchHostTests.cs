@@ -16,30 +16,12 @@ using Microsoft.IdentityModel.Tokens;
 
 namespace Spinneret.Queue.CloudTasks.Tests;
 
-/// <summary>
-/// The dispatch endpoint over a real ASP.NET pipeline rather than an invoked handler: that Cloud
-/// Tasks' POST reaches the delivery processor only when its OIDC token validates, and that the
-/// status and headers it gets back are the ones its retry behaviour depends on.
-/// </summary>
-/// <remarks>
-/// <para>
-/// The companion suite asserts what <c>MapCloudTasksDispatch</c> registers and what the handler
-/// returns when invoked directly. Neither can show that the endpoint is actually guarded:
-/// authorization is middleware, so only a request through the pipeline distinguishes a route that
-/// enforces the policy from one that merely carries its metadata.
-/// </para>
-/// <para>
-/// Tokens are signed with a symmetric test key and the scheme's <c>Configuration</c> is pre-set, so
-/// the JWT handler never reaches out to accounts.google.com for metadata. Everything else about the
-/// scheme — issuer, audience and lifetime validation — is exactly what <c>UseCloudTasksDelivery</c> configured.
-/// </para>
-/// </remarks>
+// Authorization is middleware, so only a request through the real pipeline proves the route is guarded.
 public sealed class QueueDispatchHostTests
 {
     private const string TaskNameHeader = "X-CloudTasks-TaskName";
     private const string FullTaskName = "projects/p/locations/l/queues/q/tasks/task-123";
 
-    /// <summary>The route the endpoint derives from <see cref="TestSetup.DispatcherUrl"/>.</summary>
     private const string DispatchRoute = "/internal/queue/dispatch";
 
     private static readonly SymmetricSecurityKey SigningKey =
@@ -84,8 +66,6 @@ public sealed class QueueDispatchHostTests
                 {
                     services.AddRouting();
                     services.AddTestQueue(requestAssembly: typeof(QueueDispatchHostTests).Assembly);
-                    // Replace the pieces a worker would supply, so the endpoint's own behaviour is
-                    // what is under test rather than a real handler or store.
                     services.AddSingleton<IQueueDeliveryProcessor>(processor);
                     services.AddSingleton<IDeadLetterWriter>(deadLetters);
                     services.AddSingleton<IConfigureOptions<JwtBearerOptions>>(
@@ -100,10 +80,7 @@ public sealed class QueueDispatchHostTests
                 }))
             .StartAsync();
 
-    /// <summary>
-    /// Points the scheme at a local signing key and a pre-set OIDC document, so no network fetch
-    /// happens. Issuer, audience and lifetime validation stay exactly as UseCloudTasksDelivery set them.
-    /// </summary>
+    // Local signing key and pre-set OIDC document, so the JWT handler never fetches metadata.
     private static void ValidateAgainstTestKey(JwtBearerOptions options)
     {
         options.Configuration = new OpenIdConnectConfiguration();
@@ -116,9 +93,7 @@ public sealed class QueueDispatchHostTests
         string audience = TestSetup.DispatcherUrl,
         DateTime? expires = null)
     {
-        // notBefore is derived from the expiry rather than from now, so an already-expired token is
-        // still a well-formed one — the handler rejects a nbf-after-exp pair before it ever gets to
-        // lifetime validation, which would test nothing.
+        // notBefore derives from the expiry, so an expired token still reaches lifetime validation.
         var expiresAt = expires ?? DateTime.UtcNow.AddMinutes(10);
         var token = new JwtSecurityToken(
             issuer: issuer,
@@ -151,13 +126,10 @@ public sealed class QueueDispatchHostTests
             EnqueuedAtUtc = DateTimeOffset.UtcNow,
         });
 
-    // -------------------------------------------------------------------------- the guard ---
-
     [Test]
     public async Task An_unauthenticated_post_never_reaches_the_processor()
     {
-        // The endpoint executes arbitrary registered commands, so an unguarded route is remote code
-        // execution. Metadata alone cannot show the policy runs — this request can.
+        // An unguarded route would execute arbitrary registered commands.
         var processor = new FakeProcessor();
         using var host = await StartHostAsync(processor, new FakeDeadLetterWriter());
 
@@ -170,7 +142,6 @@ public sealed class QueueDispatchHostTests
     [Test]
     public async Task A_token_for_another_audience_is_refused()
     {
-        // The audience is what stops a token minted for a different service being replayed here.
         var processor = new FakeProcessor();
         using var host = await StartHostAsync(processor, new FakeDeadLetterWriter());
 
@@ -197,7 +168,7 @@ public sealed class QueueDispatchHostTests
     [Test]
     public async Task An_expired_token_is_refused()
     {
-        // Lifetime validation runs with a minute of clock skew, so the token is aged past that.
+        // Aged past the one-minute clock skew.
         var processor = new FakeProcessor();
         using var host = await StartHostAsync(processor, new FakeDeadLetterWriter());
 
@@ -207,8 +178,6 @@ public sealed class QueueDispatchHostTests
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.Unauthorized);
         await Assert.That(processor.Calls).IsEqualTo(0);
     }
-
-    // ------------------------------------------------------------------------- the delivery ---
 
     [Test]
     public async Task An_authorized_delivery_reaches_the_processor_and_acks()
@@ -220,15 +189,14 @@ public sealed class QueueDispatchHostTests
 
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
         await Assert.That(processor.Envelope!.RequestTypeName).IsEqualTo("Orders.Ship");
-        // Only the final segment of the Cloud Tasks task name: slashes are not valid document ids.
+        // Only the final segment of the task name: slashes are not valid document ids.
         await Assert.That(processor.TaskId).IsEqualTo("task-123");
     }
 
     [Test]
     public async Task A_retry_outcome_returns_429_with_the_backoff_Cloud_Tasks_honors()
     {
-        // The queue's own retry config is an unlimited backstop, so a task ends only on a 200 —
-        // which makes the 429 and its Retry-After the entire flow-control mechanism.
+        // The queue's retry config is an unlimited backstop, so 429 and Retry-After are the whole flow control.
         var processor = new FakeProcessor { Outcome = QueueDeliveryOutcome.RetryIn(TimeSpan.FromSeconds(42)) };
         using var host = await StartHostAsync(processor, new FakeDeadLetterWriter());
 
@@ -252,7 +220,6 @@ public sealed class QueueDispatchHostTests
     [Test]
     public async Task An_unreadable_body_is_dead_lettered_and_acked()
     {
-        // No retry can repair the bytes, so the raw body is stored for inspection and the task ends.
         var deadLetters = new FakeDeadLetterWriter();
         var processor = new FakeProcessor();
         using var host = await StartHostAsync(processor, deadLetters);
@@ -279,13 +246,10 @@ public sealed class QueueDispatchHostTests
         await Assert.That(response.Headers.RetryAfter!.Delta).IsEqualTo(TimeSpan.FromMinutes(1));
     }
 
-    // ------------------------------------------------------------------------------ routing ---
-
     [Test]
     public async Task The_endpoint_answers_on_the_path_of_the_configured_dispatcher_url()
     {
-        // A mapped route that does not match DispatcherUrl is close to undetectable in production:
-        // every task 404s and retries until it expires.
+        // A mismatched route is near undetectable in production: every task 404s until it expires.
         using var host = await StartHostAsync(new FakeProcessor(), new FakeDeadLetterWriter());
 
         var configured = new Uri(TestSetup.DispatcherUrl).AbsolutePath;

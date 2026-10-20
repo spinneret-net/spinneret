@@ -1,9 +1,6 @@
 namespace Spinneret.Scheduler.Firestore.Tests;
 
-/// <summary>
-/// Pins the persisted document schema. These names are the wire format of the scheduler
-/// collection — renaming any of them breaks every already-persisted job document.
-/// </summary>
+// These names are the stored wire format; renaming one breaks every persisted job.
 public class ScheduledJobTests
 {
     [Test]
@@ -20,8 +17,7 @@ public class ScheduledJobTests
     [Test]
     public async Task One_shot_handles_carry_the_prefix_that_distinguishes_them_from_recurring_keys()
     {
-        // The prefix is what lets CancelJob reject a recurring key without reading the document,
-        // which is what keeps the transactional API write-only.
+        // The prefix lets CancelJob reject a recurring key without a read, keeping it write-only.
         await Assert.That(ScheduledJob.OneShotHandlePrefix).IsEqualTo("oneshot-");
         await Assert.That(ScheduledJob.NewOneShotHandle()).StartsWith("oneshot-");
         await Assert.That(ScheduledJob.IsOneShotHandle(ScheduledJob.NewOneShotHandle())).IsTrue();

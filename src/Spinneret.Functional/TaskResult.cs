@@ -2,12 +2,8 @@ using System.Runtime.CompilerServices;
 
 namespace Spinneret.Functional;
 
-/// <summary>
-/// An awaitable <see cref="Task{T}"/> of <see cref="Result{TOk, TError}"/> with result combinators,
-/// so async result pipelines compose without unwrapping at every step.
-/// Always create one via <see cref="TaskResult"/> factories or <c>AsTaskResult()</c> — a
-/// <c>default</c> instance has no underlying task and throws on use.
-/// </summary>
+/// <summary>An awaitable <see cref="Task{T}"/> of <see cref="Result{TOk, TError}"/> with result combinators.</summary>
+/// <remarks>Create via <see cref="TaskResult"/> or <c>AsTaskResult()</c>; a <c>default</c> instance throws on use.</remarks>
 public readonly record struct TaskResult<TOk, TError>(Task<Result<TOk, TError>> Value)
 {
     private Task<Result<TOk, TError>> UnderlyingTask => Value ?? throw new InvalidOperationException(
@@ -132,12 +128,8 @@ public readonly record struct TaskResult<TOk, TError>(Task<Result<TOk, TError>> 
     }
 }
 
-/// <summary>
-/// An awaitable <see cref="Task{T}"/> of the value-less <see cref="Result{TError}"/> with result
-/// combinators, so async result pipelines compose without unwrapping at every step.
-/// Always create one via <see cref="TaskResult"/> factories or <c>AsTaskResult()</c> — a
-/// <c>default</c> instance has no underlying task and throws on use.
-/// </summary>
+/// <summary>An awaitable <see cref="Task{T}"/> of <see cref="Result{TError}"/> with result combinators.</summary>
+/// <remarks>Create via <see cref="TaskResult"/> or <c>AsTaskResult()</c>; a <c>default</c> instance throws on use.</remarks>
 public readonly record struct TaskResult<TError>(Task<Result<TError>> Value)
 {
     private Task<Result<TError>> UnderlyingTask => Value ?? throw new InvalidOperationException(

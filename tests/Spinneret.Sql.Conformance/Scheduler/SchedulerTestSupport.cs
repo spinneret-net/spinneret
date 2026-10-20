@@ -11,10 +11,6 @@ using Spinneret.Scheduler.Sql;
 
 namespace Spinneret.Sql.Conformance;
 
-// ---------------------------------------------------------------------------------------------
-// Test command types and handlers.
-// ---------------------------------------------------------------------------------------------
-
 public sealed record TickCommand(string Name) : IRequest<Unit>;
 
 public sealed class TickHandler(DeliveryLog log) : IRequestHandler<TickCommand, Unit>
@@ -26,11 +22,7 @@ public sealed class TickHandler(DeliveryLog log) : IRequestHandler<TickCommand, 
     }
 }
 
-/// <summary>
-/// A request whose handler returns a value. A scheduled run discards it — the response type is here
-/// to prove a job is not restricted to <c>IRequest&lt;Unit&gt;</c>, and that the sweep can enqueue a
-/// stored job whose response type it only learns at runtime.
-/// </summary>
+// Proves a job isn't restricted to IRequest<Unit>, and the sweep resolves the response type at runtime.
 public sealed record ReportCommand(string Name) : IRequest<string>;
 
 public sealed class ReportHandler(DeliveryLog log) : IRequestHandler<ReportCommand, string>
@@ -42,14 +34,6 @@ public sealed class ReportHandler(DeliveryLog log) : IRequestHandler<ReportComma
     }
 }
 
-// ---------------------------------------------------------------------------------------------
-// Host harness.
-// ---------------------------------------------------------------------------------------------
-
-/// <summary>
-/// A running scheduler host: queue + scheduler registered against test-unique tables, with the
-/// queue worker and the scheduler sweeper active (unless disabled per test).
-/// </summary>
 public sealed class SchedulerTestHost : IAsyncDisposable
 {
     private readonly ServiceProvider _provider;
@@ -104,7 +88,7 @@ public sealed class SchedulerTestHost : IAsyncDisposable
         {
             dialect.UseScheduler(s, configuration);
             if (sweeper)
-                // Fast ticks so integration tests do not wait out the 15s default.
+                // Fast ticks so tests don't wait out the 15s default.
                 s.UseInHostSweeper(o => o.SweepInterval = TimeSpan.FromMilliseconds(100));
         });
         configure?.Invoke(services);
@@ -117,8 +101,6 @@ public sealed class SchedulerTestHost : IAsyncDisposable
         return new SchedulerTestHost(provider, hostedServices, dialect, suffix);
     }
 
-    // ------------------------------------------------------------------------- SQL helpers ---
-
     public string JobsTable => SchedulerOptions.TableName;
 
     public Task<System.Data.Common.DbConnection> OpenConnectionAsync() => Dialect.OpenConnectionAsync();
@@ -127,10 +109,7 @@ public sealed class SchedulerTestHost : IAsyncDisposable
 
     public Task ExecuteAsync(string sql) => Dialect.ExecuteAsync(sql);
 
-    /// <summary>
-    /// Whether the job is still outstanding work. There is no status column — a job is deleted once
-    /// it has run, been cancelled, or had its failure dead-lettered — so existence is the state.
-    /// </summary>
+    // A job is deleted once it has run, been cancelled or dead-lettered, so existence is the state.
     public async Task<bool> JobExists(string jobKey) =>
         await Dialect.CountAsync(JobsTable, $"JobKey = '{jobKey}'") == 1;
 

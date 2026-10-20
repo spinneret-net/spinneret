@@ -9,10 +9,6 @@ using Spinneret.Queue.Sql;
 
 namespace Spinneret.Sql.Conformance;
 
-/// <summary>
-/// What a SQL storage registers and how it binds and validates its options — the same for every
-/// dialect, because the dialect packages register through the shared helper. No database needed.
-/// </summary>
 public abstract class SqlQueueRegistrationConformance(SqlTestDialect dialect)
 {
     protected SqlTestDialect Dialect => dialect;
@@ -42,8 +38,6 @@ public abstract class SqlQueueRegistrationConformance(SqlTestDialect dialect)
                 q.UseInHostDelivery(configuration);
         });
     }
-
-    // -------------------------------------------------------------------- registrations ---
 
     [Test]
     public async Task Storage_exposes_producer_envelope_and_transactional_queue_as_one_instance()
@@ -151,7 +145,7 @@ public abstract class SqlQueueRegistrationConformance(SqlTestDialect dialect)
     [Test]
     public async Task Storage_without_a_delivery_registers_no_polling_worker()
     {
-        // A producer-only host: the same storage, nothing consuming it.
+        // A producer-only host: nothing consuming the storage.
         var services = AddQueue(Configuration());
 
         await Assert.That(services.Any(d => d.ImplementationType == typeof(SqlQueueWorker))).IsFalse();
@@ -170,13 +164,10 @@ public abstract class SqlQueueRegistrationConformance(SqlTestDialect dialect)
         await Assert.That(ex.Message).Contains(dialect.UseStorageName);
     }
 
-    // ------------------------------------------------------------------ host data source ---
-
     [Test]
     public async Task A_host_data_source_is_used_without_a_connection_string()
     {
-        // A host that already has a data source (shared with its own data access) hands it over.
-        // That it stays the host's to dispose is pinned by the storage's own unit tests.
+        // Disposal staying with the host is pinned by the storage's own unit tests.
         await using var hostOwned = dialect.CreateDataSourceFor(dialect.SampleConnectionString);
         var services = new ServiceCollection();
         services.AddSingleton(typeof(ILogger<>), typeof(NullLogger<>));
@@ -189,8 +180,6 @@ public abstract class SqlQueueRegistrationConformance(SqlTestDialect dialect)
 
         await Assert.That(provider.GetRequiredService<SqlQueueStorage>().DataSource).IsSameReferenceAs(hostOwned);
     }
-
-    // ------------------------------------------------------------------ options binding ---
 
     [Test]
     public async Task Storage_options_defaults_hold_when_only_the_connection_string_is_configured()
@@ -266,8 +255,6 @@ public abstract class SqlQueueRegistrationConformance(SqlTestDialect dialect)
         await Assert.That(options.ConnectionString).Contains("elsewhere");
     }
 
-    // ----------------------------------------------------------------- eager validation ---
-
     [Test]
     public async Task Missing_connection_string_fails_at_registration()
     {
@@ -319,8 +306,7 @@ public abstract class SqlQueueRegistrationConformance(SqlTestDialect dialect)
     [Test]
     public async Task A_table_name_that_fits_but_derives_an_index_name_that_does_not_fails_at_registration()
     {
-        // The table name alone is legal; the index names built from it are not. SQL Server would
-        // refuse the DDL at startup, Postgres would silently truncate it until two names collided.
+        // The index names built from it are too long: SQL Server refuses the DDL, Postgres truncates them.
         var key = $"{Section}:QueueTableName";
         var configuration = Configuration(new() { [key] = new string('q', dialect.MaxIdentifierLength - 2) });
 

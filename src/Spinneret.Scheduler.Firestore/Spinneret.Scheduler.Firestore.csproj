@@ -9,12 +9,8 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <!-- No framework reference: this package is storage. The HTTP trigger that used to live
-             here is Spinneret.Scheduler.AspNetCore, so a worker with no web stack can consume this. -->
+        <!-- No ASP.NET Core framework reference, so a worker without a web stack can use this. -->
         <PackageReference Include="Google.Cloud.Firestore" Version="4.5.0" />
-        <!-- Was arriving transitively through the AspNetCore framework reference this package no
-             longer takes. Configuration.Binder is what ConfigurationBinder.Bind lives in, which is
-             what the IConfiguration overload of UseFirestoreStorage actually calls. -->
         <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="10.0.13" />
         <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.13" />
         <PackageReference Include="Microsoft.Extensions.Options" Version="10.0.13" />
@@ -22,12 +18,8 @@
 
     <ItemGroup>
         <ProjectReference Include="..\Spinneret.Scheduler\Spinneret.Scheduler.csproj" />
-        <!-- The provider-agnostic queue, never a specific transport: jobs are dispatched onto
-             whatever IQueue the host registered, so Firestore scheduling composes with Cloud
-             Tasks, SQL Server, or anything else. -->
+        <!-- The transport-agnostic queue, so any IQueue the host registers works. -->
         <ProjectReference Include="..\Spinneret.Queue\Spinneret.Queue.csproj" />
-        <!-- Both appear in this package's own public API (IFirestoreTransactionalScheduler takes an
-             IRequest<Unit>), so they are declared rather than left to arrive through the queue. -->
         <ProjectReference Include="..\Spinneret.Mediator\Spinneret.Mediator.csproj" />
         <ProjectReference Include="..\Spinneret.Functional\Spinneret.Functional.csproj" />
     </ItemGroup>

@@ -5,18 +5,11 @@ using Spinneret.Queue.Sql;
 
 namespace Spinneret.Sql.Conformance;
 
-/// <summary>
-/// Cloud Tasks over a SQL outbox: an enqueue commits with the business write that caused it, a relay
-/// forwards it to Cloud Tasks exactly once, and a delivery's writes, cascades, bookings and dead
-/// letter commit together before the endpoint answers.
-/// </summary>
 public abstract class CloudTasksOverSqlConformance(SqlTestDialect dialect)
 {
     protected SqlTestDialect Dialect => dialect;
 
     private string Q(string identifier) => dialect.Quote(identifier);
-
-    // ---------------------------------------------------------------------------- producer ---
 
     [Test]
     public async Task An_enqueue_in_a_rolled_back_transaction_is_never_forwarded()
@@ -61,7 +54,7 @@ public abstract class CloudTasksOverSqlConformance(SqlTestDialect dialect)
     [Test]
     public async Task An_enqueue_outside_a_transaction_is_forwarded_as_it_commits()
     {
-        // No relay pass: a host that is CPU-throttled outside requests may not run one for a while.
+        // No relay pass: a CPU-throttled host may not run one for a while.
         await using var host = await CloudTasksOverSqlHost.StartAsync(Dialect);
 
         await host.Queue.Enqueue(new PingCommand("eager"));
@@ -73,8 +66,7 @@ public abstract class CloudTasksOverSqlConformance(SqlTestDialect dialect)
     [Test]
     public async Task A_dedupe_key_is_the_task_name_so_a_repeat_is_not_delivered_twice()
     {
-        // In the outbox the key only blocks a duplicate while the first is pending; once forwarded,
-        // Cloud Tasks' memory of the name is what keeps the repeat from becoming a second task.
+        // Once forwarded, Cloud Tasks' memory of the name is what blocks the repeat.
         await using var host = await CloudTasksOverSqlHost.StartAsync(Dialect);
 
         await host.Queue.Enqueue(new PingCommand("a"), new QueueOptions { DedupeKey = "order-7" });
@@ -84,8 +76,6 @@ public abstract class CloudTasksOverSqlConformance(SqlTestDialect dialect)
         await Assert.That(CloudTasksOverSqlHost.TaskIdOf(host.Tasks.SingleRequest)).IsEqualTo("order-7");
         await Assert.That(await host.OutboxCount()).IsEqualTo(0);
     }
-
-    // ------------------------------------------------------------------------------- relay ---
 
     [Test]
     public async Task A_send_that_fails_stays_in_the_outbox_and_is_retried_after_a_backoff()
@@ -109,8 +99,7 @@ public abstract class CloudTasksOverSqlConformance(SqlTestDialect dialect)
     [Test]
     public async Task A_lost_response_does_not_forward_the_message_twice()
     {
-        // The task was created but the relay never heard so: the row stays, the retry is refused as
-        // a duplicate name, and the refusal is what lets the row go.
+        // The task was created but the relay never heard; the duplicate-name refusal lets the row go.
         await using var host = await CloudTasksOverSqlHost.StartAsync(Dialect);
         await EnqueueCommitted(host, new PingCommand("lost"));
         host.Tasks.LoseNextCreateTaskResponses(1);
@@ -143,7 +132,7 @@ public abstract class CloudTasksOverSqlConformance(SqlTestDialect dialect)
     [Test]
     public async Task A_message_due_beyond_the_forwarding_horizon_waits_in_the_outbox()
     {
-        // Cloud Tasks will not schedule a task more than 30 days out; the outbox holds it until then.
+        // Cloud Tasks won't schedule more than 30 days out; the outbox holds it until then.
         await using var host = await CloudTasksOverSqlHost.StartAsync(Dialect);
 
         await host.Queue.Enqueue(new PingCommand("later"), new QueueOptions { Delay = TimeSpan.FromDays(40) });
@@ -156,8 +145,6 @@ public abstract class CloudTasksOverSqlConformance(SqlTestDialect dialect)
         var scheduled = host.Tasks.SingleRequest.Task.ScheduleTime.ToDateTimeOffset();
         await Assert.That(scheduled > host.Clock.Now).IsTrue();
     }
-
-    // ---------------------------------------------------------------------------- delivery ---
 
     [Test]
     public async Task A_delivery_commits_its_writes_and_forwards_its_cascade_before_answering()
@@ -213,8 +200,7 @@ public abstract class CloudTasksOverSqlConformance(SqlTestDialect dialect)
     [Test]
     public async Task A_redelivered_task_dead_letters_once()
     {
-        // Cloud Tasks redelivers when it never saw the 200; the dead letter is filed under the task's
-        // name, so the second write lands on the first.
+        // The dead letter is filed under the task's name, so a redelivery's write lands on the first.
         await using var host = await CloudTasksOverSqlHost.StartAsync(Dialect);
         var table = await host.CreateSideTable();
         await host.Queue.Enqueue(new WriteThenFailCommand(table));
@@ -224,8 +210,6 @@ public abstract class CloudTasksOverSqlConformance(SqlTestDialect dialect)
 
         await Assert.That(await host.DeadLetterCount()).IsEqualTo(1);
     }
-
-    // ------------------------------------------------------------------------------ resend ---
 
     [Test]
     public async Task A_resend_enqueues_and_deletes_in_one_transaction_and_is_forwarded()
@@ -244,8 +228,6 @@ public abstract class CloudTasksOverSqlConformance(SqlTestDialect dialect)
         await Assert.That(CloudTasksOverSqlHost.EnvelopeOf(host.Tasks.Requests[1]).RequestTypeName)
             .IsEqualTo(typeof(WriteThenFailCommand).FullName!);
     }
-
-    // ----------------------------------------------------------------------------- helpers ---
 
     private static async Task EnqueueCommitted(CloudTasksOverSqlHost host, params PingCommand[] commands)
     {

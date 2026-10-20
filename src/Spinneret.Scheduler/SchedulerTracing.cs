@@ -2,7 +2,6 @@ using System.Diagnostics;
 
 namespace Spinneret.Scheduler;
 
-/// <summary>Tag keys the scheduler's spans carry. Declared once, shared by every storage provider.</summary>
 internal static class SchedulerTags
 {
     internal const string JobsDispatched = "scheduler.jobs_dispatched";
@@ -11,7 +10,7 @@ internal static class SchedulerTags
     internal const string Outcome = "scheduler.outcome";
 }
 
-/// <summary>Values of the <see cref="SchedulerTags.Outcome"/> tag, documented in docs/scheduler.md.</summary>
+// Documented in docs/scheduler.md.
 internal static class SchedulerJobOutcome
 {
     internal const string Enqueued = "enqueued";
@@ -19,17 +18,13 @@ internal static class SchedulerJobOutcome
     internal const string Quarantined = "quarantined";
 }
 
-/// <summary>Values of the <see cref="SchedulerTags.JobKind"/> tag.</summary>
 internal static class SchedulerJobKind
 {
     internal const string Recurring = "recurring";
     internal const string OneShot = "oneshot";
 }
 
-/// <summary>
-/// The scheduler's spans, shared by the storage providers so the two cannot emit different shapes for
-/// the same sweep.
-/// </summary>
+// Shared by all storage providers so their spans cannot drift apart.
 internal static class SchedulerTracing
 {
     private static readonly string? Version = typeof(SchedulerTracing).Assembly.GetName().Version?.ToString();
@@ -38,10 +33,7 @@ internal static class SchedulerTracing
 
     internal static Activity? StartSweep() => Source.StartActivity("scheduler sweep", ActivityKind.Internal);
 
-    /// <summary>
-    /// Starts the span for one claimed job. Call it after the claim: a span per poll would emit one
-    /// for the pass that finds nothing, which is most of them.
-    /// </summary>
+    // Call after the claim, so empty polls emit no span.
     internal static Activity? StartJob(string jobId) =>
         Source.StartActivity("scheduler job", ActivityKind.Internal, default(ActivityContext),
             new ActivityTagsCollection { [SchedulerTags.JobId] = jobId });

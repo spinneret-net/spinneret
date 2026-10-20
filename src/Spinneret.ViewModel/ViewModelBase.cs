@@ -24,31 +24,13 @@ public abstract class ViewModelBase : BindableBase, IViewModel, IValidationState
         }
     }
     
-    /// <summary>
-    /// Creates the backing collection for a <see cref="RowCollection{TRow}"/> property. Declare it lazily,
-    /// so it can capture this view model — a field initializer cannot:
-    /// <code>
-    /// [field: AllowNull, MaybeNull]
-    /// public RowCollection&lt;MyRow&gt; Rows => field ??= CreateRowCollection&lt;MyRow&gt;();
-    /// </code>
-    /// </summary>
+    /// <summary>Creates a <see cref="RowCollection{TRow}"/>; declare the property lazily: <c>field ??= CreateRowCollection&lt;MyRow&gt;()</c>.</summary>
     protected RowCollection<TRow> CreateRowCollection<TRow>([CallerMemberName] string? propertyName = null)
         where TRow : BindableBase =>
         new(this, propertyName ?? throw new ArgumentNullException(nameof(propertyName)));
 
-    /// <summary>
-    /// Adopts a nested view model, re-raising its changes on this one at the nested path
-    /// (<c>Head.SelectedId</c>) that <c>ViewModelParser</c> and <c>RequestTracker</c> key on. A nested
-    /// view model that is not adopted is invisible to both: its edits never reach
-    /// <see cref="OnUpdateAsync"/>, so the form silently never notices them.
-    /// <para>
-    /// Declare the property lazily so it can capture this view model — a field initializer cannot:
-    /// <code>
-    /// [field: AllowNull, MaybeNull]
-    /// public MultilingualTextViewModel Name => field ??= Nested(new MultilingualTextViewModel());
-    /// </code>
-    /// </para>
-    /// </summary>
+    /// <summary>Re-raises a nested view model's changes on this one at the nested path (<c>Head.SelectedId</c>).</summary>
+    /// <remarks>Without this, its edits never reach <see cref="OnUpdateAsync"/>. Declare lazily: <c>field ??= Nested(new X())</c>.</remarks>
     protected TViewModel Nested<TViewModel>(TViewModel viewModel, [CallerMemberName] string? propertyName = null)
         where TViewModel : BindableBase
     {
@@ -70,9 +52,7 @@ public abstract class ViewModelBase : BindableBase, IViewModel, IValidationState
         RaisePropertyChanged(nameof(ValidationState));
     }
 
-    // Implemented explicitly so the lifecycle entry points are called only through IViewModel
-    // (which is how the view drives them) and cannot be shadowed by a derived class; derived
-    // classes participate via OnInitializeAsync / OnUpdateAsync.
+    // Explicit so derived classes can't shadow it; they override OnInitializeAsync / OnUpdateAsync.
     async Task IViewModel.InitializeAsync(CancellationToken cancellationToken)
     {
         _cancellationToken = cancellationToken;
@@ -114,11 +94,7 @@ public abstract class ViewModelBase : BindableBase, IViewModel, IValidationState
         return Task.CompletedTask;
     }
 
-    /// <remarks>
-    /// Changes raised before <see cref="OnInitializeAsync"/> completes — including ones raised from outside
-    /// this view model, such as an event handler it subscribed during initialization — re-render the view
-    /// but never reach this method. Do not latch work in a property for this method to pick up.
-    /// </remarks>
+    /// <remarks>Changes raised before <see cref="OnInitializeAsync"/> completes re-render the view but never reach this method.</remarks>
     protected virtual Task OnUpdateAsync(ICollection<string> changedProperties)
     {
         return Task.CompletedTask;
@@ -156,11 +132,7 @@ public abstract class ViewModelBase : BindableBase, IViewModel, IValidationState
         return true;
     }
     
-    /// <summary>
-    /// Handles exceptions thrown inside <see cref="Run"/> / <see cref="RunIfNotBusy"/>.
-    /// Assigned by the owning view (property injection); internal so consumers cannot
-    /// overwrite it mid-lifetime.
-    /// </summary>
+    /// <summary>Handles exceptions thrown inside <see cref="Run"/> / <see cref="RunIfNotBusy"/>; set by the owning view.</summary>
     public IViewModelExceptionService? ExceptionService { get; internal set; }
 
     private async Task Execute(Func<CancellationToken, Task> function)
@@ -172,8 +144,7 @@ public abstract class ViewModelBase : BindableBase, IViewModel, IValidationState
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            // The view that owns this work is gone, so nobody is left to tell. Any other cancellation — an HTTP
-            // timeout — is a failure and goes to the exception service.
+            // The owning view is gone. Other cancellations (e.g. HTTP timeouts) are real failures.
             return;
         }
         catch (Exception e)

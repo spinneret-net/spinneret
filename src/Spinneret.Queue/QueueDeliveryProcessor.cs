@@ -4,11 +4,7 @@ using Microsoft.Extensions.Logging;
 namespace Spinneret.Queue;
 
 /// <summary>
-/// Outcome of processing one queue delivery. <see cref="Ack"/> means the task is finished from the
-/// transport's perspective — succeeded, dead-lettered, discarded, or re-enqueued as a fresh task (a
-/// booked retry or a deferral). <see cref="RetryAfter"/> is the fallback when booking that outcome
-/// failed (the re-enqueue or dead-letter write threw): the transport should redeliver after the
-/// delay, and that redelivery is deliberately not counted as a failure.
+/// The result of one delivery: <see cref="Ack"/> finishes the task; <see cref="RetryAfter"/> asks for an uncounted redelivery.
 /// </summary>
 public sealed record QueueDeliveryOutcome
 {
@@ -19,16 +15,11 @@ public sealed record QueueDeliveryOutcome
     public bool Ack => RetryAfter is null;
 }
 
-/// <summary>
-/// The transport-agnostic decision engine for queue deliveries. The application — not the transport —
-/// owns task termination: every delivery ends in an explicit acknowledge, a retry re-enqueued with a
-/// backoff computed from the command's <see cref="QueuePolicy"/>, or a dead-letter. The failure budget
-/// is tracked exclusively in <see cref="QueueEnvelope.PriorFailures"/>, never derived from the
-/// transport's retry counter: the transport redelivers only when the app never acknowledged (an
-/// outage, a crash, an auth failure before this code ran), and such infrastructure noise must not
-/// spend the handler's attempts. Those uncounted loops are bounded by <see cref="QueuePolicy.MaxAge"/>
-/// once deliveries reach this code again, and by the transport's max retry duration if they never do.
-/// </summary>
+/// <summary>Decides each delivery's outcome (ack, booked retry or dead letter) from its <see cref="QueuePolicy"/>.</summary>
+/// <remarks>
+/// Attempts are counted in <see cref="QueueEnvelope.PriorFailures"/>, not the transport's retry counter,
+/// so infrastructure redeliveries do not spend the budget.
+/// </remarks>
 public interface IQueueDeliveryProcessor
 {
     Task<QueueDeliveryOutcome> ProcessAsync(QueueDeliveryContext context, CancellationToken ct);
@@ -53,8 +44,7 @@ internal sealed class QueueDeliveryProcessor(
         var envelope = context.Envelope;
         var taskId = context.TaskId;
 
-        // The span covers the whole delivery rather than the handler call: the outcome is the
-        // interesting part, and the unknown-type path below never reaches dispatch at all.
+        // Spans the whole delivery, since the unknown-type path never reaches dispatch.
         using var activity = QueueTracing.StartConsumer(envelope, taskId);
 
         QueuePolicy policy;
@@ -67,10 +57,7 @@ internal sealed class QueueDeliveryProcessor(
             return await UnknownTypeAsync(envelope, taskId, ex, activity, ct);
         }
 
-        // PriorFailures counts only failures this processor observed and booked via re-enqueue.
-        // A transport redelivery of the same task means the app never acknowledged (an outage, a
-        // crash, an auth failure before this code ran) — infrastructure noise that deliberately
-        // does not advance the attempt.
+        // Transport redeliveries are infrastructure noise and deliberately do not advance the attempt.
         var attempt = envelope.PriorFailures + 1;
         var age = timeProvider.GetUtcNow() - envelope.EnqueuedAtUtc;
 
@@ -97,8 +84,7 @@ internal sealed class QueueDeliveryProcessor(
         }
         catch (QueueHandlerFailedException ex)
         {
-            // Every ErrorResultAction is handled explicitly: a value this build does not know
-            // (mixed-version deploy) must fail loudly rather than silently behave like Retry.
+            // An unknown value (mixed-version deploy) must fail loudly, not silently act like Retry.
             switch (policy.OnErrorResult)
             {
                 case ErrorResultAction.DeadLetter:
@@ -129,13 +115,8 @@ internal sealed class QueueDeliveryProcessor(
         }
     }
 
-    /// <remarks>
-    /// During a rolling deploy a new instance can enqueue a type that an old instance receives, which a
-    /// redelivery after the rollout resolves; a type renamed or removed across a deploy never resolves.
-    /// The two look identical here, so the task is redelivered until <see cref="UnknownTypeGracePeriod"/>
-    /// and dead-lettered after. The transport redelivers rather than a booked re-enqueue: routing a
-    /// re-enqueue needs the type's channel, which only its <see cref="QueuePolicy"/> knows.
-    /// </remarks>
+    // An old instance may receive a type a rolling deploy just added, so redeliver for a grace period
+    // before dead-lettering. Transport redelivery, since a re-enqueue needs the unknown type's channel.
     private async Task<QueueDeliveryOutcome> UnknownTypeAsync(
         QueueEnvelope envelope, string taskId, UnknownRequestTypeException ex, Activity? activity,
         CancellationToken ct)
@@ -171,15 +152,12 @@ internal sealed class QueueDeliveryProcessor(
         var backoff = policy.BackoffFor(attempt);
         try
         {
-            // Book the failure by re-enqueueing a fresh task with the incremented count, exactly like
-            // deferrals — the transport's own retry counter (which also counts deliveries that never
-            // reached the app) then never influences the budget.
+            // Book the failure as a fresh task so the transport's retry counter never affects the budget.
             await envelopeQueue.Enqueue(envelope with { PriorFailures = attempt }, backoff, ct);
         }
         catch (Exception enqueueEx)
         {
-            // Fall back to transport redelivery. The failure goes unbooked — one occasional extra
-            // attempt is benign, unlike the reverse (infrastructure noise spending the budget).
+            // Unbooked failure: an occasional extra attempt is benign.
             logger.LogWarning(enqueueEx,
                 "Failed to re-enqueue {RequestType} retry; falling back to transport retry in {Backoff}",
                 envelope.RequestTypeName, backoff);
@@ -208,13 +186,11 @@ internal sealed class QueueDeliveryProcessor(
 
         try
         {
-            // A deferral is a pure reschedule: PriorFailures is unchanged (this execution deferred,
-            // it did not fail) and EnqueuedAtUtc keeps MaxAge measuring from the original enqueue.
+            // Pure reschedule: PriorFailures and EnqueuedAtUtc stay, so MaxAge counts from the original enqueue.
             await envelopeQueue.Enqueue(envelope, ex.RetryAfter, ct);
         }
         catch (Exception enqueueEx)
         {
-            // The current task remains the timer: redeliver it after the requested delay instead.
             logger.LogWarning(enqueueEx,
                 "Failed to re-enqueue deferred {RequestType}; falling back to transport retry in {RetryAfter}",
                 envelope.RequestTypeName, ex.RetryAfter);
@@ -229,11 +205,7 @@ internal sealed class QueueDeliveryProcessor(
         return QueueDeliveryOutcome.Acked;
     }
 
-    /// <summary>
-    /// The retry budget (attempts or age) is spent. Permanent failures never come through here —
-    /// they dead-letter unconditionally, because a defect is worth surfacing even for work that
-    /// something else redoes.
-    /// </summary>
+    // Not used for permanent failures: those always dead-letter, since a defect is worth surfacing.
     private async Task<QueueDeliveryOutcome> GiveUpAsync(
         QueueEnvelope envelope, QueuePolicy policy, string taskId, int attempts, string error,
         Activity? activity, CancellationToken ct)
@@ -274,8 +246,7 @@ internal sealed class QueueDeliveryProcessor(
         }
         catch (Exception ex)
         {
-            // Never drop a task because the dead-letter store is unavailable — keep redelivering until
-            // the write lands (the transport's max retry duration is the only backstop).
+            // Never drop a task: redeliver until the write lands.
             logger.LogCritical(ex,
                 "Failed to write dead-letter for {CommandType} (task {TaskId}, attempts: {Attempts}). Payload: {Payload}",
                 envelope.RequestTypeName, taskId, attempts, envelope.PayloadJson);

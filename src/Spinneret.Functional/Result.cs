@@ -1,10 +1,6 @@
 namespace Spinneret.Functional;
 
-/// <summary>
-/// The outcome of an operation that produces no value: either success, or an error of
-/// <typeparamref name="TError"/>. The error type is unconstrained — an enum, a record,
-/// or any type the application uses to describe failures.
-/// </summary>
+/// <summary>The outcome of an operation that produces no value: success or an error.</summary>
 public sealed record Result<TError>
 {
     private readonly TError _error;
@@ -52,7 +48,7 @@ public sealed record Result<TError>
         );
     }
 
-    /// <summary>Runs an async operation on success; an error short-circuits without running it.</summary>
+    /// <summary>Runs an async operation on success only.</summary>
     public Task<Result<TError>> TraverseTask(Func<Task> okFn)
     {
         return Match(
@@ -65,7 +61,7 @@ public sealed record Result<TError>
         );
     }
 
-    /// <summary>Runs an async value-producing operation on success; an error short-circuits without running it.</summary>
+    /// <summary>Runs an async value-producing operation on success only.</summary>
     public Task<Result<TMapped, TError>> TraverseTask<TMapped>(Func<Task<TMapped>> okFn)
     {
         return Match(
@@ -102,7 +98,7 @@ public sealed record Result<TError>
         }
     }
 
-    /// <summary>Collapses both outcomes into a single value. The one place a result is unpacked.</summary>
+    /// <summary>Collapses both outcomes into a single value.</summary>
     public T Match<T>(Func<T> okFn, Func<TError, T> errorFn)
     {
         if (_isOk)
@@ -131,11 +127,7 @@ public sealed record Result<TError>
     }
 }
 
-/// <summary>
-/// The outcome of an operation: a value of <typeparamref name="TOk"/> on success, or an error
-/// of <typeparamref name="TError"/>. The error type is unconstrained — an enum, a record,
-/// or any type the application uses to describe failures.
-/// </summary>
+/// <summary>The outcome of an operation: a <typeparamref name="TOk"/> value on success, or an error.</summary>
 public sealed record Result<TOk, TError>
 {
     private readonly TOk _ok;
@@ -194,7 +186,7 @@ public sealed record Result<TOk, TError>
         );
     }
 
-    /// <summary>Runs an async operation on the success value; an error short-circuits without running it.</summary>
+    /// <summary>Runs an async operation on the success value only.</summary>
     public Task<Result<TError>> TraverseTask(Func<TOk, Task> okFn)
     {
         return Match(
@@ -207,7 +199,7 @@ public sealed record Result<TOk, TError>
         );
     }
 
-    /// <summary>Runs an async value-producing operation on the success value; an error short-circuits without running it.</summary>
+    /// <summary>Runs an async value-producing operation on the success value only.</summary>
     public Task<Result<TMapped, TError>> TraverseTask<TMapped>(Func<TOk, Task<TMapped>> okFn)
     {
         return Match(
@@ -243,7 +235,7 @@ public sealed record Result<TOk, TError>
         }
     }
 
-    /// <summary>Collapses both outcomes into a single value. The one place a result is unpacked.</summary>
+    /// <summary>Collapses both outcomes into a single value.</summary>
     public T Match<T>(Func<TOk, T> okFn, Func<TError, T> errorFn)
     {
         if (_isOk)
@@ -266,7 +258,7 @@ public sealed record Result<TOk, TError>
         return new Result<TOk, TError>(default!, error, false);
     }
 
-    /// <summary>Lifts a nullable reference: a value becomes Ok, null becomes the error produced by <paramref name="errorFn"/>.</summary>
+    /// <summary>Ok for a non-null value; otherwise the error from <paramref name="errorFn"/>.</summary>
     public static Result<TOk, TError> FromNullable(TOk? value, Func<TError> errorFn)
     {
         if (value is not null)
@@ -310,13 +302,13 @@ public static class Result
         return Result<TOk, TError>.Error(error);
     }
 
-    /// <summary>Lifts a nullable reference: a value becomes Ok, null becomes the error produced by <paramref name="errorFn"/>.</summary>
+    /// <summary>Ok for a non-null value; otherwise the error from <paramref name="errorFn"/>.</summary>
     public static Result<TOk, TError> FromNullable<TOk, TError>(TOk? value, Func<TError> errorFn)
     {
         return Result<TOk, TError>.FromNullable(value, errorFn);
     }
 
-    /// <summary>Lifts a nullable value type: a value becomes Ok (unwrapped), null becomes the error produced by <paramref name="errorFn"/>.</summary>
+    /// <summary>Ok for a non-null value; otherwise the error from <paramref name="errorFn"/>.</summary>
     public static Result<TOk, TError> FromNullable<TOk, TError>(TOk? value, Func<TError> errorFn)
         where TOk : struct
     {
@@ -332,7 +324,7 @@ public static class Result
 /// <summary>Combinators over nested results.</summary>
 public static class ResultExtensions
 {
-    /// <summary>Swaps the nesting order of a result of a result, so the inner error becomes the outer one.</summary>
+    /// <summary>Swaps the nesting order of a nested result.</summary>
     public static Result<Result<TOk, TError1>, TError2> Swap<TOk, TError1, TError2>(this Result<Result<TOk, TError2>, TError1> input)
     {
         return input.Match<Result<Result<TOk, TError1>, TError2>>(
@@ -344,7 +336,7 @@ public static class ResultExtensions
         );
     }
 
-    /// <summary>Swaps the nesting order of a result of a value-less result, so the inner error becomes the outer one.</summary>
+    /// <summary>Swaps the nesting order of a nested value-less result.</summary>
     public static Result<Result<TError1>, TError2> Swap<TError1, TError2>(this Result<Result<TError2>, TError1> input)
     {
         return input.Match<Result<Result<TError1>, TError2>>(

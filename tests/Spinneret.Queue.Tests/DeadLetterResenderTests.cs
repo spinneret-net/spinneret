@@ -43,10 +43,6 @@ public class DeadLetterResenderTests
             () => throw new InvalidOperationException("Expected an error but the resend succeeded."),
             error => error);
 
-    // -----------------------------------------------------------------------------------------
-    // The happy path.
-    // -----------------------------------------------------------------------------------------
-
     [Test]
     public async Task Enqueues_the_stored_command_and_removes_the_entry()
     {
@@ -62,8 +58,7 @@ public class DeadLetterResenderTests
     [Test]
     public async Task Enqueues_before_deleting()
     {
-        // Losing the entry ahead of a failed enqueue would take the payload with it; the other order
-        // leaves an entry to resend again. Asserted through a queue that refuses to enqueue.
+        // Deleting first would lose the payload if the enqueue then failed.
         var (resender, queue, store, _, _) = Build(DeadLetter());
         queue.Throw = new InvalidOperationException("transport down");
 
@@ -77,8 +72,7 @@ public class DeadLetterResenderTests
     [Test]
     public async Task Groups_the_enqueue_and_the_delete_into_one_committed_unit_of_work()
     {
-        // The SQL unit of work turns this grouping into a single commit; here it only has to be the case
-        // that both operations happen inside it rather than around it.
+        // The SQL unit of work makes this one commit; here both just have to run inside it.
         var (resender, queue, store, _, scope) = Build(DeadLetter());
         var insideAtEnqueue = false;
         var insideAtDelete = false;
@@ -142,10 +136,6 @@ public class DeadLetterResenderTests
         await Assert.That(Expect.Single(queue.Enqueued)).IsTypeOf<SecondChannelCommand>();
     }
 
-    // -----------------------------------------------------------------------------------------
-    // The three refusals.
-    // -----------------------------------------------------------------------------------------
-
     [Test]
     public async Task Reports_a_key_that_is_no_longer_stored()
     {
@@ -169,7 +159,7 @@ public class DeadLetterResenderTests
         await Assert.That(((ResendDeadLetterError.UnknownCommandType)error).CommandTypeName)
             .IsEqualTo("Acme.RenamedCommand");
         await Assert.That(queue.Enqueued).IsEmpty();
-        // The payload is still readable, so discarding it here would destroy recoverable work.
+        // The payload is still readable, so the entry stays.
         await Assert.That(await store.GetAsync("task-1")).IsNotNull();
     }
 
@@ -214,8 +204,7 @@ public class DeadLetterResenderTests
     [Test]
     public async Task Lets_an_unexpected_serializer_failure_through()
     {
-        // Only the two malformed-payload shapes are turned into a result. Anything else is a bug in
-        // the host's serializer, and swallowing it would report it back as the operator's fault.
+        // Anything but a malformed payload is a serializer bug, not the operator's fault.
         var (resender, _, _, serializer, _) = Build(DeadLetter());
         serializer.OnDeserialize = (_, _) => throw new InvalidOperationException("serializer misconfigured");
 
@@ -233,9 +222,7 @@ public class DeadLetterResenderTests
         await Assert.That(async () => await resender.ResendAsync(key)).Throws<ArgumentException>();
     }
 
-    // -----------------------------------------------------------------------------------------
-    // Decorators used to observe when, relative to the scope, each operation runs.
-    // -----------------------------------------------------------------------------------------
+    // Decorators that observe when each operation runs relative to the scope.
 
     private sealed class ObservingQueue(IQueue inner, Action onEnqueue) : IQueue
     {

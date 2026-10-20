@@ -135,8 +135,6 @@ public sealed class StartupExtensionsTests
     [Test]
     public async Task AddQueue_without_request_assemblies_fails_at_registration()
     {
-        // A queue that knows no command types accepts no enqueue, so it is a configuration error
-        // rather than an empty-but-valid state.
         var services = new ServiceCollection();
 
         var ex = Assert.Throws<InvalidOperationException>(
@@ -148,9 +146,7 @@ public sealed class StartupExtensionsTests
     [Test]
     [Arguments("worker.example.com/dispatch", "absolute")]
     [Arguments("/internal/queue/dispatch", "absolute")]
-    // A leading slash is a *file path* to Uri on Unix, so it yields an absolute file:// URI there
-    // while failing outright on Windows. These two pin the scheme requirement that makes the
-    // outcome identical on both — without them the relative case above only fails on Windows.
+    // On Unix, Uri reads a leading slash as a file path; these pin the scheme check on every platform.
     [Arguments("file:///internal/queue/dispatch", "http(s)")]
     [Arguments("ftp://worker.example.com/dispatch", "http(s)")]
     [Arguments("http://worker.example.com/dispatch", "https")]
@@ -181,8 +177,7 @@ public sealed class StartupExtensionsTests
     [Test]
     public async Task UseCloudTasksDelivery_with_an_emulator_but_no_issuer_fails_at_startup()
     {
-        // Binds and starts happily today, then rejects every delivery: the endpoint keeps validating
-        // emulator-minted tokens against accounts.google.com.
+        // Otherwise emulator-minted tokens are validated against accounts.google.com and all rejected.
         var config = TestSetup.Config(
             values => values["Queue:CloudTasks:EmulatorEndpoint"] = TestSetup.EmulatorEndpoint);
         var services = new ServiceCollection();
@@ -212,7 +207,7 @@ public sealed class StartupExtensionsTests
     [Test]
     public async Task UseCloudTasksDelivery_accepts_an_opaque_oidc_audience()
     {
-        // A JWT 'aud' is an opaque string, not a URL — Cloud Tasks sends it verbatim.
+        // A JWT 'aud' is an opaque string, not a URL.
         var config = TestSetup.Config(values => values["Queue:CloudTasks:OidcAudience"] = "custom-audience");
 
         var provider = TestSetup.BuildProvider(config);

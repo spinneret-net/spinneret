@@ -6,18 +6,11 @@ using Microsoft.Extensions.Logging;
 
 namespace Spinneret.Queue.CloudTasks;
 
-/// <summary>
-/// HTTP trigger for one relay pass, for hosts that do not run the relay in the background — a host
-/// that scales to zero has no thread to tick, so an external scheduler drives the pass instead.
-/// </summary>
 internal static class QueueRelayEndpoint
 {
     internal const string DefaultRoutePattern = "/internal/queue/relay";
 
-    /// <summary>
-    /// Maps the route. Deliberately neither named after the public entry point nor an extension
-    /// method, for the same reason as <see cref="QueueDispatchEndpoint.Map"/>.
-    /// </summary>
+    // Not an extension method, for the same reason as QueueDispatchEndpoint.Map.
     public static IEndpointRouteBuilder Map(IEndpointRouteBuilder endpoints, string authorizationPolicy, string pattern)
     {
         endpoints
@@ -37,14 +30,11 @@ internal static class QueueRelayEndpoint
 
         try
         {
-            // The result travels back to the caller: an external scheduler is the only thing that
-            // knows a pass happened, so telling it what the pass did makes the job observable.
             return Results.Ok(await relay.RelayAsync(ct));
         }
         catch (Exception ex)
         {
-            // 500 rather than a swallowed error: the caller is a scheduler, and a non-success
-            // response is what makes it retry.
+            // A non-success response is what makes the scheduler retry.
             logger.LogError(ex, "Queue relay pass failed");
             return Results.StatusCode(StatusCodes.Status500InternalServerError);
         }

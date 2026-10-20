@@ -2,16 +2,7 @@ using System.Diagnostics;
 
 namespace Spinneret.Queue.Tests;
 
-/// <summary>
-/// The producer span, asserted on <see cref="QueueTracing"/> itself: every transport publishes
-/// through it, so the shape is pinned once rather than per transport.
-/// </summary>
-/// <remarks>
-/// Tags are spelled as literals, not as the <c>QueueTags</c> consts the production code uses,
-/// because docs/queue.md publishes these strings. Each test uses a request type name no other test
-/// uses, which is what lets the <see cref="SpanCollector"/> find its own span among the ones TUnit's
-/// parallel tests are producing.
-/// </remarks>
+// Tags are literals because docs/queue.md publishes them; unique request types let each test find its span.
 public class QueuePublishTracingTests
 {
     private static QueueEnvelope Envelope(string requestTypeName) => new()
@@ -42,9 +33,7 @@ public class QueuePublishTracingTests
     [Test]
     public async Task A_dedupe_key_is_its_own_tag_and_never_the_message_id()
     {
-        // messaging.message.id means the id the transport assigned, which the producer does not know:
-        // Cloud Tasks builds its task name from the dedupe key, so the two coincide there, while the
-        // MSSQL transport hands back an identity column value that has nothing to do with it.
+        // The message id is the transport's to assign, which the producer doesn't know.
         const string requestType = "Publish.Tests.Deduped.SendWelcomeEmail";
         using var spans = new SpanCollector();
 
@@ -79,8 +68,7 @@ public class QueuePublishTracingTests
     public async Task The_name_survives_whatever_shape_the_registered_type_name_has(
         string requestTypeName, string expected)
     {
-        // The registry hands over Type.FullName, and a nested or closed generic type spells that in
-        // ways a naive split on '.' turns into gibberish.
+        // Nested and closed generic FullNames break a naive split on '.'.
         using var spans = new SpanCollector();
 
         using (QueueTracing.StartProducer("default", Envelope(requestTypeName), dedupeKey: null))

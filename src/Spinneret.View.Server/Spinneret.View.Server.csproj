@@ -9,9 +9,7 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <!-- The reason this package exists: IHttpContextAccessor ships only in the shared
-             framework, and a framework reference cannot be restored from a Blazor WebAssembly
-             app. Keeping it here leaves Spinneret.View consumable from both hosts. -->
+        <!-- Why this package exists: keeps the framework reference out of WebAssembly-safe Spinneret.View. -->
         <FrameworkReference Include="Microsoft.AspNetCore.App" />
     </ItemGroup>
 

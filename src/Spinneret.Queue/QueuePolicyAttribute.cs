@@ -2,13 +2,8 @@ using System.Globalization;
 
 namespace Spinneret.Queue;
 
-/// <summary>
-/// Declares the <see cref="QueuePolicy"/> for a command type when enqueued. Commands without the
-/// attribute get <see cref="QueuePolicy.Default"/>. Durations are invariant-culture
-/// <see cref="TimeSpan"/> strings (e.g. <c>"00:10:00"</c>, <c>"7.00:00:00"</c>) because attributes
-/// cannot carry <see cref="TimeSpan"/> values; they are parsed once at startup by
-/// <see cref="QueueTypeRegistry"/>, so a typo fails the host at boot rather than a delivery at runtime.
-/// </summary>
+/// <summary>Declares a command type's <see cref="QueuePolicy"/>; durations are invariant <see cref="TimeSpan"/> strings.</summary>
+/// <remarks>Parsed at startup, so an invalid value fails the host at boot.</remarks>
 [AttributeUsage(AttributeTargets.Class, Inherited = false)]
 public sealed class QueuePolicyAttribute : Attribute
 {

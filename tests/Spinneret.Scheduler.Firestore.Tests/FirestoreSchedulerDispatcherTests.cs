@@ -5,16 +5,7 @@ using Spinneret.Queue;
 
 namespace Spinneret.Scheduler.Firestore.Tests;
 
-/// <summary>
-/// The dispatch sweep against a real Firestore (the emulator, via Testcontainers): the lease that
-/// keeps two hosts from double-dispatching one due slot, and what happens to a job whose occurrence
-/// cannot be enqueued.
-/// </summary>
-/// <remarks>
-/// What the emulator does not prove: it never enforces composite-index requirements, so the
-/// single-field <c>nextExecuteAt</c> query it serves here says nothing about index provisioning in
-/// production. What it does prove is the lease transaction, the re-arming and the compensation.
-/// </remarks>
+// The emulator never enforces composite indexes, so these tests don't cover index provisioning.
 [ClassDataSource<FirestoreEmulatorFixture>(Shared = SharedType.PerTestSession)]
 public sealed class FirestoreSchedulerDispatcherTests(FirestoreEmulatorFixture fixture)
 {
@@ -23,8 +14,6 @@ public sealed class FirestoreSchedulerDispatcherTests(FirestoreEmulatorFixture f
 
     private static int Enqueued(SchedulerTestHost host, string name) =>
         host.Queue.CountOf<TestRequest>(r => r.Name == name);
-
-    // ----------------------------------------------------------------------- recurring jobs ---
 
     [Test]
     public async Task Due_recurring_job_is_enqueued_and_rearmed()
@@ -37,7 +26,6 @@ public sealed class FirestoreSchedulerDispatcherTests(FirestoreEmulatorFixture f
 
         await Assert.That(result.JobsDispatched).IsEqualTo(1);
         await Assert.That(Enqueued(host, "d")).IsEqualTo(1);
-        // The document is never removed, and its next run has moved into the future.
         await Assert.That(await host.JobExists("due")).IsTrue();
         await Assert.That(await host.JobNextExecuteAt("due") > DateTimeOffset.UtcNow).IsTrue();
     }
@@ -59,8 +47,7 @@ public sealed class FirestoreSchedulerDispatcherTests(FirestoreEmulatorFixture f
     [Test]
     public async Task Due_recurring_job_with_a_non_unit_response_is_enqueued()
     {
-        // The sweep only learns the response type at runtime, from the stored type name, and
-        // enqueues through reflection — so a job that is not IRequest<Unit> is the interesting case.
+        // The sweep enqueues via reflection on the stored type name, so a non-Unit response matters.
         await using var host = await SchedulerTestHost.StartAsync(fixture);
         await host.Scheduler.RegisterAsync("reporting", new ReportRequest("r"), Hourly);
         await host.MakeDue("reporting");
@@ -87,9 +74,7 @@ public sealed class FirestoreSchedulerDispatcherTests(FirestoreEmulatorFixture f
     [Test]
     public async Task Competing_sweeps_dispatch_a_due_job_exactly_once()
     {
-        // Two hosts sweep the same collection at the same moment. The lease — advancing
-        // nextExecuteAt inside a transaction before any work — is the only thing standing between
-        // that and a double dispatch.
+        // Only the lease (advancing nextExecuteAt in a transaction) prevents a double dispatch.
         await using var host = await SchedulerTestHost.StartAsync(fixture);
         await using var rival = await SchedulerTestHost.StartAsync(fixture, reuseCollection: host.Collection);
 
@@ -119,8 +104,7 @@ public sealed class FirestoreSchedulerDispatcherTests(FirestoreEmulatorFixture f
     [Test]
     public async Task The_sweeper_dispatches_a_due_job_without_being_asked()
     {
-        // The same thing through the timer trigger rather than a hand-driven sweep, so the hosted
-        // service and its interval are exercised too.
+        // Via the timer, so the hosted service and its interval are exercised.
         await using var host = await SchedulerTestHost.StartAsync(fixture, sweeper: true);
         await host.Scheduler.RegisterAsync("timed", new TestRequest("t"), Hourly);
         await host.MakeDue("timed");
@@ -128,14 +112,12 @@ public sealed class FirestoreSchedulerDispatcherTests(FirestoreEmulatorFixture f
         await Wait.Until(() => Enqueued(host, "t") == 1, "the sweeper to dispatch the due job");
     }
 
-    // ------------------------------------------------------------------ failure compensation ---
-
     [Test]
     public async Task Failed_recurring_dispatch_dead_letters_the_occurrence_but_keeps_the_schedule()
     {
         await using var host = await SchedulerTestHost.StartAsync(fixture);
         await host.Scheduler.RegisterAsync("broken", new TestRequest("b"), Hourly);
-        // Sabotage the persisted type name so the sweep cannot resolve the request.
+        // Corrupt the stored type name so the request can't be resolved.
         await host.SetField("broken", ScheduledJob.Fields.RequestTypeName, "No.Such.Type");
         await host.MakeDue("broken");
 
@@ -145,7 +127,6 @@ public sealed class FirestoreSchedulerDispatcherTests(FirestoreEmulatorFixture f
         var entry = host.DeadLetters.Entries.Single();
         await Assert.That(entry.Source).IsEqualTo(DeadLetterSource.Scheduler);
         await Assert.That(entry.CommandTypeName).IsEqualTo("No.Such.Type");
-        // The schedule stays armed: one bad occurrence must not end the recurrence.
         await Assert.That(await host.JobExists("broken")).IsTrue();
         await Assert.That(await host.JobNextExecuteAt("broken") > DateTimeOffset.UtcNow).IsTrue();
     }
@@ -153,8 +134,7 @@ public sealed class FirestoreSchedulerDispatcherTests(FirestoreEmulatorFixture f
     [Test]
     public async Task Each_failed_recurring_occurrence_is_dead_lettered_separately()
     {
-        // A recurring job's failures are distinct events, so they must not collapse onto one
-        // idempotency key the way a redelivered queue task does.
+        // Unlike queue redeliveries, each failed occurrence is a distinct event.
         await using var host = await SchedulerTestHost.StartAsync(fixture);
         await host.Scheduler.RegisterAsync("repeatedly-broken", new TestRequest("rb"), Hourly);
         await host.SetField("repeatedly-broken", ScheduledJob.Fields.RequestTypeName, "No.Such.Type");
@@ -171,8 +151,7 @@ public sealed class FirestoreSchedulerDispatcherTests(FirestoreEmulatorFixture f
     [Test]
     public async Task Unreadable_schedule_is_quarantined_without_blocking_other_jobs()
     {
-        // A job written by a newer version and then rolled back must not starve everything behind
-        // it in the same snapshot, and must survive so a host that understands it can pick it up.
+        // E.g. written by a newer version, then rolled back: must neither block others nor be deleted.
         await using var host = await SchedulerTestHost.StartAsync(fixture);
         await host.Scheduler.RegisterAsync("poison", new TestRequest("p"), Hourly);
         await host.Scheduler.RegisterAsync("healthy", new TestRequest("h"), Hourly);
@@ -185,7 +164,6 @@ public sealed class FirestoreSchedulerDispatcherTests(FirestoreEmulatorFixture f
 
         await Assert.That(Enqueued(host, "h")).IsEqualTo(1);
         await Assert.That(host.Queue.CountOf<TestRequest>(r => r.Name == "p")).IsEqualTo(0);
-        // Kept, not deleted: it is unreadable, not finished. And pushed out of the way.
         await Assert.That(await host.JobExists("poison")).IsTrue();
         await Assert.That(await host.JobNextExecuteAt("poison") > DateTimeOffset.UtcNow.AddMinutes(4)).IsTrue();
         await Assert.That(host.DeadLetters.Entries).Count().IsEqualTo(1);
@@ -203,19 +181,15 @@ public sealed class FirestoreSchedulerDispatcherTests(FirestoreEmulatorFixture f
 
         await host.Sweep.SweepAsync(CancellationToken.None);
 
-        // Both were attempted and both were dead-lettered, rather than the first aborting the pass.
         await Assert.That(host.DeadLetters.Entries).Count().IsEqualTo(2);
         await Assert.That(await host.JobExists("first")).IsTrue();
         await Assert.That(await host.JobExists("second")).IsTrue();
     }
 
-    // ----------------------------------------------------------------------- one-shot jobs ---
-
     [Test]
     public async Task Due_one_shot_is_enqueued_and_its_document_removed()
     {
-        // A one-shot has served its purpose once it is on the queue; the queue message is now the
-        // record, and deleting is what keeps the collection bounded.
+        // Deleting once enqueued keeps the collection bounded.
         await using var host = await SchedulerTestHost.StartAsync(fixture);
         var handle = await ScheduleOneShot(host, new TestRequest("once"), DateTimeOffset.UtcNow);
 
@@ -262,16 +236,13 @@ public sealed class FirestoreSchedulerDispatcherTests(FirestoreEmulatorFixture f
 
         await Assert.That(host.DeadLetters.Entries).Count().IsEqualTo(1);
         await Assert.That(host.DeadLetters.Entries.Single().Source).IsEqualTo(DeadLetterSource.Scheduler);
-        // Safe in the dead-letter store, so the document may go.
         await Assert.That(await host.JobExists(handle)).IsFalse();
     }
 
     [Test]
     public async Task A_one_shot_survives_a_dead_letter_write_that_did_not_land()
     {
-        // The document is the only remaining copy of the payload once the enqueue has failed. If the
-        // dead-letter write fails too, deleting it would lose the work outright — so it must stay,
-        // and the lapsed lease is what gets it retried.
+        // The document is the only copy left, so it must stay for the lapsed lease to retry.
         await using var host = await SchedulerTestHost.StartAsync(fixture);
         var handle = await ScheduleOneShot(host, new TestRequest("precious"), DateTimeOffset.UtcNow);
         host.Queue.FailWith = new InvalidOperationException("transport is down");
@@ -282,7 +253,6 @@ public sealed class FirestoreSchedulerDispatcherTests(FirestoreEmulatorFixture f
         await Assert.That(host.DeadLetters.Entries).IsEmpty();
         await Assert.That(await host.JobExists(handle)).IsTrue();
 
-        // And once both recover, the lapsed lease lets a later sweep run it after all.
         host.Queue.FailWith = null;
         host.DeadLetters.FailWith = null;
         await host.MakeDue(handle);
@@ -292,7 +262,6 @@ public sealed class FirestoreSchedulerDispatcherTests(FirestoreEmulatorFixture f
         await Assert.That(await host.JobExists(handle)).IsFalse();
     }
 
-    /// <summary>Commits a one-shot through the transactional scheduler and returns its handle.</summary>
     private static async Task<string> ScheduleOneShot(
         SchedulerTestHost host, IRequest<Unit> request, DateTimeOffset executeAt)
     {

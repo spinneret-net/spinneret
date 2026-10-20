@@ -4,10 +4,6 @@ using Microsoft.Extensions.Options;
 
 namespace Spinneret.Queue.Firestore;
 
-/// <summary>
-/// Reads back what <see cref="FirestoreDeadLetterWriter"/> stored, over the same
-/// <see cref="DeadLetterDocument"/> field names, so the two can never drift.
-/// </summary>
 internal sealed class FirestoreDeadLetterStore(
     FirestoreDb db,
     IOptions<FirestoreDeadLetterOptions> options)
@@ -19,10 +15,8 @@ internal sealed class FirestoreDeadLetterStore(
     {
         ArgumentNullException.ThrowIfNull(query);
 
-        // Ordering by a field and then by document id in the same direction is what Firestore does
-        // implicitly anyway, and it is served by the automatic single-field index — so hosts create
-        // no composite index for this page. Writing it out makes the second cursor value explicit.
-        // Adding a where-filter here would change that, and would need an index per filtered field.
+        // Field then document id, same direction: served by the automatic index, no composite index needed.
+        // A where-filter would need one.
         var firestoreQuery = Collection
             .OrderByDescending(DeadLetterDocument.Fields.DeadLetteredAt)
             .OrderByDescending(FieldPath.DocumentId);
@@ -34,8 +28,7 @@ internal sealed class FirestoreDeadLetterStore(
                 Timestamp.FromDateTimeOffset(position.DeadLetteredAt), position.IdempotencyKey);
         }
 
-        // One more than asked for: whether that extra row came back is what distinguishes a full
-        // last page from a full page with more behind it, without a second count query.
+        // One extra row tells whether another page follows.
         var snapshot = await firestoreQuery.Limit(query.PageSize + 1).GetSnapshotAsync(ct);
 
         var hasMore = snapshot.Documents.Count > query.PageSize;
@@ -67,9 +60,7 @@ internal sealed class FirestoreDeadLetterStore(
 
         try
         {
-            // MustExist rather than an unconditional delete, which Firestore treats as success on a
-            // document that was never there — the caller could not then tell "discarded" from
-            // "someone else got there first".
+            // MustExist: a plain delete succeeds on a missing document, hiding "already gone".
             await Collection.Document(idempotencyKey).DeleteAsync(Precondition.MustExist, ct);
             return true;
         }

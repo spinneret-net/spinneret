@@ -5,33 +5,15 @@ using Spinneret.Queue.Sql;
 
 namespace Spinneret.Queue.Postgres;
 
-/// <summary>
-/// The PostgreSQL spelling of the queue's storage — the single source of truth for every statement
-/// and the DDL, built from the configured names so the schema and the statements can never drift.
-/// </summary>
-/// <remarks>
-/// <para>
-/// Postgres aborts a transaction on any failed statement: everything after it fails until a
-/// rollback. So no statement here may fail on an outcome the storage expects — a duplicate dedupe
-/// key or dead-letter key is an <c>ON CONFLICT DO NOTHING</c>, never a caught violation — or it
-/// would take the caller's transaction down with it.
-/// </para>
-/// <para>
-/// Schema and table names are quoted, so they keep the case they were configured with. Column
-/// names are not, so they fold to lower case in the catalog and read the same quoted or not.
-/// </para>
-/// </remarks>
+// Postgres aborts the transaction on any failed statement, so expected conflicts use ON CONFLICT DO
+// NOTHING, never a caught violation. Table names are quoted (case kept); column names fold to lower case.
 internal sealed class PostgresQueueDialect : SqlQueueDialect
 {
     public static readonly PostgresQueueDialect Instance = new();
 
     private const string DeadLetterColumns = SqlQueueStatements.DeadLetterColumns;
 
-    /// <summary>
-    /// The paging order, repeated by every dead-letter read. Descending on both columns, and the
-    /// idempotency key breaks ties so the order is total — without it a cursor sitting inside a
-    /// group of entries sharing an instant could skip or repeat rows.
-    /// </summary>
+    // The key breaks timestamp ties, so the keyset cursor never skips or repeats rows.
     private const string DeadLetterOrder = "ORDER BY DeadLetteredAt DESC, IdempotencyKey DESC";
 
     private PostgresQueueDialect()
@@ -40,7 +22,7 @@ internal sealed class PostgresQueueDialect : SqlQueueDialect
 
     public override string Name => "postgres";
 
-    /// <summary>NAMEDATALEN - 1 bytes; identifiers are validated to be ASCII, so characters.</summary>
+    // NAMEDATALEN - 1 bytes; identifiers are ASCII.
     public override int MaxIdentifierLength => 63;
 
     public override string QuoteIdentifier(string identifier) => $"\"{identifier.Replace("\"", "\"\"")}\"";
@@ -54,9 +36,7 @@ internal sealed class PostgresQueueDialect : SqlQueueDialect
 
         return new SqlQueueStatements
         {
-            // The conflict target repeats the partial index's predicate, which is how Postgres picks
-            // that index as the arbiter. A duplicate returns no row at all, which the outbox reads as
-            // "already pending"; it never raises, so the caller's transaction carries on.
+            // The predicate makes Postgres pick the partial index as arbiter; a duplicate returns no row.
             Enqueue = $"""
                 INSERT INTO {queueTable} (MessageId, Channel, VisibleAt, DedupeKey, Envelope)
                 VALUES (@MessageId, @Channel, @VisibleAt, @DedupeKey, @Envelope)
@@ -64,10 +44,8 @@ internal sealed class PostgresQueueDialect : SqlQueueDialect
                 RETURNING true;
                 """,
 
-            // The DELETE inside the caller's transaction is the lock: the row is invisible to peers
-            // exactly while the delivery runs, a rollback puts it back, and SKIP LOCKED lets
-            // concurrent workers pass over claimed rows instead of blocking on them. A row a relay
-            // holds is being forwarded elsewhere, so it is not this worker's to deliver.
+            // The DELETE in the delivery transaction is the lock; a rollback restores the row, and
+            // SKIP LOCKED passes over rows other workers hold.
             Dequeue = $"""
                 DELETE FROM {queueTable}
                 WHERE Id = (
@@ -81,10 +59,7 @@ internal sealed class PostgresQueueDialect : SqlQueueDialect
                 RETURNING Id, MessageId, Envelope;
                 """,
 
-            // A lease rather than a destructive claim: the send is a network call, which must not
-            // hold a transaction open, and a relay that dies mid-send must leave the row to be
-            // re-leased once the lease runs out. SKIP LOCKED makes concurrent relays pass over each
-            // other's rows instead of leasing the same ones.
+            // SKIP LOCKED makes concurrent relays pass over each other's rows.
             LeaseForRelay = $"""
                 UPDATE {queueTable} AS q
                 SET LeasedUntil = @LeaseUntil, LeaseToken = @LeaseToken
@@ -130,8 +105,7 @@ internal sealed class PostgresQueueDialect : SqlQueueDialect
                 WHERE Id = @Id;
                 """,
 
-            // A duplicate idempotency key means the entry was already recorded by an earlier
-            // delivery of the same task, which is success, not an error.
+            // A duplicate key was recorded by an earlier delivery: success, not an error.
             WriteDeadLetter = $"""
                 INSERT INTO {deadLetterTable}
                     (IdempotencyKey, Source, CommandTypeName, Description, PayloadJson, Error, Attempts, DeadLetteredAt, TraceId)
@@ -146,8 +120,6 @@ internal sealed class PostgresQueueDialect : SqlQueueDialect
                 LIMIT @Take;
                 """,
 
-            // The keyset form of "everything ordered after this row": strictly older, or the same
-            // instant with a lower key.
             ListDeadLettersAfter = $"""
                 SELECT {DeadLetterColumns}
                 FROM {deadLetterTable}
@@ -176,8 +148,7 @@ internal sealed class PostgresQueueDialect : SqlQueueDialect
         var deadLetterTable = Qualify(names.Schema, names.DeadLetterTable);
         var n = PostgresDerivedNames.Of(names);
 
-        // One DO block is one statement, so the whole script runs in one implicit transaction —
-        // atomic, and holding the advisory lock to the end — without the caller managing one.
+        // One DO block runs in one implicit transaction, holding the advisory lock to the end.
         return $"""
             DO $spinneret$
             BEGIN
@@ -248,10 +219,7 @@ internal sealed class PostgresQueueDialect : SqlQueueDialect
             """;
     }
 
-    /// <summary>
-    /// Binds a UTC instant as <c>timestamptz</c>. Npgsql maps a <see cref="DateTimeOffset"/> with a
-    /// zero offset there; any other offset is rejected, hence the normalization.
-    /// </summary>
+    // Npgsql rejects a non-zero offset for timestamptz, hence the normalization.
     public override void AddTimestamp(DbCommand command, string name, DateTimeOffset utc)
     {
         var parameter = command.CreateParameter();
@@ -264,12 +232,8 @@ internal sealed class PostgresQueueDialect : SqlQueueDialect
     public override DateTimeOffset ReadTimestamp(DbDataReader reader, int ordinal) =>
         reader.GetFieldValue<DateTimeOffset>(ordinal);
 
-    /// <summary>
-    /// Asks the server: in an aborted transaction every statement fails with
-    /// <c>in_failed_sql_transaction</c> until a rollback, so a trivial one tells. Npgsql does not
-    /// publish the transaction status it tracks, and a commit would not tell either — Postgres answers
-    /// COMMIT of an aborted transaction by rolling it back without an error.
-    /// </summary>
+    // Npgsql doesn't expose transaction status, and COMMIT of an aborted transaction silently rolls back,
+    // so probe with a trivial statement.
     public override async Task<bool> IsAbortedAsync(DbTransaction transaction, CancellationToken ct)
     {
         try
@@ -284,15 +248,10 @@ internal sealed class PostgresQueueDialect : SqlQueueDialect
         }
     }
 
-    /// <summary>Escapes a value for a single-quoted SQL string literal.</summary>
     private static string Literal(string value) => value.Replace("'", "''");
 }
 
-/// <summary>
-/// The index and constraint names the DDL derives from the configured table names — in one place,
-/// so the script and the length validation can never disagree on them. Postgres index names are
-/// unique per schema, not per table, so each one carries its table's name.
-/// </summary>
+// Shared by the DDL and the length validation. Index names are unique per schema, so each carries its table's name.
 internal readonly record struct PostgresDerivedNames(
     string QueuePrimaryKey,
     string ChannelIndex,

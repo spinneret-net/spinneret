@@ -2,14 +2,6 @@ using System.Diagnostics;
 
 namespace Spinneret.Mediator.Tests;
 
-/// <summary>
-/// One span per <see cref="ISpinneretMediator.Send{TResponse}"/>, so a trace shows which request ran
-/// and — when the response came from the cache — why no handler work appears beneath it.
-/// </summary>
-/// <remarks>
-/// Spans are recorded by <see cref="TracingTestListener"/>; collection is keyed by span name, so
-/// every test below uses a request type no other test sends.
-/// </remarks>
 public class MediatorTracingTests
 {
     private static IReadOnlyList<Activity> SpansFor<TRequest>() =>
@@ -57,8 +49,7 @@ public class MediatorTracingTests
     }
 }
 
-// Request types exclusive to this class. The shared fixtures are sent by other tests in the
-// assembly, and the collecting listener is process-wide, so reusing one would mix in their spans.
+// Exclusive to this class: the listener is process-wide, so shared types would mix in other spans.
 internal sealed record TracedQuery(string Text) : IRequest<string>;
 
 internal sealed class TracedHandler : IRequestHandler<TracedQuery, string>

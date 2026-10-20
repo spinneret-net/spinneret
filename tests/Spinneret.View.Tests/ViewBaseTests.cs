@@ -8,8 +8,6 @@ namespace Spinneret.View.Tests;
 
 public class ViewBaseTests
 {
-    // ----- Lifecycle: initialization -----
-
     [Test]
     public async Task State_before_first_render_is_Uninitialized()
     {
@@ -94,7 +92,7 @@ public class ViewBaseTests
         await Assert.That(view.State).IsEqualTo(ViewState.InitializationFailed);
         await Assert.That(harness.CreatedViewModels[0].PropertyChangedHandlerCount).IsEqualTo(0);
         await Assert.That(harness.Coordinator.SubscribeCallCount).IsEqualTo(0);
-        // The failure is still reported through SafeExecute's logger, not the renderer.
+        // Reported through SafeExecute's logger, not the renderer.
         await Assert.That(harness.Renderer.HandledExceptions.Count).IsEqualTo(0);
     }
 
@@ -109,7 +107,7 @@ public class ViewBaseTests
 
         viewModel.Raise("Name");
 
-        // Negative check: give a would-be update pipeline time to run before asserting.
+        // Give a would-be update time to run before asserting it didn't.
         await Task.Delay(100);
         await Assert.That(viewModel.UpdateCallCount).IsEqualTo(0);
         await Assert.That(harness.Renderer.RenderBatchCount).IsEqualTo(renderCountBefore);
@@ -139,7 +137,7 @@ public class ViewBaseTests
         await Assert.That(viewModel.UpdateCallCount).IsEqualTo(0);
         await Assert.That(viewModel.PropertyChangedHandlerCount).IsEqualTo(1);
 
-        // Once initialized, the full pipeline (UpdateAsync, then render) applies.
+        // Once initialized, UpdateAsync runs before the render.
         viewModel.Raise("Name");
 
         await TestWait.UntilAsync(() => viewModel.UpdateCallCount >= 1);
@@ -167,7 +165,7 @@ public class ViewBaseTests
         await rendering;
 
         await TestWait.UntilAsync(() => harness.Renderer.RenderBatchCount > renderCountBefore);
-        // Negative check: give a would-be update pipeline time to run before asserting.
+        // Give a would-be update time to run before asserting it didn't.
         await Task.Delay(100);
         await Assert.That(viewModel.UpdateCallCount).IsEqualTo(0);
     }
@@ -193,8 +191,6 @@ public class ViewBaseTests
         await Assert.That(harness.Coordinator.ActiveRefreshSubscriptionCount).IsEqualTo(0);
     }
 
-    // ----- ViewModel property -----
-
     [Test]
     public async Task ViewModel_getter_resolves_owned_view_model_from_DI_and_caches_it()
     {
@@ -216,15 +212,13 @@ public class ViewBaseTests
         var view = harness.Renderer.CreateComponent<OwnedVmView>();
         var suppliedViewModel = new FakeViewModel();
 
-#pragma warning disable BL0005 // deliberately exercising the public setter directly
+#pragma warning disable BL0005 // testing the public setter directly
         view.ViewModel = suppliedViewModel;
 #pragma warning restore BL0005
 
         await Assert.That(ReferenceEquals(view.ViewModel, suppliedViewModel)).IsTrue();
         await Assert.That(harness.CreatedViewModels.Count).IsEqualTo(0);
     }
-
-    // ----- Refresh coordination -----
 
     [Test]
     public async Task Refresh_disposes_owned_view_model_and_initializes_a_new_instance()
@@ -257,13 +251,12 @@ public class ViewBaseTests
 
         var refresh = harness.Coordinator.RequestRefreshAsync();
 
-        // The new view model is on screen (in its loading state) while it is still initializing.
         await TestWait.UntilAsync(() => harness.Renderer.RenderBatchCount > renderCountBefore);
         await Assert.That(refresh.IsCompleted).IsFalse();
         await Assert.That(harness.CreatedViewModels.Count).IsEqualTo(2);
         await Assert.That(ReferenceEquals(view.ViewModel, harness.CreatedViewModels[1])).IsTrue();
 
-        // Changes it raises while initializing (IsBusy from Run) keep re-rendering it.
+        // Changes raised while initializing (IsBusy from Run) keep re-rendering it.
         var renderCountDuring = harness.Renderer.RenderBatchCount;
         harness.CreatedViewModels[1].Raise("IsBusy");
         await TestWait.UntilAsync(() => harness.Renderer.RenderBatchCount > renderCountDuring);
@@ -304,7 +297,7 @@ public class ViewBaseTests
         await Assert.That(view.State).IsEqualTo(ViewState.InitializationFailed);
         await Assert.That(harness.CreatedViewModels.Count).IsEqualTo(2);
 
-        // A subsequent refresh is a no-op because the view is no longer Initialized.
+        // No-op: the view is no longer Initialized.
         await harness.Coordinator.RequestRefreshAsync();
 
         await Assert.That(harness.CreatedViewModels.Count).IsEqualTo(2);
@@ -333,16 +326,13 @@ public class ViewBaseTests
         var handlers = harness.Coordinator.SnapshotRefreshHandlers();
         await view.DisposeAsync();
 
-        // Replay the handler the view registered before it was disposed (mirrors a refresh
-        // racing a teardown).
+        // Replay the stale handler, as a refresh racing a teardown would.
         await Task.WhenAll(handlers.Select(handler => handler()));
 
         await Assert.That(view.State).IsEqualTo(ViewState.Disposed);
         await Assert.That(harness.CreatedViewModels.Count).IsEqualTo(1);
         await Assert.That(harness.CreatedViewModels[0].InitializeCallCount).IsEqualTo(1);
     }
-
-    // ----- Parameter changes -----
 
     [Test]
     public async Task OnParametersSetAsync_new_parameter_view_model_detaches_the_old_one_without_disposing_it()
@@ -390,8 +380,6 @@ public class ViewBaseTests
         await Assert.That(viewModel.PropertyChangedHandlerCount).IsEqualTo(1);
     }
 
-    // ----- PropertyChanged -> UpdateAsync pipeline -----
-
     [Test]
     public async Task PropertyChanged_triggers_UpdateAsync_with_the_changed_property_name_and_rerenders()
     {
@@ -432,8 +420,7 @@ public class ViewBaseTests
 
         await TestWait.UntilAsync(() =>
             viewModel.UpdatedProperties.Contains("First") && viewModel.UpdatedProperties.Contains("Second"));
-        // The update lock coalesces changes raised before the pending update drains, so the
-        // two changes arrive in at most two UpdateAsync calls (exact count is timing dependent).
+        // Changes are coalesced; the exact count is timing dependent.
         await Assert.That(viewModel.UpdateCallCount is >= 1 and <= 2).IsTrue();
     }
 
@@ -453,8 +440,6 @@ public class ViewBaseTests
         await Assert.That(viewModelA.UpdateCallCount).IsEqualTo(0);
         await Assert.That(viewModelB.UpdatedProperties).Contains("Fresh");
     }
-
-    // ----- Disposal -----
 
     [Test]
     public async Task DisposeAsync_disposes_the_owned_view_model_and_removes_the_refresh_subscription()
@@ -513,8 +498,6 @@ public class ViewBaseTests
         await Assert.That(harness.CreatedViewModels.Count).IsEqualTo(0);
     }
 
-    // ----- Exception service wiring -----
-
     [Test]
     public async Task Initialization_sets_the_registered_exception_service_on_a_ViewModelBase_derived_view_model()
     {
@@ -536,8 +519,6 @@ public class ViewBaseTests
         var viewModel = harness.CreatedBaseViewModels.Single();
         await Assert.That(viewModel.ExceptionService).IsNull();
     }
-
-    // ----- Test harness -----
 
     private sealed class Harness
     {

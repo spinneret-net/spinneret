@@ -1,36 +1,15 @@
 namespace Spinneret.Queue.Firestore.Tests;
 
-/// <summary>
-/// The admin side against a real Firestore (the emulator, via Testcontainers): the query and the
-/// keyset cursor that page a dead-letter screen, and a resend over a transport that has no
-/// transaction to offer.
-/// </summary>
-/// <remarks>
-/// <para>
-/// The ordering under test — <c>deadLetteredAt</c> descending then document id descending, resumed
-/// with a two-value <c>StartAfter</c> — is what lets this page work off Firestore's automatic
-/// single-field index. Nothing below proves that: the emulator does not enforce composite-index
-/// requirements, so it serves queries production would reject with FAILED_PRECONDITION. What these
-/// tests do prove is that the ordering, the tie-break and the cursor are correct.
-/// </para>
-/// <para>
-/// Entries are seeded straight into Firestore rather than written through
-/// <see cref="FirestoreDeadLetterWriter"/>, because the writer's own clock cannot produce the exact
-/// instants and ties the paging cases need.
-/// </para>
-/// </remarks>
+// The emulator doesn't enforce composite indexes, so these prove ordering and cursors, not index fit.
 [ClassDataSource<FirestoreEmulatorFixture>(Shared = SharedType.PerTestSession)]
 public sealed class FirestoreDeadLetterStoreTests(FirestoreEmulatorFixture fixture)
 {
     private static readonly DateTimeOffset Base = new(2026, 8, 15, 10, 0, 0, TimeSpan.Zero);
 
-    /// <summary>The refusal a resend came back with, or null if it went through.</summary>
     private static async Task<ResendDeadLetterError?> ResendError(
         DeadLetterTestHost host, string key, string? payloadJson = null) =>
         (await host.Resender.ResendAsync(key, payloadJson))
         .Match<ResendDeadLetterError?>(() => null, error => error);
-
-    // ------------------------------------------------------------------------------ reads ---
 
     [Test]
     public async Task Reads_back_every_field_that_was_stored()
@@ -54,8 +33,6 @@ public sealed class FirestoreDeadLetterStoreTests(FirestoreEmulatorFixture fixtu
     [Test]
     public async Task Reads_back_what_the_writer_itself_wrote()
     {
-        // The two directions of the document contract, pinned against each other through a real
-        // Firestore rather than a hand-built field map.
         await using var host = DeadLetterTestHost.Start(fixture);
         await host.Writer.WriteAsync(new DeadLetterEntry
         {
@@ -96,8 +73,7 @@ public sealed class FirestoreDeadLetterStoreTests(FirestoreEmulatorFixture fixtu
     [Test]
     public async Task Refuses_a_document_this_library_did_not_write()
     {
-        // The map-level reader is unit-tested; this proves the same guard fires when the fields
-        // arrive off a live DocumentSnapshot, which is a different code path into it.
+        // Same guard as the unit-tested map reader, but reached through a live DocumentSnapshot.
         await using var host = DeadLetterTestHost.Start(fixture);
         await host.Document("foreign").CreateAsync(new Dictionary<string, object?>
         {
@@ -106,8 +82,6 @@ public sealed class FirestoreDeadLetterStoreTests(FirestoreEmulatorFixture fixtu
 
         await Assert.That(() => host.Store.GetAsync("foreign")).Throws<InvalidOperationException>();
     }
-
-    // ------------------------------------------------------------------------------ paging ---
 
     [Test]
     public async Task Lists_newest_first()
@@ -126,8 +100,7 @@ public sealed class FirestoreDeadLetterStoreTests(FirestoreEmulatorFixture fixtu
     [Test]
     public async Task Reports_no_cursor_when_the_page_is_the_last_one()
     {
-        // Exactly a full page with nothing behind it must still end the walk, which is what the
-        // limit-plus-one probe is for.
+        // A full page with nothing behind it is what the limit-plus-one probe exists for.
         await using var host = DeadLetterTestHost.Start(fixture);
         await host.Seed("a", Base);
         await host.Seed("b", Base.AddMinutes(1));
@@ -172,9 +145,7 @@ public sealed class FirestoreDeadLetterStoreTests(FirestoreEmulatorFixture fixtu
     [Arguments(3)]
     public async Task Pages_through_entries_sharing_one_instant(int pageSize)
     {
-        // The whole reason the query orders by document id as well: entries that tie on
-        // deadLetteredAt still have a total order, so a cursor can resume inside the tie without
-        // skipping or repeating one.
+        // Ordering by document id too gives ties a total order, so a cursor can resume inside one.
         await using var host = DeadLetterTestHost.Start(fixture);
         for (var i = 0; i < 5; i++)
             await host.Seed($"tied-{i}", Base);
@@ -188,10 +159,7 @@ public sealed class FirestoreDeadLetterStoreTests(FirestoreEmulatorFixture fixtu
     [Test]
     public async Task Pages_through_instants_finer_than_Firestore_stores()
     {
-        // Firestore keeps microseconds; DeadLetterCursor encodes 100ns ticks. If the cursor were
-        // built from anything but the stored value, StartAfter would land off the row it names and
-        // silently skip or repeat entries at every page boundary. The MSSQL store had exactly this
-        // bug against DATETIME2(3); this is the Firestore equivalent.
+        // Firestore keeps microseconds but the cursor encodes ticks; it must be built from the stored value.
         await using var host = DeadLetterTestHost.Start(fixture);
         for (var i = 0; i < 6; i++)
             await host.Seed($"fine-{i}", Base.AddTicks(i * 7));
@@ -205,8 +173,7 @@ public sealed class FirestoreDeadLetterStoreTests(FirestoreEmulatorFixture fixtu
     [Test]
     public async Task Keeps_its_place_when_entries_are_deleted_behind_the_cursor()
     {
-        // The page exists to delete entries from, so the reader must survive the collection
-        // shrinking underneath it — which an offset-based pager would not.
+        // An offset-based pager would skip entries here.
         await using var host = DeadLetterTestHost.Start(fixture);
         for (var i = 0; i < 6; i++)
             await host.Seed($"task-{i}", Base.AddMinutes(i));
@@ -214,7 +181,6 @@ public sealed class FirestoreDeadLetterStoreTests(FirestoreEmulatorFixture fixtu
         var first = await host.Store.ListAsync(new DeadLetterQuery { PageSize = 2 });
         await Assert.That(first.Items.Select(i => i.IdempotencyKey)).IsEquivalentTo(new[] { "task-5", "task-4" });
 
-        // Discard both entries just read, then continue from the cursor they produced.
         foreach (var item in first.Items)
             await host.Store.DeleteAsync(item.IdempotencyKey);
 
@@ -234,13 +200,10 @@ public sealed class FirestoreDeadLetterStoreTests(FirestoreEmulatorFixture fixtu
             .Throws<ArgumentException>();
     }
 
-    // ---------------------------------------------------------------------------- deleting ---
-
     [Test]
     public async Task Deletes_an_entry_once()
     {
-        // MustExist rather than an unconditional delete, which Firestore reports as success on a
-        // document that was never there — so the second caller learns someone got there first.
+        // MustExist: Firestore reports an unconditional delete of a missing document as success.
         await using var host = DeadLetterTestHost.Start(fixture);
         await host.Seed("task-1", Base);
 
@@ -256,8 +219,6 @@ public sealed class FirestoreDeadLetterStoreTests(FirestoreEmulatorFixture fixtu
 
         await Assert.That(await host.Store.DeleteAsync("never-stored")).IsFalse();
     }
-
-    // --------------------------------------------------------------------------- resending ---
 
     [Test]
     public async Task Resend_enqueues_the_command_and_removes_the_entry()
@@ -292,7 +253,7 @@ public sealed class FirestoreDeadLetterStoreTests(FirestoreEmulatorFixture fixtu
 
         await Assert.That(error).IsTypeOf<ResendDeadLetterError.UnknownCommandType>();
         await Assert.That(host.Queue.Enqueued).IsEmpty();
-        // The payload is still readable, so the entry stays rather than being discarded.
+        // The payload is still readable, so the entry stays.
         await Assert.That(await host.Store.GetAsync("task-1")).IsNotNull();
     }
 
@@ -321,9 +282,7 @@ public sealed class FirestoreDeadLetterStoreTests(FirestoreEmulatorFixture fixtu
     [Test]
     public async Task A_failed_enqueue_leaves_the_entry_to_be_resent_again()
     {
-        // Firestore offers no transaction the queue can join, so the resend enqueues first and
-        // deletes after. An interruption must therefore leave the work in the store rather than
-        // losing it — at-least-once, matching the delivery guarantee the queue already gives.
+        // No transaction to join, so resend enqueues before deleting: an interruption must not lose work.
         await using var host = DeadLetterTestHost.Start(fixture);
         await host.Seed("task-1", Base);
         host.Queue.FailWith = new InvalidOperationException("transport is down");
@@ -336,8 +295,6 @@ public sealed class FirestoreDeadLetterStoreTests(FirestoreEmulatorFixture fixtu
     [Test]
     public async Task A_dead_lettered_command_can_be_listed_and_resent()
     {
-        // The whole admin loop over one store: what the writer recorded is what the page shows and
-        // what the resend puts back.
         await using var host = DeadLetterTestHost.Start(fixture);
         await host.Writer.WriteAsync(new DeadLetterEntry
         {

@@ -174,8 +174,7 @@ public class ViewRefreshCoordinatorTests
     [Test]
     public async Task SubscribePreRefresh_handler_can_unsubscribe_a_refresh_subscriber_before_phase_two()
     {
-        // This mirrors the documented route-guard scenario: a pre-refresh handler disposes
-        // a page (and thereby its refresh subscription) so it never re-initializes.
+        // The documented route-guard scenario: a pre-refresh handler disposes a page.
         var coordinator = CreateCoordinator();
         var invocations = 0;
         var subscription = coordinator.Subscribe(() =>

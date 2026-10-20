@@ -1,9 +1,5 @@
 namespace Spinneret.Queue.Tests;
 
-/// <summary>
-/// The cursor is handed to applications and comes back through a query string, so it must survive
-/// that trip intact and reject anything else clearly.
-/// </summary>
 public class DeadLetterCursorTests
 {
     private static readonly DateTimeOffset At = new(2026, 8, 15, 10, 30, 0, TimeSpan.Zero);
@@ -22,8 +18,7 @@ public class DeadLetterCursorTests
     [Test]
     public async Task Keeps_sub_second_precision()
     {
-        // The MSSQL store compares this value for equality against a DATETIME2(3) column, so losing
-        // milliseconds here would skip or repeat rows at a page boundary.
+        // The MSSQL store compares this against a DATETIME2(3) column, so milliseconds must survive.
         var precise = At.AddMilliseconds(123);
 
         var decoded = DeadLetterCursor.Decode(new DeadLetterCursor(precise, "task-1").Encode());
@@ -38,8 +33,7 @@ public class DeadLetterCursorTests
     [Arguments("tåsk-ünïcode")]
     public async Task Round_trips_keys_that_collide_with_its_own_encoding(string key)
     {
-        // Cloud Tasks ids and scheduler job keys are not restricted to a safe alphabet, and the
-        // payload is split on its first separator precisely so a key may contain more of them.
+        // Keys aren't restricted to a safe alphabet; decoding splits on the first separator only.
         var decoded = DeadLetterCursor.Decode(new DeadLetterCursor(At, key).Encode());
 
         await Assert.That(decoded.IdempotencyKey).IsEqualTo(key);

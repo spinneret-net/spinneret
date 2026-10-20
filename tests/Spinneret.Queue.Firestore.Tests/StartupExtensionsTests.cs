@@ -74,8 +74,6 @@ public class StartupExtensionsTests
     [Test]
     public async Task A_host_registered_writer_wins()
     {
-        // TryAdd, so a host that registered its own writer first keeps it — the documented contract
-        // for every Spinneret default.
         var services = new ServiceCollection();
         services.AddSingleton<IDeadLetterWriter, FakeDeadLetterWriter>();
 

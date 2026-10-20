@@ -9,11 +9,7 @@ using Spinneret.Mediator;
 
 namespace Spinneret.Queue.Tests;
 
-// ---------------------------------------------------------------------------------------------
-// Test command types scanned by QueueTypeRegistry from this assembly. All policies must be
-// valid: an invalid [QueuePolicy] anywhere in the assembly fails registry construction for
-// every test. Invalid-policy scenarios use DynamicRequestAssembly instead.
-// ---------------------------------------------------------------------------------------------
+// Scanned by QueueTypeRegistry: an invalid [QueuePolicy] here fails every test (use DynamicRequestAssembly).
 
 public sealed class UnannotatedCommand : IRequest<Unit>;
 
@@ -45,19 +41,13 @@ public sealed class PlainResponseCommand : IRequest<string>;
 
 public abstract class AbstractCommand : IRequest<Unit>;
 
-// ---------------------------------------------------------------------------------------------
-// Hand-rolled fakes.
-// ---------------------------------------------------------------------------------------------
-
 internal sealed class FakeDispatcher : IQueueDispatcher
 {
     public Exception? Throw { get; set; }
     public int Calls { get; private set; }
 
-    /// <summary>The ambient activity as the handler saw it — the trace the message is processed in.</summary>
     public ActivityContext ObservedContext { get; private set; }
 
-    /// <summary>The parent of the span the handler ran under — who the consumer attached itself to.</summary>
     public ActivitySpanId ObservedParentSpanId { get; private set; }
 
     public Task Dispatch(QueueEnvelope envelope, CancellationToken ct)
@@ -118,7 +108,6 @@ internal sealed class FakeDeadLetterStore : IDeadLetterStore
 {
     private readonly Dictionary<string, DeadLetter> _entries = new(StringComparer.Ordinal);
 
-    /// <summary>Every key passed to <see cref="DeleteAsync"/>, whether or not it existed.</summary>
     public List<string> Deleted { get; } = [];
 
     public FakeDeadLetterStore Add(DeadLetter deadLetter)
@@ -143,10 +132,6 @@ internal sealed class FakeDeadLetterStore : IDeadLetterStore
     }
 }
 
-/// <summary>
-/// Records whether the work ran inside the unit of work and whether it committed, so tests can tell
-/// a resend that grouped its enqueue and delete from one that ran them loose.
-/// </summary>
 internal sealed class RecordingUnitOfWorkFactory : IQueueUnitOfWorkFactory
 {
     public int Executions { get; private set; }
@@ -179,7 +164,6 @@ internal sealed class RecordingUnitOfWorkFactory : IQueueUnitOfWorkFactory
 
 internal sealed class FakeMediator : ISpinneretMediator
 {
-    /// <summary>The response Send returns; must be castable to the request's TResponse.</summary>
     public object? Response { get; set; }
     public object? LastRequest { get; private set; }
     public int Calls { get; private set; }
@@ -194,7 +178,6 @@ internal sealed class FakeMediator : ISpinneretMediator
 
 internal sealed class FakeSerializer : IQueuePayloadSerializer
 {
-    /// <summary>Override deserialization; default creates the request via its parameterless ctor.</summary>
     public Func<string, Type, object?>? OnDeserialize { get; set; }
 
     public string Serialize(object request, Type requestType) => "{}";
@@ -208,15 +191,7 @@ internal sealed class FixedTimeProvider(DateTimeOffset now) : TimeProvider
     public override DateTimeOffset GetUtcNow() => now;
 }
 
-// ---------------------------------------------------------------------------------------------
-// Helpers.
-// ---------------------------------------------------------------------------------------------
-
-/// <summary>
-/// Collects finished queue spans. <see cref="TaggedWith"/> filters by a tag the caller made unique
-/// to its own test, because an <see cref="ActivityListener"/> is process-global while TUnit runs
-/// tests in parallel — without the filter a test would assert on a sibling's spans.
-/// </summary>
+// ActivityListener is process-global and tests run in parallel, so filter by a per-test tag.
 internal sealed class SpanCollector : IDisposable
 {
     private readonly List<Activity> _spans = [];
@@ -260,7 +235,6 @@ internal static class Expect
 
 internal static class TestServices
 {
-    /// <summary>Registers open-generic null loggers so internal DI-registered services resolve.</summary>
     public static IServiceCollection AddNullLogging(this IServiceCollection services)
     {
         services.AddSingleton(typeof(ILogger<>), typeof(NullLogger<>));
@@ -270,24 +244,17 @@ internal static class TestServices
 
 internal static class ProcessorTestExtensions
 {
-    /// <summary>Shorthand that wraps envelope + task id into a <see cref="QueueDeliveryContext"/>.</summary>
     public static Task<QueueDeliveryOutcome> ProcessAsync(
         this IQueueDeliveryProcessor processor, QueueEnvelope envelope, string taskId, CancellationToken ct)
         => processor.ProcessAsync(new QueueDeliveryContext { Envelope = envelope, TaskId = taskId }, ct);
 }
 
-/// <summary>
-/// Builds a throwaway in-memory assembly containing a single command implementing IRequest&lt;Unit&gt;
-/// (or the given response types), optionally annotated with [QueuePolicy]. Lets invalid-policy,
-/// duplicate-name and dual-interface scenarios exercise QueueTypeRegistry's public constructor
-/// without poisoning the test assembly scan.
-/// </summary>
+// A throwaway assembly, so invalid-policy scenarios don't poison the test assembly scan.
 internal static class DynamicRequestAssembly
 {
     public static Assembly WithRequest(string fullName, params (string Property, object Value)[] policyProperties) =>
         WithRequest(fullName, [typeof(Unit)], policyProperties);
 
-    /// <summary>Same, but implementing IRequest&lt;T&gt; once per type in <paramref name="responseTypes"/>.</summary>
     public static Assembly WithRequest(
         string fullName, Type[] responseTypes, params (string Property, object Value)[] policyProperties)
     {

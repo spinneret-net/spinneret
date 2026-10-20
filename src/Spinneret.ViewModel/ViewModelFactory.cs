@@ -1,8 +1,6 @@
 namespace Spinneret.ViewModel;
 
-/// <summary>
-/// Resolves view models from the container. Implemented by the library — inject and call.
-/// </summary>
+/// <summary>Resolves view models from the container.</summary>
 public interface IViewModelFactory
 {
     T Create<T>() where T : IViewModel;

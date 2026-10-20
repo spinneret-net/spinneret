@@ -3,10 +3,7 @@ using Spinneret.ViewModel;
 
 namespace Spinneret.View.Tests;
 
-/// <summary>
-/// No-op view model base for types that only need to exist so assembly scanning
-/// (StartupExtensions/ViewResolver) can discover them.
-/// </summary>
+/// <summary>No-op base for types that exist only to be found by assembly scanning.</summary>
 public abstract class StubViewModel : IViewModel
 {
 #pragma warning disable CS0067 // event is required by the interface, never raised by these stubs

@@ -7,16 +7,10 @@ using Spinneret.Queue;
 
 namespace Spinneret.Scheduler.Firestore.Tests;
 
-/// <summary>
-/// Transport, schedule storage and trigger are separate choices. These assert the combination that
-/// motivated the split — Firestore schedules dispatched onto a queue that is not Cloud Tasks — and
-/// that the three registrations commute.
-/// </summary>
 public class CompositionTests
 {
     private static IConfiguration EmptyConfiguration => new ConfigurationBuilder().Build();
 
-    /// <summary>Stands in for whichever transport the host chose; the scheduler only needs the seam.</summary>
     private sealed class FakeQueuePayloadSerializer : IQueuePayloadSerializer
     {
         public string Serialize(object request, Type requestType) => "{}";
@@ -35,8 +29,7 @@ public class CompositionTests
     [Test]
     public async Task Firestore_schedules_compose_with_a_non_gcp_queue()
     {
-        // Asserted on the collection rather than by resolving: constructing a real FirestoreDb needs
-        // credentials, and what matters here is that the wiring lines up across three packages.
+        // Asserted on the collection: a real FirestoreDb needs credentials.
         var services = AnotherTransportsQueue();
 
         services.AddScheduler(s => s.UseFirestoreStorage(EmptyConfiguration).UseInHostSweeper());
@@ -53,8 +46,7 @@ public class CompositionTests
     [Test]
     public async Task The_queue_and_scheduler_registrations_commute()
     {
-        // Scheduler first, queue last — the order a reader would naturally write, and one that used
-        // to throw.
+        // The natural order, which used to throw.
         var schedulerFirst = new ServiceCollection();
         schedulerFirst.AddSingleton(typeof(ILogger<>), typeof(NullLogger<>));
         schedulerFirst.AddScheduler(s => s.UseFirestoreStorage(EmptyConfiguration).UseInHostSweeper());
@@ -71,8 +63,6 @@ public class CompositionTests
     [Test]
     public async Task The_scheduler_package_needs_no_web_stack()
     {
-        // The HTTP trigger moved to Spinneret.Scheduler.AspNetCore, so this package must not drag
-        // ASP.NET Core in behind a worker service that has no use for it.
         var referenced = typeof(FirestoreSchedulerOptions).Assembly
             .GetReferencedAssemblies()
             .Select(a => a.Name)

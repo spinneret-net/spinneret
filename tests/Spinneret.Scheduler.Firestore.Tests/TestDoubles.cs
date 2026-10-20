@@ -4,11 +4,6 @@ using Spinneret.Queue;
 
 namespace Spinneret.Scheduler.Firestore.Tests;
 
-// ---------------------------------------------------------------------------------------------
-// Request types scanned by QueueTypeRegistry from this assembly, plus hand-rolled fakes for the
-// payload serializer and clock. No mocking library is used.
-// ---------------------------------------------------------------------------------------------
-
 public sealed record TestRequest(string Name) : IRequest<Unit>;
 
 public sealed record OtherTestRequest(int Number) : IRequest<Unit>;

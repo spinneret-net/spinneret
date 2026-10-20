@@ -14,15 +14,13 @@
     </ItemGroup>
 
     <ItemGroup>
-        <!-- Used directly by this package's public API; declared explicitly instead of
-             relying on Spinneret.Parsing's transitive references. -->
+        <!-- Used by the public API; don't rely on transitive references. -->
         <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.13" />
         <PackageReference Include="Microsoft.Extensions.Localization.Abstractions" Version="10.0.13" />
     </ItemGroup>
 
     <ItemGroup>
-        <!-- Spinneret.View performs the framework-side property injection of
-             ViewModelBase.ExceptionService (internal setter). -->
+        <!-- Spinneret.View sets ViewModelBase.ExceptionService (internal setter). -->
         <InternalsVisibleTo Include="Spinneret.View" />
         <InternalsVisibleTo Include="Spinneret.ViewModel.Tests" />
         <InternalsVisibleTo Include="Spinneret.View.Tests" />

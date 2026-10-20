@@ -1,9 +1,6 @@
 namespace Spinneret.Queue;
 
-/// <summary>
-/// Server-side counterpart to <see cref="IQueue"/>. Invoked by the transport's HTTP
-/// endpoint when a task is delivered.
-/// </summary>
+/// <summary>Runs a delivered envelope's handler; the worker-side counterpart to <see cref="IQueue"/>.</summary>
 public interface IQueueDispatcher
 {
     Task Dispatch(QueueEnvelope envelope, CancellationToken ct);

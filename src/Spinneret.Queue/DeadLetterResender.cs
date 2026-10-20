@@ -3,11 +3,6 @@ using Spinneret.Functional;
 
 namespace Spinneret.Queue;
 
-/// <summary>
-/// Resend, in terms every transport already provides: read the entry, resolve its command type,
-/// deserialize, enqueue, delete. Transport-specific only in how tightly the enqueue and the delete
-/// are bound together, which <see cref="IQueueUnitOfWorkFactory"/> supplies.
-/// </summary>
 internal sealed class DeadLetterResender(
     IDeadLetterStore store,
     IQueue queue,
@@ -41,9 +36,7 @@ internal sealed class DeadLetterResender(
         {
             request = serializer.Deserialize(payloadJson ?? deadLetter.PayloadJson, registered.RequestType);
         }
-        // A resent payload may have been edited by hand, so malformed JSON is an expected outcome
-        // here rather than a bug — reported back to the operator instead of thrown. NotSupportedException
-        // covers a payload whose shape the serializer cannot map onto the command at all.
+        // Hand-edited payloads make bad JSON an expected outcome, not a bug.
         catch (Exception ex) when (ex is JsonException or NotSupportedException)
         {
             return Result.Error<ResendDeadLetterError>(new ResendDeadLetterError.InvalidPayload(ex.Message));
@@ -56,9 +49,7 @@ internal sealed class DeadLetterResender(
 
         await unitOfWork.ExecuteAndCommitAsync(async token =>
         {
-            // Enqueue first: should the delete not happen, the entry is still there to resend, which
-            // beats a delete that succeeded ahead of an enqueue that did not and took the payload
-            // with it. In a transactional unit of work neither is visible until both have committed.
+            // Enqueue before delete: if the delete fails the entry survives to be resent, never lost.
             await ResolvedRequestEnqueuer.Enqueue(queue, request, registered.ResponseType, token);
             await store.DeleteAsync(idempotencyKey, token);
         }, ct);

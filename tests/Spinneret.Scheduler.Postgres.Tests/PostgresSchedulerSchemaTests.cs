@@ -3,7 +3,6 @@ using Spinneret.Scheduler.Sql;
 
 namespace Spinneret.Scheduler.Postgres.Tests;
 
-/// <summary>What the PostgreSQL scheduler script and statements say; what running them does is the conformance suites' job.</summary>
 public sealed class PostgresSchedulerSchemaTests
 {
     private static readonly SqlSchedulerStatements Statements =

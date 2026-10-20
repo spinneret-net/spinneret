@@ -1,16 +1,13 @@
 using Spinneret.Mediator;
 using Spinneret.Scheduler;
 
-// ReSharper disable once CheckNamespace — deliberate: registration extensions live in the
-// DI namespace so every Add* call is discoverable without a using directive.
+// ReSharper disable once CheckNamespace — DI namespace for discoverability.
 namespace Microsoft.Extensions.DependencyInjection
 {
     public static class SchedulerServiceCollectionExtensions
     {
         /// <summary>
-        /// Registers the scheduler, composed in <paramref name="configure"/> from a storage and an
-        /// optional timer — see <see cref="SchedulerBuilder"/> — plus the startup installer that
-        /// asserts every declared <see cref="IRecurringJob"/> into it.
+        /// Registers the scheduler composed in <paramref name="configure"/> and installs every declared <see cref="IRecurringJob"/> at startup.
         /// </summary>
         /// <example>
         /// <code>
@@ -29,16 +26,11 @@ namespace Microsoft.Extensions.DependencyInjection
         }
 
         /// <summary>
-        /// Registers a recurring job inline — sugar for implementing <see cref="IRecurringJob"/> when
-        /// the job is just "enqueue this request on this schedule" and a dedicated class would be noise.
-        /// The scheduler's installer picks it up at startup like any other <see cref="IRecurringJob"/>.
+        /// Registers a recurring job inline, without implementing <see cref="IRecurringJob"/>.
         /// </summary>
-        /// <param name="services"></param>
-        /// <param name="key">Stable identifier for the job; must be unique across all recurring jobs.</param>
-        /// <param name="schedule">
-        /// When the job is enqueued. Read it from configuration here if the cadence differs per
-        /// environment — <c>Schedule.Parse(configuration["Jobs:MonthClose"]!)</c>.
-        /// </param>
+        /// <param name="services">The service collection.</param>
+        /// <param name="key">Stable identifier, unique across all recurring jobs.</param>
+        /// <param name="schedule">When the job is enqueued.</param>
         /// <param name="requestFactory">Builds the request to enqueue on each run.</param>
         public static IServiceCollection AddRecurringJob<TResponse>(
             this IServiceCollection services, string key, Schedule schedule, Func<IRequest<TResponse>> requestFactory)
@@ -51,12 +43,9 @@ namespace Microsoft.Extensions.DependencyInjection
         }
 
         /// <summary>
-        /// Declares that a recurring job previously installed under <paramref name="key"/> is gone, so
-        /// the installer removes its stored definition at startup. Deleting the job from code is not
-        /// enough on its own — see <see cref="IRetiredRecurringJob"/> for why, and for how long to
-        /// leave the retirement in place.
+        /// Removes the stored recurring job under <paramref name="key"/> at startup; see <see cref="IRetiredRecurringJob"/>.
         /// </summary>
-        /// <param name="services"></param>
+        /// <param name="services">The service collection.</param>
         /// <param name="key">The key the retired job used to be installed under.</param>
         public static IServiceCollection RetireRecurringJob(this IServiceCollection services, string key)
         {

@@ -2,31 +2,18 @@ using System.Reflection;
 using Spinneret.View;
 using Spinneret.ViewModel;
 
-// ReSharper disable once CheckNamespace — deliberate: registration extensions live in the
-// DI namespace so every Add* call is discoverable without a using directive.
+// ReSharper disable once CheckNamespace — DI namespace for discoverability
 namespace Microsoft.Extensions.DependencyInjection;
 
 public static class MvvmServiceCollectionExtensions
 {
-    /// <summary>
-    /// Registers the MVVM services — <see cref="IViewModelFactory"/>, the view-refresh
-    /// coordinator, the view resolver built by scanning for <c>ViewBase&lt;T&gt;</c> subclasses,
-    /// and the render context — scanning the entry assembly and auto-registering view models.
-    /// </summary>
-    /// <typeparam name="TRenderContext">
-    /// The host's render context: <see cref="ClientRenderContext"/> for WebAssembly, or
-    /// <c>ServerRenderContext</c> from Spinneret.View.Server for Blazor Server. That one reads
-    /// <c>HttpContext</c>, which ships only in the shared framework, so it lives in its own
-    /// package to keep this one restorable from WebAssembly.
-    /// </typeparam>
+    /// <summary>Registers the MVVM services, scanning the entry assembly and auto-registering view models.</summary>
+    /// <typeparam name="TRenderContext"><see cref="ClientRenderContext"/> for WebAssembly, or <c>ServerRenderContext</c> (Spinneret.View.Server) for Blazor Server.</typeparam>
     public static IServiceCollection AddMvvm<TRenderContext>(this IServiceCollection services)
         where TRenderContext : class, IRenderContext
         => services.AddMvvm<TRenderContext>(_ => { });
 
-    /// <summary>
-    /// Registers the MVVM services with explicit configuration — which assemblies to scan
-    /// and whether to auto-register view models.
-    /// </summary>
+    /// <summary>Registers the MVVM services with explicit configuration.</summary>
     public static IServiceCollection AddMvvm<TRenderContext>(
         this IServiceCollection services,
         Action<MvvmOptions> configure) where TRenderContext : class, IRenderContext

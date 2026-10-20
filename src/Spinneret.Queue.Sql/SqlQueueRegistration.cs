@@ -6,22 +6,13 @@ using Microsoft.Extensions.Options;
 using Spinneret.Queue;
 using Spinneret.Queue.Sql;
 
-// ReSharper disable once CheckNamespace — deliberate: registration extensions live in the
-// DI namespace so every Use* call is discoverable without a using directive.
+// ReSharper disable once CheckNamespace — DI namespace for discoverability
 namespace Microsoft.Extensions.DependencyInjection
 {
     public static class SqlQueueBuilderExtensions
     {
-        /// <summary>
-        /// Delivers messages in this host: polling workers drain the SQL storage's table, one message
-        /// per database transaction, so a handler's writes, its cascade enqueues and the delivery's
-        /// outcome commit together. Requires a SQL storage such as <c>UseMssqlStorage</c> or <c>UsePostgresStorage</c>.
-        /// Configuration is read from the <c>Queue:InHost</c> section.
-        /// </summary>
-        /// <remarks>
-        /// Use it only on hosts that should consume: a producer-only host (a public API in front of a
-        /// worker service) composes the same storage without a delivery.
-        /// </remarks>
+        /// <summary>Delivers messages in this host by polling the SQL storage, configured from <c>Queue:InHost</c>.</summary>
+        /// <remarks>Each delivery runs in one transaction, so a handler's writes and the outcome commit together.</remarks>
         public static QueueBuilder UseInHostDelivery(this QueueBuilder queue, IConfiguration configuration)
         {
             ArgumentNullException.ThrowIfNull(configuration);
@@ -46,8 +37,7 @@ namespace Microsoft.Extensions.DependencyInjection
 
             return queue.UseDelivery(new QueueDeliveryRole(nameof(UseInHostDelivery), (services, registry) =>
             {
-                // Fail as early as possible on broken configuration; the options-pipeline validation
-                // re-validates at host start to also cover later Configure/PostConfigure changes.
+                // Fail fast; ValidateOnStart re-checks later Configure/PostConfigure changes.
                 var eagerlyBound = new InHostDeliveryOptions();
                 configure(eagerlyBound);
                 InHostDeliveryOptionsValidator.ValidateOrThrow(eagerlyBound, registry);
@@ -65,28 +55,12 @@ namespace Microsoft.Extensions.DependencyInjection
 
 namespace Spinneret.Queue.Sql
 {
-    /// <summary>
-    /// A dialect package's storage, as the shared registration needs it: the <c>Use*Storage</c>
-    /// method name (for error messages), the options section, the dialect, and how to build a data
-    /// source from a connection string when the host does not supply one.
-    /// </summary>
     internal sealed record SqlStorageDescriptor(
         string MethodName, string SectionName, SqlQueueDialect Dialect, Func<string, DbDataSource> CreateDataSource);
 
-    /// <summary>
-    /// The registrations every SQL dialect shares. A dialect package describes itself with a
-    /// <see cref="SqlStorageDescriptor"/> and its options type; nothing below knows which database it
-    /// is talking to.
-    /// </summary>
     internal static class SqlQueueRegistration
     {
-        /// <summary>
-        /// Sets the queue's storage to a SQL dialect. Binds <typeparamref name="TOptions"/> from the
-        /// descriptor's section of <paramref name="configuration"/> (when given), then
-        /// <paramref name="configure"/>, then resolves a <c>ConnectionStringName</c>; validates eagerly
-        /// and again at host start. With <paramref name="dataSource"/> the host's data source is used
-        /// — and left for the host to dispose — and no connection string is needed.
-        /// </summary>
+        // A host-supplied dataSource is left for the host to dispose.
         public static QueueBuilder UseSqlStorage<TOptions>(
             this QueueBuilder queue,
             SqlStorageDescriptor descriptor,
@@ -106,8 +80,7 @@ namespace Spinneret.Queue.Sql
                 descriptor.MethodName,
                 register: (services, _) =>
                 {
-                    // Fail as early as possible on broken configuration; the options-pipeline
-                    // validation re-validates at host start to also cover later Configure calls.
+                    // Fail fast; ValidateOnStart re-checks later Configure calls.
                     var eagerlyBound = new TOptions();
                     apply(eagerlyBound);
                     validator.ValidateOrThrow(eagerlyBound);
@@ -139,21 +112,13 @@ namespace Spinneret.Queue.Sql
             {
                 configuration?.GetSection(sectionName).Bind(options);
                 configure?.Invoke(options);
-                // The section may carry only the name; resolve it into ConnectionString for runtime
-                // consumers — after configure, so a name set in code resolves too.
+                // After configure, so a ConnectionStringName set in code resolves too.
                 if (configuration is not null
                     && string.IsNullOrWhiteSpace(options.ConnectionString)
                     && !string.IsNullOrWhiteSpace(options.ConnectionStringName))
                     options.ConnectionString = configuration.GetConnectionString(options.ConnectionStringName) ?? string.Empty;
             };
 
-        /// <summary>
-        /// The storage role for a SQL dialect. <paramref name="register"/> adds the dialect's own
-        /// options and validation; the role then registers the outbox as <see cref="IQueue"/>,
-        /// <see cref="IEnvelopeQueue"/> and <see cref="ISqlTransactionalQueue"/>, the ambient-transaction
-        /// seam, the unit of work and savepoint boundary, the table-backed dead-letter writer and store,
-        /// and the schema initializer.
-        /// </summary>
         internal static QueueStorageRole StorageRole(
             string name,
             Action<IServiceCollection, QueueTypeRegistry> register,
@@ -173,12 +138,7 @@ namespace Spinneret.Queue.Sql
             };
         }
 
-        /// <summary>
-        /// Registers the relay that forwards the outbox to the delivery's push transport, its
-        /// background pass, and eager forwarding of what units of work commit. Runs before the
-        /// storage's own registration, so the forwarding observer wins over the storage's silent one.
-        /// The transport supplies the <see cref="QueueRelaySettings"/>.
-        /// </summary>
+        // Runs before the storage's registration, so the forwarding observer wins over the silent one.
         internal static IServiceCollection AddSqlOutboxRelay(this IServiceCollection services)
         {
             services.TryAddSingleton<SqlOutboxRelay>();
@@ -188,11 +148,8 @@ namespace Spinneret.Queue.Sql
             return services;
         }
 
-        /// <summary>
-        /// Registers the storage services. Everything is added with <c>TryAdd</c> ahead of the core
-        /// defaults, so the storage's unit of work and boundary win over the pass-through ones while a
-        /// dead-letter store chosen explicitly — registered earlier still — wins over the table.
-        /// </summary>
+        // TryAdd ahead of the core defaults, so these beat the pass-through ones but an explicit
+        // dead-letter store (registered earlier) beats the table.
         internal static IServiceCollection AddSqlQueueStorage(
             this IServiceCollection services, Func<IServiceProvider, SqlQueueStorage> storage)
         {
@@ -200,8 +157,7 @@ namespace Spinneret.Queue.Sql
             services.TryAddSingleton<ISqlTransactionProvider, AsyncLocalSqlTransactionProvider>();
             services.TryAddSingleton<ISqlOutboxObserver, NoSqlOutboxObserver>();
             services.TryAddSingleton<SqlConnectionSource>();
-            // Also registered as itself: deliveries and sweeps must run in a SQL unit of work even
-            // when a host replaced IQueueUnitOfWorkFactory, since their claims are SQL statements.
+            // Also as itself: claims are SQL, so deliveries need it even if IQueueUnitOfWorkFactory is replaced.
             services.TryAddSingleton<SqlUnitOfWorkFactory>();
             services.TryAddSingleton<IQueueUnitOfWorkFactory>(sp => sp.GetRequiredService<SqlUnitOfWorkFactory>());
             services.TryAddScoped<IQueueDispatchBoundary, SavepointDispatchBoundary>();
@@ -217,11 +173,6 @@ namespace Spinneret.Queue.Sql
         }
     }
 
-    /// <summary>
-    /// Validates <see cref="InHostDeliveryOptions"/> against the command registry: every configured
-    /// channel-parallelism key matches a declared channel, so a typo fails the host at boot instead of
-    /// silently spinning workers for a channel no command rides on.
-    /// </summary>
     internal sealed class InHostDeliveryOptionsValidator(QueueTypeRegistry registry) : IValidateOptions<InHostDeliveryOptions>
     {
         public ValidateOptionsResult Validate(string? name, InHostDeliveryOptions options)
@@ -254,11 +205,6 @@ namespace Spinneret.Queue.Sql
         }
     }
 
-    /// <summary>
-    /// Validates a dialect's <see cref="SqlStorageOptions"/>: a connection to use, and identifiers
-    /// that are safe to splice into SQL — including the index and constraint names the DDL derives
-    /// from them, which must fit the database's identifier limit too.
-    /// </summary>
     internal sealed class SqlStorageOptionsValidator<TOptions>(
         SqlQueueDialect dialect, string sectionName, bool requiresConnectionString)
         : IValidateOptions<TOptions>
@@ -292,7 +238,6 @@ namespace Spinneret.Queue.Sql
         }
     }
 
-    /// <summary>The identifier checks every SQL options validator shares, worded once.</summary>
     internal static class SqlIdentifiers
     {
         public static void Validate(SqlQueueDialect dialect, string value, string configKey)

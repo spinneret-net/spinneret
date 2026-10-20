@@ -14,9 +14,7 @@
     <Using Include="Spinneret.Testing" />
   </ItemGroup>
 
-  <!-- The scheduler conformance suites, compiled into this assembly so their commands are scanned
-       from it and its InternalsVisibleTo grants cover them; SchedulerConformance.cs runs them on SQL
-       Server. -->
+  <!-- Compiled in so their commands are scanned from this assembly and its InternalsVisibleTo applies. -->
   <ItemGroup>
     <Compile Include="..\Spinneret.Sql.Conformance\SqlTestDialect.cs" LinkBase="Conformance" />
     <Compile Include="..\Spinneret.Sql.Conformance\Dialects\MssqlTestDialect.cs" LinkBase="Conformance" />

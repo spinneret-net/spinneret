@@ -125,8 +125,7 @@ public class ViewModelBaseTests
     [Test]
     public async Task Run_inside_OnInitializeAsync_raises_IsBusy_before_the_first_await()
     {
-        // The view subscribes before initializing and relies on IsBusy being raised synchronously,
-        // so a loading indicator bound to it shows for the whole initialization.
+        // The view relies on IsBusy being raised synchronously, so a loading indicator shows throughout.
         var gate = new TaskCompletionSource();
         var sut = new InitializingViewModel(gate.Task);
         var raised = new List<string?>();
@@ -202,7 +201,7 @@ public class ViewModelBaseTests
         await Assert.That(sut.IsBusy).IsFalse();
     }
 
-    // The view that owned the work went away mid-request — navigating off a page that is still loading.
+    // The owning view went away mid-request, e.g. navigating off a page still loading.
     [Test]
     public async Task Run_cancelled_through_its_own_token_is_neither_reported_nor_rethrown()
     {
@@ -312,7 +311,6 @@ public class ViewModelBaseTests
             Nested(viewModel, name);
     }
 
-    /// <summary>The typical derived view model: loads its data through Run during initialization.</summary>
     private sealed class InitializingViewModel(Task work) : ViewModelBase
     {
         protected override Task OnInitializeAsync() => Run(_ => work);

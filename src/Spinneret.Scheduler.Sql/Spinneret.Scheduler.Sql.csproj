@@ -23,8 +23,7 @@
     </ItemGroup>
 
     <ItemGroup>
-        <!-- SqlSchedulerDialect and the registration helper: a dialect package supplies the
-             statements and registers the scheduler through them. -->
+        <!-- Dialect packages implement SqlSchedulerDialect. -->
         <InternalsVisibleTo Include="Spinneret.Scheduler.Sql.Tests" />
         <InternalsVisibleTo Include="Spinneret.Scheduler.Mssql" />
         <InternalsVisibleTo Include="Spinneret.Scheduler.Mssql.Tests" />

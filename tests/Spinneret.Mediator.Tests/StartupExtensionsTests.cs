@@ -58,8 +58,6 @@ public class StartupExtensionsTests
     [Test]
     public async Task AddMediator_does_not_register_open_generic_handler_types()
     {
-        // OpenGenericEchoHandler<T> lives in this assembly; scanning must skip it,
-        // both to avoid a registration error and to keep it out of the container.
         var services = new ServiceCollection();
         services.AddMediator([typeof(StartupExtensionsTests).Assembly]);
         await using var provider = services.BuildServiceProvider();
@@ -165,8 +163,7 @@ public class StartupExtensionsTests
     [Test]
     public async Task AddMediator_without_arguments_scans_the_entry_assembly()
     {
-        // In this test host the entry assembly is the test assembly itself,
-        // so the parameterless overload should find the handlers defined here.
+        // In this test host the entry assembly is the test assembly itself.
         var services = new ServiceCollection();
         services.AddMediator();
         await using var provider = services.BuildServiceProvider();

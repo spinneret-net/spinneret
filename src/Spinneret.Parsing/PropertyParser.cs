@@ -4,21 +4,11 @@ using Spinneret.Functional;
 
 namespace Spinneret.Parsing;
 
-/// <summary>
-/// Selects and parses properties of <typeparamref name="TModel"/> inside a
-/// <see cref="IModelParser{TError}.Parse{TModel,TParsed}"/> call, recording an error per failing property
-/// instead of stopping at the first one. Created by the library and handed to the parse
-/// lambda — not constructible by consumers.
-/// <para>
-/// String values are trimmed before parsing, and a whitespace-only string counts as missing
-/// for <c>Require</c>/<c>Optional</c> — the boundary treats "  " the same as absent input.
-/// </para>
-/// <para>
-/// When a property fails, its error is recorded and <c>default</c> is returned so the
-/// remaining properties still parse; the enclosing <see cref="IModelParser{TError}.Parse{TModel,TParsed}"/>
-/// returns the full error list instead of a model.
-/// </para>
-/// </summary>
+/// <summary>Parses properties of <typeparamref name="TModel"/> inside <see cref="IModelParser{TError}.Parse{TModel,TParsed}"/>, recording every failure.</summary>
+/// <remarks>
+/// Strings are trimmed, and whitespace-only counts as missing. A failing property records its error
+/// and returns <c>default</c> so parsing continues.
+/// </remarks>
 public sealed class PropertyParser<TModel, TError>
 {
     private static readonly ConcurrentDictionary<(Type MemberType, string Path), Delegate> CompiledAccessors = new();
@@ -154,7 +144,7 @@ public sealed class PropertyParser<TModel, TError>
         return MatchResult(memberName, res);
     }
 
-    /// <summary>Requires a nested model to be present and parses it with a nested parser scoped to its property path.</summary>
+    /// <summary>Requires a nested model to be present and parses it with a nested parser.</summary>
     public TParsed NestRequired<TNestedModel, TParsed>(
         Expression<Func<TModel, TNestedModel>> expression,
         Func<PropertyParser<TNestedModel, TError>, TParsed> nestedParser)
@@ -173,11 +163,7 @@ public sealed class PropertyParser<TModel, TError>
         return nestedParser(nestedPropertyParser);
     }
 
-    /// <summary>
-    /// Requires a collection property to be present and parses each element, recording errors
-    /// under indexed names ("Items[3]"). Elements that parse successfully are returned even when
-    /// others fail — the enclosing parse still fails on any recorded error.
-    /// </summary>
+    /// <summary>Requires a collection to be present and parses each element, recording errors as "Items[3]".</summary>
     public IEnumerable<TParsed> Many<TMember, TParsed>(
         Expression<Func<TModel, IEnumerable<TMember>?>> expression,
         Func<TMember, Result<TParsed, TError>> parser)
@@ -211,11 +197,7 @@ public sealed class PropertyParser<TModel, TError>
         return res;
     }
 
-    /// <summary>
-    /// Requires a collection of nested models to be present and parses each with a nested parser
-    /// scoped to its indexed property path ("Items[3].Name"). Elements that parse successfully
-    /// are returned even when others fail — the enclosing parse still fails on any recorded error.
-    /// </summary>
+    /// <summary>Requires a collection of nested models to be present and parses each with a nested parser.</summary>
     public IEnumerable<TParsed> NestMany<TNestedModel, TParsed>(
         Expression<Func<TModel, IEnumerable<TNestedModel>?>> expression,
         Func<PropertyParser<TNestedModel, TError>, TParsed> nestedParser)
@@ -248,7 +230,7 @@ public sealed class PropertyParser<TModel, TError>
         return res;
     }
 
-    /// <summary>Parses a reference-typed property when present; absent (or whitespace string) yields null without error.</summary>
+    /// <summary>Parses a reference-typed property when present; absent yields null.</summary>
     public TParsed? Optional<TMember, TParsed>(
         Expression<Func<TModel, TMember?>> expression,
         Func<TMember, Result<TParsed, TError>> parser)
@@ -264,7 +246,7 @@ public sealed class PropertyParser<TModel, TError>
         return MatchResult(memberName, res);
     }
 
-    /// <summary>Parses a nullable value-typed property when present; absent yields null without error.</summary>
+    /// <summary>Parses a nullable value-typed property when present; absent yields null.</summary>
     public TParsed? Optional<TMember, TParsed>(
         Expression<Func<TModel, TMember?>> expression,
         Func<TMember, Result<TParsed, TError>> parser)
@@ -280,7 +262,7 @@ public sealed class PropertyParser<TModel, TError>
         return MatchResult(memberName, res);
     }
 
-    /// <summary>Parses a nested model when present; absent yields null without error.</summary>
+    /// <summary>Parses a nested model when present; absent yields null.</summary>
     public TParsed? NestOptional<TNestedModel, TParsed>(
         Expression<Func<TModel, TNestedModel?>> expression,
         Func<PropertyParser<TNestedModel, TError>, TParsed> nestedParser)
@@ -299,7 +281,7 @@ public sealed class PropertyParser<TModel, TError>
         return nestedParser(nestedPropertyParser);
     }
 
-    /// <summary>Parses a nullable value-typed nested model when present; absent yields null without error.</summary>
+    /// <summary>Parses a nullable value-typed nested model when present; absent yields null.</summary>
     public TParsed? NestOptional<TNestedModel, TParsed>(
         Expression<Func<TModel, TNestedModel?>> expression,
         Func<PropertyParser<TNestedModel, TError>, TParsed> nestedParser)
@@ -318,7 +300,7 @@ public sealed class PropertyParser<TModel, TError>
         return nestedParser(nestedPropertyParser);
     }
 
-    /// <summary>Parses a nullable value-typed property into a value type when present; absent yields null without error.</summary>
+    /// <summary>Parses a nullable value-typed property into a value type when present; absent yields null.</summary>
     public TParsed? OptionalStruct<TMember, TParsed>(
         Expression<Func<TModel, TMember?>> expression,
         Func<TMember, Result<TParsed, TError>> parser)
@@ -334,7 +316,7 @@ public sealed class PropertyParser<TModel, TError>
         return MatchResult(memberName, res);
     }
 
-    /// <summary>Parses a reference-typed property into a value type when present; absent (or whitespace string) yields null without error.</summary>
+    /// <summary>Parses a reference-typed property into a value type when present; absent yields null.</summary>
     public TParsed? OptionalStruct<TMember, TParsed>(
         Expression<Func<TModel, TMember?>> expression,
         Func<TMember, Result<TParsed, TError>> parser)
@@ -350,7 +332,7 @@ public sealed class PropertyParser<TModel, TError>
         return MatchResult(memberName, res);
     }
 
-    /// <summary>Parses a nested model into a value type when present; absent yields null without error.</summary>
+    /// <summary>Parses a nested model into a value type when present; absent yields null.</summary>
     public TParsed? NestOptionalStruct<TNestedModel, TParsed>(
         Expression<Func<TModel, TNestedModel?>> expression,
         Func<PropertyParser<TNestedModel, TError>, TParsed> nestedParser)
@@ -369,7 +351,7 @@ public sealed class PropertyParser<TModel, TError>
         return nestedParser(nestedPropertyParser);
     }
 
-    /// <summary>Parses a nullable value-typed nested model into a value type when present; absent yields null without error.</summary>
+    /// <summary>Parses a nullable value-typed nested model into a value type when present; absent yields null.</summary>
     public TParsed? NestOptionalStruct<TNestedModel, TParsed>(
         Expression<Func<TModel, TNestedModel?>> expression,
         Func<PropertyParser<TNestedModel, TError>, TParsed> nestedParser)
@@ -397,8 +379,7 @@ public sealed class PropertyParser<TModel, TError>
 
     private TMember GetMemberValue<TMember>(Expression<Func<TModel, TMember>> expression, string memberPath)
     {
-        // Safe to cache by path: GetMemberName has already validated the expression is a plain
-        // member chain off the lambda parameter, so path + member type fully determine it.
+        // Safe to cache by path: GetMemberName already validated a plain member chain.
         var accessor = (Func<TModel, TMember>)CompiledAccessors.GetOrAdd(
             (typeof(TMember), memberPath),
             static (_, expr) => expr.Compile(),
@@ -426,11 +407,7 @@ public sealed class PropertyParser<TModel, TError>
 /// <summary>Combinators for parsing models that are an <see cref="Either{T1, T2}"/> of two shapes.</summary>
 public static class PropertyParserExtensions
 {
-    /// <summary>
-    /// Parses whichever case the model holds, using the matching parser, and returns the
-    /// parsed value as an <see cref="Either{TParsed1, TParsed2}"/>. Errors are recorded in
-    /// the enclosing parse as usual.
-    /// </summary>
+    /// <summary>Parses whichever case the model holds with the matching parser.</summary>
     public static Either<TParsed1, TParsed2> ParseEither<TModel1, TModel2, TParsed1, TParsed2, TError>(
         this PropertyParser<Either<TModel1, TModel2>, TError> parser,
         Func<TModel1, PropertyParser<TModel1, TError>, TParsed1> parser1,

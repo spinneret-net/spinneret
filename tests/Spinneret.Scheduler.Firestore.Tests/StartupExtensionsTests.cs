@@ -6,12 +6,7 @@ using Spinneret.Queue;
 
 namespace Spinneret.Scheduler.Firestore.Tests;
 
-/// <summary>
-/// Verifies the DI surface of <c>UseFirestoreStorage</c> against the
-/// referenced assembly. Internal implementation types cannot be named here (the source-linked
-/// copies compiled into this test assembly are distinct types), so registrations are asserted
-/// via descriptor inspection by type name.
-/// </summary>
+// Internal types are source-linked copies here, so registrations are asserted by type name.
 public class StartupExtensionsTests
 {
     private static IConfiguration EmptyConfiguration => new ConfigurationBuilder().Build();
@@ -27,8 +22,6 @@ public class StartupExtensionsTests
     [Test]
     public async Task UseFirestoreStorage_composes_in_either_order_relative_to_the_queue()
     {
-        // Previously this threw when the scheduler was registered first, even though the resulting
-        // container was identical. Nothing here reads the collection, so the calls commute.
         var before = new ServiceCollection();
         before.AddSingleton(new QueueTypeRegistry([]));
         before.AddScheduler(s => s.UseFirestoreStorage(EmptyConfiguration));

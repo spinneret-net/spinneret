@@ -2,8 +2,7 @@ using Spinneret.Sql.Conformance;
 
 namespace Spinneret.Scheduler.Postgres.Tests;
 
-// The shared conformance suites (tests/Spinneret.Sql.Conformance/Scheduler), run on Postgres.
-// Each class only binds a suite to this database; the scenarios live in the base class.
+// Binds the shared scheduler conformance suites to Postgres.
 
 [InheritsTests]
 [ClassDataSource<PostgresContainerFixture>(Shared = SharedType.PerTestSession)]

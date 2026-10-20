@@ -3,22 +3,14 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Spinneret.Queue;
 using Spinneret.Queue.Firestore;
 
-// ReSharper disable once CheckNamespace — deliberate: registration extensions live in the
-// DI namespace so every Use* call is discoverable without a using directive.
+// ReSharper disable once CheckNamespace — DI namespace, for discoverability.
 namespace Microsoft.Extensions.DependencyInjection;
 
 public static class FirestoreQueueBuilderExtensions
 {
-    /// <summary>
-    /// Keeps dead letters in Firestore: the <see cref="IDeadLetterWriter"/> the queue files
-    /// exhausted work with, and the <see cref="IDeadLetterStore"/> an admin page lists, resends and
-    /// discards from. Independent of the queue's storage and delivery — and chosen over a SQL
-    /// storage's own dead-letter table when both are present.
-    /// </summary>
+    /// <summary>Keeps dead letters in Firestore, configured from <c>Queue:Firestore</c>; requires a registered <c>FirestoreDb</c>.</summary>
     /// <remarks>
-    /// Requires a host-registered <c>FirestoreDb</c>. A dead letter written here is not part of a SQL
-    /// delivery's transaction, so it relies on its idempotency key alone; prefer the SQL storage's own
-    /// table when the queue has one. Configuration is read from the <c>Queue:Firestore</c> section.
+    /// Overrides a SQL storage's own dead-letter table, but isn't part of its delivery transaction.
     /// </remarks>
     public static QueueBuilder UseFirestoreDeadLetters(this QueueBuilder queue, IConfiguration configuration)
     {
@@ -34,10 +26,7 @@ public static class FirestoreQueueBuilderExtensions
         return queue.UseFirestoreDeadLettersCore(configure);
     }
 
-    /// <summary>
-    /// As <see cref="UseFirestoreDeadLetters(QueueBuilder, IConfiguration)"/>, with the defaults —
-    /// the <c>dead_letters</c> collection.
-    /// </summary>
+    /// <summary>As <see cref="UseFirestoreDeadLetters(QueueBuilder, IConfiguration)"/>, with the defaults.</summary>
     public static QueueBuilder UseFirestoreDeadLetters(this QueueBuilder queue) =>
         queue.UseFirestoreDeadLettersCore(configure: null);
 

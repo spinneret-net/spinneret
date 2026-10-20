@@ -7,11 +7,7 @@ public static class CloudTasksAuth
 {
     public const string SchemeName = "QueueOIDC";
 
-    /// <summary>
-    /// Authorization policy guarding endpoints that accept Google-minted OIDC tokens (Cloud Tasks
-    /// dispatch and Cloud Scheduler ticks). Exposed so the host can apply it to its own internal
-    /// endpoints with <c>RequireAuthorization(CloudTasksAuth.PolicyName)</c>.
-    /// </summary>
+    /// <summary>Authorization policy accepting Google-minted OIDC tokens, for use on the host's own internal endpoints.</summary>
     public const string PolicyName = "QueueOIDC";
 
     internal static IServiceCollection AddQueueOidcAuth(this IServiceCollection services, CloudTasksOptions options)

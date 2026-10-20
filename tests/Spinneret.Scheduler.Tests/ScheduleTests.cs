@@ -4,11 +4,9 @@ public class ScheduleTests
 {
     private const string Stockholm = "Europe/Stockholm";
 
-    /// <summary>A UTC instant, so the expected local slots below can be written as the UTC they land on.</summary>
+    /// <summary>A UTC instant, so expected local slots can be written in UTC.</summary>
     private static DateTimeOffset Utc(int year, int month, int day, int hour, int minute, int second = 0) =>
         new(year, month, day, hour, minute, second, TimeSpan.Zero);
-
-    // ------------------------------------------------------------------------------ NextRun ---
 
     [Test]
     public async Task Next_run_is_the_next_matching_local_slot()
@@ -26,16 +24,14 @@ public class ScheduleTests
         var schedule = Schedule.Cron("0 3 * * *", Stockholm);
         var slot = Utc(2026, 8, 12, 1, 0); // exactly 03:00 CEST
 
-        // Exactly at the slot: a sweep leases by advancing to NextRun, so returning the same instant
-        // would re-select the job forever.
+        // A sweep leases by advancing to NextRun, so returning the same instant would re-select the job forever.
         await Assert.That(schedule.NextRun(slot)).IsEqualTo(Utc(2026, 8, 13, 1, 0));
     }
 
     [Test]
     public async Task Next_run_is_independent_of_the_offset_now_is_expressed_in()
     {
-        // The same instant written with a different offset must produce the same run: the schedule's
-        // zone decides local time, never the caller's.
+        // The schedule's zone decides local time, never the caller's offset.
         var schedule = Schedule.Cron("0 3 * * *", Stockholm);
         var utc = Utc(2026, 8, 12, 10, 0);
         var sameInstantElsewhere = new DateTimeOffset(2026, 8, 12, 16, 0, 0, TimeSpan.FromHours(6));
@@ -55,47 +51,39 @@ public class ScheduleTests
     [Test]
     public async Task Spring_forward_gap_runs_when_the_clock_finishes_the_jump()
     {
-        // Stockholm springs forward 2026-03-29 02:00 CET -> 03:00 CEST, so 02:30 never happens that
-        // day. The slot runs at the moment the gap closes (03:00 CEST = 01:00 UTC) rather than being
-        // skipped for the day.
+        // Stockholm springs forward 2026-03-29 02:00 CET -> 03:00 CEST, so 02:30 never happens that day.
         var schedule = Schedule.Cron("30 2 * * *", Stockholm);
         var now = Utc(2026, 3, 29, 0, 0); // 01:00 CET, before the transition
 
         await Assert.That(schedule.NextRun(now)).IsEqualTo(Utc(2026, 3, 29, 1, 0));
-        // And the day after, the slot is back to its ordinary local time (02:30 CEST = 00:30 UTC).
+        // The day after: back to 02:30 CEST = 00:30 UTC.
         await Assert.That(schedule.NextRun(Utc(2026, 3, 29, 1, 0))).IsEqualTo(Utc(2026, 3, 30, 0, 30));
     }
 
     [Test]
     public async Task Fall_back_overlap_runs_a_fixed_slot_once()
     {
-        // Stockholm falls back 2026-10-25 03:00 CEST -> 02:00 CET, so 02:30 happens twice. A slot
-        // named once a day runs on the first pass only (02:30 CEST = 00:30 UTC).
+        // Stockholm falls back 2026-10-25 03:00 CEST -> 02:00 CET, so 02:30 happens twice.
         var schedule = Schedule.Cron("30 2 * * *", Stockholm);
 
         await Assert.That(schedule.NextRun(Utc(2026, 10, 24, 23, 30))).IsEqualTo(Utc(2026, 10, 25, 0, 30));
 
-        // From the first occurrence the next run is the following day: the repeated hour must not
-        // produce a second run of a once-a-day slot.
         await Assert.That(schedule.NextRun(Utc(2026, 10, 25, 0, 30))).IsEqualTo(Utc(2026, 10, 26, 1, 30));
     }
 
     [Test]
     public async Task Fall_back_overlap_runs_a_recurring_slot_in_both_passes()
     {
-        // The counterpart to the fixed slot: an expression that recurs within the hour keeps running
-        // through the repeated hour, so 02:00 CET (01:00 UTC) follows 02:30 CEST (00:30 UTC).
+        // 02:00 CET (01:00 UTC) follows 02:30 CEST (00:30 UTC).
         var schedule = Schedule.Cron("*/30 * * * *", Stockholm);
 
         await Assert.That(schedule.NextRun(Utc(2026, 10, 25, 0, 30))).IsEqualTo(Utc(2026, 10, 25, 1, 0));
     }
 
-    // --------------------------------------------------------------------------- canonical ---
-
     [Test]
     public async Task Canonical_string_is_stable()
     {
-        // Pins the wire format: persisted and configured schedules must stay parseable across versions.
+        // Persisted and configured schedules must stay parseable across versions.
         await Assert.That(Schedule.Cron("0 3 * * *", Stockholm).ToString())
             .IsEqualTo("cron:Europe/Stockholm:0 3 * * *");
     }
@@ -103,8 +91,7 @@ public class ScheduleTests
     [Test]
     public async Task Expression_is_normalized_to_one_canonical_form()
     {
-        // Providers compare the stored canonical string to decide whether a schedule changed, so
-        // spacing and name casing must not read as a different schedule on the next deploy.
+        // Providers compare canonical strings to detect a changed schedule.
         var schedule = Schedule.Cron("  0   3  *  *  mon\t", Stockholm);
 
         await Assert.That(schedule.Expression).IsEqualTo("0 3 * * MON");
@@ -132,8 +119,6 @@ public class ScheduleTests
         await Assert.That(Schedule.Cron("0 3 * * *", Stockholm).TimeZoneId).IsEqualTo("Europe/Stockholm");
     }
 
-    // ----------------------------------------------------------------------------- rejects ---
-
     [Test]
     [Arguments("* * * *")]
     [Arguments("* * * * * * *")]
@@ -154,7 +139,7 @@ public class ScheduleTests
     [Test]
     public async Task Expression_that_never_occurs_throws_argument_exception()
     {
-        // Valid cron, but 30 February never arrives: a sweep could never advance the job past it.
+        // 30 February never arrives, so a sweep could never advance the job.
         await Assert.That(() => Schedule.Cron("0 0 30 2 *", Stockholm)).Throws<ArgumentException>();
     }
 
@@ -191,16 +176,12 @@ public class ScheduleTests
     [Test]
     public async Task Non_iana_zone_is_rejected()
     {
-        // Only the zone id is persisted, and any host running the sweep rehydrates it by id. A zone
-        // without an IANA id — a custom zone here, a Windows id such as "W. Europe Standard Time" on
-        // a Windows host — would produce a schedule other hosts cannot resolve. The zone is custom
-        // rather than a real Windows id so the test asserts the same guard on every platform.
+        // Only the zone id is persisted, so other hosts must resolve it; a custom zone keeps the guard
+        // platform-independent (a Windows id would do on Windows only).
         var custom = TimeZoneInfo.CreateCustomTimeZone("Mars/Olympus", TimeSpan.Zero, "Olympus", "Olympus");
 
         await Assert.That(() => Schedule.Cron("0 3 * * *", custom)).Throws<ArgumentException>();
     }
-
-    // ------------------------------------------------------------------------------- Parse ---
 
     [Test]
     [Arguments("nonsense")]
@@ -217,8 +198,7 @@ public class ScheduleTests
     [Arguments("daily:Europe/Stockholm:07:00:00")]
     public async Task Parse_pre_cron_forms_throw_format_exception(string text)
     {
-        // Stored by an older version: the sweep quarantines what it cannot parse, so the message has
-        // to be the one an operator reads.
+        // Stored by an older version; the sweep quarantines it, so an operator reads this message.
         await Assert.That(() => Schedule.Parse(text)).Throws<FormatException>()
             .WithMessageContaining("pre-cron");
     }
@@ -235,8 +215,7 @@ public class ScheduleTests
     [Arguments("cron:Europe/Stockholm:0 0 30 2 *")]
     public async Task Parse_wraps_a_rejected_expression_as_format_exception(string text)
     {
-        // Parse's contract is FormatException for any non-canonical text — an expression the schedule
-        // rejects must not leak the ArgumentException from the factory.
+        // Parse's contract is FormatException, never the factory's ArgumentException.
         await Assert.That(() => Schedule.Parse(text)).Throws<FormatException>();
     }
 

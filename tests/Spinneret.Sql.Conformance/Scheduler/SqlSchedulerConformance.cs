@@ -3,10 +3,6 @@ using Spinneret.Scheduler;
 
 namespace Spinneret.Sql.Conformance;
 
-/// <summary>
-/// End-to-end tests against a real database (Docker via Testcontainers): registration semantics,
-/// the dispatch sweep, transactional one-shots, and failure compensation.
-/// </summary>
 public abstract class SqlSchedulerConformance(SqlTestDialect dialect)
 {
     protected SqlTestDialect Dialect => dialect;
@@ -19,13 +15,12 @@ public abstract class SqlSchedulerConformance(SqlTestDialect dialect)
     private static readonly Schedule Hourly = Schedule.Cron("0 * * * *", Stockholm);
     private static readonly Schedule EverySecond = Schedule.Cron("* * * * * *", Stockholm);
 
-    /// <summary>A slot no test run can be close to: a fixed daily time roughly half a day away.</summary>
+    // A fixed daily time roughly half a day away, so no test run is close to the slot.
     private static Schedule FarOff()
     {
         var localHour = TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, StockholmZone).Hour;
         return Schedule.Cron($"13 {(localHour + 12) % 24} * * *", Stockholm);
     }
-    // ---------------------------------------------------------------------- registration ---
 
     [Test]
     public async Task RegisterAsync_creates_a_job_with_the_first_run_armed()
@@ -35,7 +30,7 @@ public abstract class SqlSchedulerConformance(SqlTestDialect dialect)
         await host.Scheduler.RegisterAsync("hourly", new TickCommand("h"), Hourly);
 
         await Assert.That(await host.JobExists("hourly")).IsTrue();
-        // An hourly slot lands somewhere in the next hour rather than a fixed distance out.
+        // An hourly slot lands somewhere in the next hour, not a fixed distance out.
         var next = await host.JobNextExecuteAt("hourly");
         await Assert.That(next > DateTime.UtcNow).IsTrue();
         await Assert.That(next <= DateTime.UtcNow.AddMinutes(60)).IsTrue();
@@ -74,8 +69,7 @@ public abstract class SqlSchedulerConformance(SqlTestDialect dialect)
         var moved = FarOff();
         await host.Scheduler.RegisterAsync("moving", new TickCommand("m"), moved);
 
-        // Re-armed onto the new schedule's next slot. The replacement never falls on the hour, so it
-        // cannot coincide with what the hourly schedule had armed.
+        // The replacement never falls on the hour, so it can't coincide with the hourly slot.
         var next = await host.JobNextExecuteAt("moving");
         var expected = moved.NextRun(DateTimeOffset.UtcNow).UtcDateTime;
         await Assert.That(next).IsNotEqualTo(armed);
@@ -88,8 +82,7 @@ public abstract class SqlSchedulerConformance(SqlTestDialect dialect)
     [Test]
     public async Task RegisterAsync_recreates_a_job_that_is_gone()
     {
-        // A job that ran, was cancelled, or had its failure dead-lettered no longer exists, so the
-        // next registration has to re-create it rather than assume a row is there to refresh.
+        // A job that ran, was cancelled or was dead-lettered no longer exists, so registering re-creates it.
         await using var host = await SchedulerTestHost.StartAsync(Dialect, sweeper: false);
         await host.Scheduler.RegisterAsync("revived", new TickCommand("r"), Hourly);
         await host.ExecuteAsync($"DELETE FROM {Q(host.JobsTable)} WHERE JobKey = 'revived'");
@@ -119,9 +112,7 @@ public abstract class SqlSchedulerConformance(SqlTestDialect dialect)
     [Test]
     public async Task RegisterAsync_from_many_instances_at_once_yields_one_job()
     {
-        // Ten instances of the same application all assert the same job as they start. JobKey is the
-        // primary key and the register-or-refresh holds a key-range lock (UPDLOCK, HOLDLOCK) over
-        // it, so the concurrent attempts serialise into one insert and nine in-place refreshes.
+        // The register-or-refresh lock serialises concurrent attempts into one insert and nine refreshes.
         await using var host = await SchedulerTestHost.StartAsync(Dialect, sweeper: false);
 
         await Task.WhenAll(Enumerable.Range(0, 10).Select(i =>
@@ -136,7 +127,6 @@ public abstract class SqlSchedulerConformance(SqlTestDialect dialect)
     [Test]
     public async Task Parallel_installers_converge_on_one_job_per_key()
     {
-        // The same thing one level up: ten hosts sharing the tables, each running its own installer.
         var suffix = Guid.NewGuid().ToString("N")[..12];
         var hosts = await Task.WhenAll(Enumerable.Range(0, 10).Select(_ => SchedulerTestHost.StartAsync(
             Dialect,
@@ -158,8 +148,6 @@ public abstract class SqlSchedulerConformance(SqlTestDialect dialect)
                 await host.DisposeAsync();
         }
     }
-
-    // ------------------------------------------------------------------------- retiring ---
 
     [Test]
     public async Task UnregisterAsync_removes_a_recurring_job()
@@ -187,8 +175,7 @@ public abstract class SqlSchedulerConformance(SqlTestDialect dialect)
     [Test]
     public async Task UnregisterAsync_leaves_a_one_shot_job_untouched()
     {
-        // One-shot handles share the JobKey namespace with recurring keys; only a recurring job
-        // carries a schedule, and only a recurring job may be removed this way.
+        // One-shot handles share the JobKey namespace, but only recurring jobs may be removed this way.
         await using var host = await SchedulerTestHost.StartAsync(Dialect, sweeper: false);
 
         await using var connection = await host.OpenConnectionAsync();
@@ -221,7 +208,6 @@ public abstract class SqlSchedulerConformance(SqlTestDialect dialect)
                 "the declared job to be installed");
         }
 
-        // The next release drops the job and retires its key against the same tables.
         await using var second = await SchedulerTestHost.StartAsync(
             Dialect,
             sweeper: false,
@@ -234,14 +220,12 @@ public abstract class SqlSchedulerConformance(SqlTestDialect dialect)
             "the retired job to be removed");
     }
 
-    // ------------------------------------------------------------------------- dispatch ---
-
     [Test]
     public async Task Due_recurring_job_is_enqueued_delivered_and_rearmed()
     {
         await using var host = await SchedulerTestHost.StartAsync(Dialect);
 
-        // Six fields schedule to the second; with a 100ms sweep the job should tick repeatedly.
+        // Six fields schedule to the second, so a 100ms sweep ticks it repeatedly.
         await host.Scheduler.RegisterAsync("ticker", new TickCommand("t"), EverySecond);
 
         await Wait.Until(() => host.Log.DeliveryCount("tick:t") >= 2, "the recurring job to run at least twice");
@@ -254,9 +238,7 @@ public abstract class SqlSchedulerConformance(SqlTestDialect dialect)
     {
         await using var host = await SchedulerTestHost.StartAsync(Dialect);
 
-        // By the time the sweep enqueues this job it has only the stored type name, so the response
-        // type comes from the registry rather than the call site — the path that has to reach the
-        // typed IQueue.Enqueue<TResponse> without the caller ever naming string.
+        // The sweep has only the stored type name, so the response type must come from the registry.
         await host.Scheduler.RegisterAsync("reporter", new ReportCommand("r"), EverySecond);
 
         await Wait.Until(() => host.Log.DeliveryCount("report:r") >= 1, "the non-Unit recurring job to run");
@@ -279,15 +261,13 @@ public abstract class SqlSchedulerConformance(SqlTestDialect dialect)
     [Test]
     public async Task Competing_sweeps_dispatch_a_due_job_exactly_once()
     {
-        // Two hosts sweep the same tables — the claim's row lock must keep them from
-        // double-dispatching the same due slot.
+        // The claim's row lock must keep two sweepers from double-dispatching a slot.
         await using var host = await SchedulerTestHost.StartAsync(Dialect);
         await using var rival = await SchedulerTestHost.StartAsync(
             Dialect, reuseSuffix: host.Suffix,
             configure: services => services.AddSingleton(host.Log)); // shared delivery log
 
-        // One due slot of a schedule whose next run is half a day out: whichever sweep wins books
-        // that run, so seeing two deliveries would prove a double dispatch.
+        // The next run is half a day out, so two deliveries would prove a double dispatch.
         await host.Scheduler.RegisterAsync("contested", new TickCommand("c"), FarOff());
         await host.ExecuteAsync(
             $"UPDATE {Q(host.JobsTable)} SET NextExecuteAt = {Dialect.Now} WHERE JobKey = 'contested'");
@@ -296,8 +276,6 @@ public abstract class SqlSchedulerConformance(SqlTestDialect dialect)
         await Task.Delay(700);
         await Assert.That(host.Log.DeliveryCount("tick:c")).IsEqualTo(1);
     }
-
-    // ------------------------------------------------------------- transactional one-shot ---
 
     [Test]
     public async Task One_shot_in_a_committed_transaction_runs_once_and_is_removed()
@@ -375,8 +353,7 @@ public abstract class SqlSchedulerConformance(SqlTestDialect dialect)
     [Test]
     public async Task Cancelling_with_a_recurring_key_is_rejected_and_leaves_the_schedule_intact()
     {
-        // Cancel deletes, so without the guard a caller reaching for the wrong retirement method
-        // would silently destroy a live schedule. UnregisterAsync is the one that retires these.
+        // Cancel deletes, so without the guard it would silently destroy a live schedule.
         await using var host = await SchedulerTestHost.StartAsync(Dialect, sweeper: false);
         await host.Scheduler.RegisterAsync("nightly-cleanup", new TickCommand("n"), FarOff());
 
@@ -391,14 +368,11 @@ public abstract class SqlSchedulerConformance(SqlTestDialect dialect)
         await Assert.That(await host.JobExists("nightly-cleanup")).IsTrue();
     }
 
-    // ------------------------------------------------------------------- failure paths ---
-
     [Test]
     public async Task Failed_recurring_dispatch_dead_letters_the_occurrence_but_keeps_the_schedule()
     {
         await using var host = await SchedulerTestHost.StartAsync(Dialect, sweeper: false);
         await host.Scheduler.RegisterAsync("broken", new TickCommand("b"), EverySecond);
-        // Sabotage the persisted type name so the sweep cannot resolve the request.
         await host.ExecuteAsync(
             $"UPDATE {Q(host.JobsTable)} SET RequestTypeName = 'No.Such.Type', NextExecuteAt = {Dialect.Now} " +
             $"WHERE JobKey = 'broken'");
@@ -419,8 +393,7 @@ public abstract class SqlSchedulerConformance(SqlTestDialect dialect)
         await using var host = await SchedulerTestHost.StartAsync(Dialect, sweeper: false);
         await host.Scheduler.RegisterAsync("poison", new TickCommand("p"), EverySecond);
         await host.Scheduler.RegisterAsync("healthy", new TickCommand("h"), EverySecond);
-        // Corrupt the poison job's schedule and make it the oldest-due row, so a sweep that fails
-        // on it would starve everything behind it.
+        // The oldest-due poison row would starve everything behind it if the sweep failed on it.
         await host.ExecuteAsync(
             $"UPDATE {Q(host.JobsTable)} SET Schedule = 'cron:Mars/Olympus:0 3 * * *', " +
             $"NextExecuteAt = {Dialect.MinutesFromNow(-10)} WHERE JobKey = 'poison'");
@@ -431,8 +404,6 @@ public abstract class SqlSchedulerConformance(SqlTestDialect dialect)
             Dialect, reuseSuffix: host.Suffix,
             configure: services => services.AddSingleton(host.Log));
 
-        // The healthy job must still dispatch, and the poison one is quarantined: dead-lettered,
-        // kept, and pushed out of the sweep's way.
         await Wait.Until(() => host.Log.DeliveryCount("tick:h") >= 1, "the healthy job to dispatch");
         await Wait.Until(async () => await host.DeadLetterCount() >= 1, "the poison job to be dead-lettered");
         await Assert.That(await host.JobExists("poison")).IsTrue();

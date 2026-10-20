@@ -3,10 +3,7 @@ using System.Text.Json.Serialization;
 
 namespace Spinneret.Functional;
 
-/// <summary>
-/// A value that is exactly one of two types. Unlike <see cref="Result{TOk, TError}"/> the two
-/// cases are peers — neither is the "failure". Commonly used to union two error types.
-/// </summary>
+/// <summary>A value that is exactly one of two peer types, e.g. a union of two error types.</summary>
 public sealed record Either<T1, T2>
 {
     [JsonInclude]
@@ -19,7 +16,7 @@ public sealed record Either<T1, T2>
     private readonly T2? value2;
 
     [JsonConstructor]
-#pragma warning disable IDE0051 // Private member is used for deserialization only
+#pragma warning disable IDE0051 // Used by deserialization
     private Either(int tag, T1? value1, T2? value2)
 #pragma warning restore IDE0051
     {
@@ -107,7 +104,7 @@ public sealed record Either<T1, T2>
         return new(tag == 1 ? 2 : 1, value2, value1);
     }
 
-    /// <summary>Transforms whichever case is present with a result-producing function, short-circuiting on error.</summary>
+    /// <summary>Transforms whichever case is present with a result-producing function.</summary>
     public Result<Either<T3, T4>, TError> TraverseResult<T3, T4, TError>(
         Func<T1, Result<T3, TError>> f1,
         Func<T2, Result<T4, TError>> f2

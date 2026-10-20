@@ -5,11 +5,6 @@ using Spinneret.Mediator;
 
 namespace Spinneret.Queue.Tests;
 
-/// <summary>
-/// Covers QueueDispatcher — internal, so it is resolved the way a host gets it (AddQueueCore +
-/// IQueueDispatcher) and the result-to-exception mapping is observed via which handler responses
-/// raise QueueHandlerFailedException.
-/// </summary>
 public class QueueDispatcherTests
 {
     private readonly FakeMediator _mediator = new();
@@ -33,10 +28,6 @@ public class QueueDispatcherTests
         EnqueuedAtUtc = DateTimeOffset.UtcNow,
     };
 
-    // -----------------------------------------------------------------------------------------
-    // Happy path
-    // -----------------------------------------------------------------------------------------
-
     [Test]
     public async Task Dispatch_unit_command_deserializes_payload_and_sends_it_to_the_mediator()
     {
@@ -56,10 +47,6 @@ public class QueueDispatcherTests
 
         await Assert.That(_mediator.Calls).IsEqualTo(1);
     }
-
-    // -----------------------------------------------------------------------------------------
-    // Payload problems are permanent
-    // -----------------------------------------------------------------------------------------
 
     [Test]
     public async Task Dispatch_undeserializable_payload_throws_permanent_exception()
@@ -111,10 +98,6 @@ public class QueueDispatcherTests
 
         await Assert.That(_mediator.Calls).IsEqualTo(0);
     }
-
-    // -----------------------------------------------------------------------------------------
-    // Result introspection of handler responses
-    // -----------------------------------------------------------------------------------------
 
     [Test]
     public async Task Dispatch_single_generic_result_in_error_throws_failed_exception_with_the_error()
@@ -193,10 +176,6 @@ public class QueueDispatcherTests
 
         await Assert.That(_mediator.Calls).IsEqualTo(1);
     }
-
-    // -----------------------------------------------------------------------------------------
-    // Exception surface
-    // -----------------------------------------------------------------------------------------
 
     [Test]
     public async Task QueueHandlerRetryAfterException_carries_delay_and_default_message()

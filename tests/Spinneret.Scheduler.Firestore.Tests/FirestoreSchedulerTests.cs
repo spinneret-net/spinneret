@@ -3,13 +3,6 @@ using Spinneret.Queue;
 
 namespace Spinneret.Scheduler.Firestore.Tests;
 
-/// <summary>
-/// Covers the argument validation of <see cref="FirestoreScheduler.RegisterAsync"/>, which runs
-/// before any Firestore access — proven by constructing the scheduler with a null FirestoreDb.
-/// The transactional register-or-refresh behaviour itself is covered against the Firestore emulator
-/// by <see cref="FirestoreSchedulerIntegrationTests"/>. Schedule construction rules (cron validity,
-/// zone) are covered by the Spinneret.Scheduler test suite.
-/// </summary>
 public class FirestoreSchedulerTests
 {
     private const string Stockholm = "Europe/Stockholm";
@@ -47,8 +40,7 @@ public class FirestoreSchedulerTests
     [Test]
     public async Task RegisterAsync_valid_schedule_passes_validation()
     {
-        // With a null FirestoreDb the first Firestore access fails with a NullReferenceException,
-        // proving that a valid key and schedule clear the argument validation.
+        // A null FirestoreDb throws NullReferenceException on first access, i.e. after validation passed.
         var scheduler = CreateScheduler();
 
         await Assert.That(() =>

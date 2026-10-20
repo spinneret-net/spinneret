@@ -2,10 +2,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Spinneret.Queue.Tests;
 
-/// <summary>
-/// The rules <c>AddQueue</c> holds a composition to, with stand-in roles so the rules are tested
-/// rather than any one provider.
-/// </summary>
 public class QueueBuilderTests
 {
     private static QueueStorageRole Storage(string name = "UseTestStorage", bool claimable = true, bool relay = false) =>
@@ -77,7 +73,7 @@ public class QueueBuilderTests
     [Test]
     public async Task Storage_feeding_a_transport_needs_a_relay()
     {
-        // Otherwise enqueues would land in the storage and nothing would ever forward them.
+        // Otherwise enqueues would land in storage and nothing would forward them.
         var ex = Assert.Throws<InvalidOperationException>(() =>
             Compose(q => q.UseStorage(Storage(relay: false)).UseDelivery(Transport())));
 

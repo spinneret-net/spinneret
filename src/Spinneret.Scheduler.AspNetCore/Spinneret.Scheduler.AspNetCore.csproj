@@ -13,9 +13,6 @@
     </ItemGroup>
 
     <ItemGroup>
-        <!-- The scheduler abstraction only: this package is a trigger, so it knows nothing about
-             where jobs are stored. Keeping the framework reference here is what lets the storage
-             packages stay plain libraries. -->
         <ProjectReference Include="..\Spinneret.Scheduler\Spinneret.Scheduler.csproj" />
     </ItemGroup>
 

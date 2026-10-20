@@ -4,18 +4,8 @@ using System.ComponentModel;
 
 namespace Spinneret.ViewModel;
 
-/// <summary>
-/// The rows of a collection a view model parses with <c>NestMany</c>. A row's field binding and its
-/// validation error are both keyed by the row's position — <c>Rows[2].Name</c> — so the position is
-/// part of the collection's state, not just of its contents. This owns the three things that have to
-/// stay in step with it:
-/// <list type="bullet">
-/// <item>each row's <see cref="INotifyPropertyChanged.PropertyChanged"/> subscription,</item>
-/// <item>the row's validation errors, which follow it when its index moves and go away when it does,</item>
-/// <item>the change notification: a row edit is raised at the row's own path, so only that row is
-/// revalidated, while adding, removing or moving rows is raised as a change to the collection.</item>
-/// </list>
-/// </summary>
+/// <summary>Rows parsed with <c>NestMany</c>, keeping index-keyed errors (<c>Rows[2].Name</c>) with their row as it moves.</summary>
+/// <remarks>A row edit is raised at the row's own path; adding, removing or moving rows is raised on the collection.</remarks>
 public sealed class RowCollection<TRow> : ObservableCollection<TRow>
     where TRow : BindableBase
 {
@@ -28,14 +18,10 @@ public sealed class RowCollection<TRow> : ObservableCollection<TRow>
         this.name = name;
     }
 
-    /// <summary>
-    /// The order as of the last notification. A <see cref="NotifyCollectionChangedAction.Reset"/> — which
-    /// is what <see cref="Collection{T}.Clear"/> and <see cref="ReplaceAll"/> raise — carries no items, so
-    /// the rows that left and the indexes they left behind can only be recovered from a remembered order.
-    /// </summary>
+    // A Reset carries no items, so departed rows and their indexes come from the remembered order.
     private List<TRow> _previous = [];
 
-    /// <summary>Swaps the whole list in one notification, for pages that rebuild their rows functionally.</summary>
+    /// <summary>Replaces all rows with a single Reset notification.</summary>
     public void ReplaceAll(IEnumerable<TRow> rows)
     {
         var replacement = rows.ToList();
@@ -86,8 +72,7 @@ public sealed class RowCollection<TRow> : ObservableCollection<TRow>
         for (var index = 0; index < current.Count; index++)
             currentIndexes[current[index]] = index;
 
-        // Every moved error is removed before any is re-added: two rows swapping places would otherwise
-        // have the first row's new key overwritten by the second row's removal of its old one.
+        // Remove all moved errors before re-adding any, so swapped rows don't clobber each other's keys.
         var moved = new List<(string Key, string Error)>();
 
         for (var previousIndex = 0; previousIndex < previous.Count; previousIndex++)

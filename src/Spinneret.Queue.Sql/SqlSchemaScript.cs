@@ -3,12 +3,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Spinneret.Queue.Sql;
 
-/// <summary>
-/// Runs an idempotent schema script at startup, retrying briefly: at boot the database is often
-/// still warming up next to the host (fresh container, failover). A database that stays unreachable
-/// fails startup, which is the right outcome for a host whose queue cannot work. The script supplies
-/// its own transaction and locking; it runs as one command outside any transaction.
-/// </summary>
+// Retries briefly because the database is often still starting next to the host.
 internal static class SqlSchemaScript
 {
     private const int MaxAttempts = 5;

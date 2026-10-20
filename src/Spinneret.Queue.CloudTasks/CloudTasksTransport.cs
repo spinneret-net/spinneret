@@ -9,11 +9,6 @@ using GcpHttpMethod = Google.Cloud.Tasks.V2.HttpMethod;
 
 namespace Spinneret.Queue.CloudTasks;
 
-/// <summary>
-/// Creates one Cloud Task per outbound message: an OIDC-authenticated POST of the envelope to
-/// <see cref="CloudTasksOptions.DispatcherUrl"/>, on the queue mapped to the message's channel. A
-/// message name becomes the task name, which Cloud Tasks deduplicates on.
-/// </summary>
 internal sealed class CloudTasksTransport(
     CloudTasksClient client,
     IOptions<CloudTasksOptions> cloudTasksOptions)
@@ -44,8 +39,7 @@ internal sealed class CloudTasksTransport(
             },
         };
 
-        // From the envelope, not the ambient activity, so header and body cannot disagree. It is what
-        // puts ASP.NET's own server span for the dispatch request in the business trace.
+        // From the envelope, not the ambient activity, so header and body cannot disagree.
         if (envelope.TraceParent is { } traceParent)
         {
             task.HttpRequest.Headers["traceparent"] = traceParent;
@@ -67,7 +61,6 @@ internal sealed class CloudTasksTransport(
         }
         catch (RpcException ex) when (message.MessageName is not null && ex.StatusCode == StatusCode.AlreadyExists)
         {
-            // A task with this name already exists (or recently did) — Cloud Tasks has the message.
             return false;
         }
     }

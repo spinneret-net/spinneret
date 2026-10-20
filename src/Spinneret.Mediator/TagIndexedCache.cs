@@ -89,7 +89,7 @@ internal sealed class TagIndexedCache(IMemoryCache inner) : ITagIndexedCache
             {
                 if (inner.TryGetValue(evictedKey, out _))
                 {
-                    // Key has been added again - do nothing.
+                    // Re-added since eviction; keep its tags.
                     return;
                 }
 

@@ -3,16 +3,7 @@ using Grpc.Core;
 
 namespace Spinneret.Queue.Firestore.Tests;
 
-/// <summary>
-/// The write side against a real Firestore (the emulator, via Testcontainers): that a dead letter
-/// lands as the document shape the contract promises, and that the first write wins however many
-/// times the transport redelivers.
-/// </summary>
-/// <remarks>
-/// What the emulator does not prove: it never enforces composite-index requirements, so a query it
-/// serves happily can still be rejected in production with FAILED_PRECONDITION. These tests pin
-/// document shape, ordering and transaction semantics — not index provisioning.
-/// </remarks>
+// The emulator doesn't enforce composite indexes, so these pin document shape and semantics only.
 [ClassDataSource<FirestoreEmulatorFixture>(Shared = SharedType.PerTestSession)]
 public sealed class FirestoreDeadLetterWriterTests(FirestoreEmulatorFixture fixture)
 {
@@ -46,7 +37,6 @@ public sealed class FirestoreDeadLetterWriterTests(FirestoreEmulatorFixture fixt
         await Assert.That(fields[DeadLetterDocument.Fields.Description]).IsEqualTo("nightly sync");
         await Assert.That(fields[DeadLetterDocument.Fields.PayloadJson]).IsEqualTo("""{"name":"ada"}""");
         await Assert.That(fields[DeadLetterDocument.Fields.Error]).IsEqualTo("boom");
-        // Firestore widens every integer to 64 bits, whatever width was written.
         await Assert.That(fields[DeadLetterDocument.Fields.Attempts]).IsEqualTo(3L);
         await Assert.That(fields[DeadLetterDocument.Fields.DeadLetteredAt])
             .IsEqualTo(Timestamp.FromDateTimeOffset(host.Clock.Now));
@@ -67,7 +57,6 @@ public sealed class FirestoreDeadLetterWriterTests(FirestoreEmulatorFixture fixt
     [Test]
     public async Task Stores_a_null_description_as_null_rather_than_omitting_the_field()
     {
-        // Readers see a consistent shape either way, which is what the docs promise.
         await using var host = DeadLetterTestHost.Start(fixture);
 
         await host.Writer.WriteAsync(Entry(description: null));
@@ -80,7 +69,7 @@ public sealed class FirestoreDeadLetterWriterTests(FirestoreEmulatorFixture fixt
     [Test]
     public async Task A_redelivered_write_keeps_the_instant_the_failure_actually_happened()
     {
-        // Create-not-Set: a Set would move deadLetteredAt forward on every redelivery.
+        // Create, not Set: a Set would move deadLetteredAt forward on every redelivery.
         await using var host = DeadLetterTestHost.Start(fixture);
         var first = host.Clock.Now;
 
@@ -97,8 +86,7 @@ public sealed class FirestoreDeadLetterWriterTests(FirestoreEmulatorFixture fixt
     [Test]
     public async Task Two_writers_racing_on_one_key_yield_a_single_document()
     {
-        // Genuine concurrency, not a sequential redelivery: the loser takes the AlreadyExists
-        // branch against a real Firestore rather than a hand-built RpcException.
+        // Genuine concurrency, so the loser hits the real AlreadyExists branch.
         await using var host = DeadLetterTestHost.Start(fixture);
 
         await Task.WhenAll(host.Writer.WriteAsync(Entry()), host.Writer.WriteAsync(Entry()));
@@ -109,12 +97,8 @@ public sealed class FirestoreDeadLetterWriterTests(FirestoreEmulatorFixture fixt
     [Test]
     public async Task Heavier_contention_still_never_produces_a_second_document()
     {
-        // Beyond two writers the emulator serializes same-document writes with a pessimistic lock
-        // and starts returning Aborted ("Transaction lock timeout") to the ones that wait too long.
-        // That is emulator vocabulary, not a library fault, and propagating it is what the writer
-        // is supposed to do: QueueDeliveryProcessor retries a failed dead-letter write rather than
-        // acknowledging the task. So the assertion is the invariant that survives either outcome —
-        // a writer may fail, but it may never end up having written a second entry.
+        // The emulator aborts waiting writers with lock timeouts (retried by the processor in production),
+        // so only the invariant holds: a writer may fail, but never writes a second document.
         await using var host = DeadLetterTestHost.Start(fixture);
 
         var outcomes = await Task.WhenAll(Enumerable.Range(0, 6).Select(async _ =>

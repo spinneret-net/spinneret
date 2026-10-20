@@ -4,8 +4,7 @@ namespace Spinneret.View.Tests;
 
 public class ViewResolverTests
 {
-    // ViewResolver is internal; the public way to obtain a configured instance is through
-    // AddMvvm, which scans the given assemblies for ViewBase<T> subclasses.
+    // ViewResolver is internal; AddMvvm is the public way to get a configured one.
     private static IViewResolver CreateResolver() =>
         new ServiceCollection()
             .AddMvvm<ClientRenderContext>(o => { o.AutoRegisterViewModels = false; o.Assemblies.Add(typeof(ViewResolverTests).Assembly); })
@@ -38,8 +37,7 @@ public class ViewResolverTests
     {
         var resolver = CreateResolver();
 
-        // TrioViewModel maps to TrioFirstView and TrioSecondView; neither matches "Trio",
-        // so the resolver falls back to the first mapped view (scan order is unspecified).
+        // Neither matches "Trio", so the resolver falls back to the first mapped view (order unspecified).
         var viewType = resolver.ResolveViewType(typeof(TrioViewModel));
 
         var isMappedView = viewType == typeof(TrioFirstView) || viewType == typeof(TrioSecondView);

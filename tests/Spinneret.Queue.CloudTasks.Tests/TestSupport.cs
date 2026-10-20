@@ -29,11 +29,7 @@ internal static class TestSetup
     public const string EmulatorEndpoint = "localhost:8123";
     public const string EmulatorIssuer = "http://localhost:8980";
 
-    /// <summary>
-    /// Emulator configuration. The issuer travels with the endpoint because the two are only valid
-    /// together: with an emulator but no issuer, the dispatch endpoint would still validate against
-    /// accounts.google.com and reject every emulator-minted token.
-    /// </summary>
+    // The issuer travels with the endpoint: without it, every emulator-minted token is rejected.
     public static IConfiguration EmulatorConfig(Action<Dictionary<string, string?>>? mutate = null) =>
         Config(values =>
         {
@@ -58,7 +54,6 @@ internal static class TestSetup
         return new ConfigurationBuilder().AddInMemoryCollection(values).Build();
     }
 
-    /// <summary>The queue every suite here composes: Cloud Tasks delivery, no storage.</summary>
     public static IServiceCollection AddTestQueue(
         this IServiceCollection services, IConfiguration? config = null, Assembly? requestAssembly = null) =>
         services.AddQueue(q => q
@@ -76,8 +71,7 @@ internal static class TestSetup
         configure?.Invoke(services);
         services.AddTestQueue(config, requestAssembly);
 
-        // Last registration wins for constructor injection, so this replaces the real
-        // client factory registration without touching the library's wiring.
+        // Last registration wins, so this replaces the real client factory.
         if (client is not null)
             services.AddSingleton(client);
 

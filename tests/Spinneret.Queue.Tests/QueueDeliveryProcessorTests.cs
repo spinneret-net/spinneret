@@ -10,10 +10,6 @@ public class QueueDeliveryProcessorTests
     private readonly FakeEnvelopeQueue _envelopeQueue = new();
     private readonly FakeDeadLetterWriter _deadLetters = new();
 
-    /// <summary>
-    /// QueueDeliveryProcessor is internal, so the processor is obtained the way a host gets it:
-    /// through AddQueueCore and the IQueueDeliveryProcessor registration.
-    /// </summary>
     private IQueueDeliveryProcessor CreateProcessor()
     {
         var services = new ServiceCollection();
@@ -38,10 +34,6 @@ public class QueueDeliveryProcessorTests
         TraceParent = traceParent,
     };
 
-    // -----------------------------------------------------------------------------------------
-    // Happy path
-    // -----------------------------------------------------------------------------------------
-
     [Test]
     public async Task ProcessAsync_successful_dispatch_acks_without_side_effects()
     {
@@ -54,10 +46,6 @@ public class QueueDeliveryProcessorTests
         await Assert.That(_deadLetters.Entries).IsEmpty();
         await Assert.That(_envelopeQueue.Enqueued).IsEmpty();
     }
-
-    // -----------------------------------------------------------------------------------------
-    // Transient failures: booked retries with doubling backoff
-    // -----------------------------------------------------------------------------------------
 
     [Test]
     public async Task ProcessAsync_failure_before_max_attempts_re_enqueues_with_doubling_backoff_and_books_the_failure()
@@ -98,7 +86,7 @@ public class QueueDeliveryProcessorTests
     {
         _dispatcher.Throw = new InvalidOperationException("boom");
 
-        // AnnotatedCommand declares MinBackoff 5s and MaxAttempts 2: attempt 1 of 2 retries in 5s.
+        // AnnotatedCommand: MinBackoff 5s, MaxAttempts 2.
         var outcome = await CreateProcessor().ProcessAsync(
             Envelope<AnnotatedCommand>(), "task-1", CancellationToken.None);
 
@@ -120,16 +108,12 @@ public class QueueDeliveryProcessorTests
         await Assert.That(_deadLetters.Entries).IsEmpty();
     }
 
-    // -----------------------------------------------------------------------------------------
-    // Exhaustion: attempts and age budgets
-    // -----------------------------------------------------------------------------------------
-
     [Test]
     public async Task ProcessAsync_failure_at_max_attempts_dead_letters()
     {
         _dispatcher.Throw = new InvalidOperationException("boom");
 
-        // Default policy: 7 attempts. 6 booked failures make this execution attempt 7, the final one.
+        // Default policy: 7 attempts, so 6 booked failures make this the final one.
         var outcome = await CreateProcessor().ProcessAsync(
             Envelope<UnannotatedCommand>(priorFailures: 6), "task-1", CancellationToken.None);
 
@@ -158,7 +142,7 @@ public class QueueDeliveryProcessorTests
     {
         _dispatcher.Throw = new InvalidOperationException("boom");
 
-        // The age bound is exclusive: a task exactly MaxAge old has not yet exceeded it.
+        // The age bound is exclusive.
         var outcome = await CreateProcessor().ProcessAsync(
             Envelope<UnannotatedCommand>(age: TimeSpan.FromDays(1)), "task-1", CancellationToken.None);
 
@@ -172,7 +156,7 @@ public class QueueDeliveryProcessorTests
     {
         _dispatcher.Throw = new InvalidOperationException("boom");
 
-        // DiscardOnExhaustion policy: 2 attempts. One booked failure makes this attempt 2, the final one.
+        // DiscardOnExhaustion policy: 2 attempts, so this is the final one.
         var outcome = await CreateProcessor().ProcessAsync(
             Envelope<DiscardOnExhaustionCommand>(priorFailures: 1), "task-1", CancellationToken.None);
 
@@ -192,10 +176,6 @@ public class QueueDeliveryProcessorTests
         await Assert.That(outcome.Ack).IsTrue();
         await Assert.That(_deadLetters.Entries).IsEmpty();
     }
-
-    // -----------------------------------------------------------------------------------------
-    // Permanent failures
-    // -----------------------------------------------------------------------------------------
 
     [Test]
     public async Task ProcessAsync_permanent_failure_dead_letters_immediately()
@@ -221,10 +201,6 @@ public class QueueDeliveryProcessorTests
         await Assert.That(outcome.Ack).IsTrue();
         await Assert.That(Expect.Single(_deadLetters.Entries).Error).IsEqualTo("defect");
     }
-
-    // -----------------------------------------------------------------------------------------
-    // Error results: policy-driven handling
-    // -----------------------------------------------------------------------------------------
 
     [Test]
     public async Task ProcessAsync_error_result_dead_letters_by_default()
@@ -280,10 +256,6 @@ public class QueueDeliveryProcessorTests
         await Assert.That(_envelopeQueue.Enqueued).IsEmpty();
     }
 
-    // -----------------------------------------------------------------------------------------
-    // Deferrals
-    // -----------------------------------------------------------------------------------------
-
     [Test]
     public async Task ProcessAsync_deferral_re_enqueues_unchanged_preserving_failures_and_original_enqueue_time()
     {
@@ -306,7 +278,7 @@ public class QueueDeliveryProcessorTests
     {
         _dispatcher.Throw = new QueueHandlerRetryAfterException(TimeSpan.FromHours(1));
 
-        // Annotated policy: MaxAge 1h. Age 30m plus a 1h deferral would exceed it.
+        // MaxAge 1h: 30m old plus a 1h deferral exceeds it.
         var outcome = await CreateProcessor().ProcessAsync(
             Envelope<AnnotatedCommand>(age: TimeSpan.FromMinutes(30)), "task-1", CancellationToken.None);
 
@@ -321,7 +293,7 @@ public class QueueDeliveryProcessorTests
     {
         _dispatcher.Throw = new QueueHandlerRetryAfterException(TimeSpan.FromMinutes(30));
 
-        // Age 30m + 30m deferral == MaxAge 1h exactly; the bound is exclusive.
+        // 30m + 30m == MaxAge exactly; the bound is exclusive.
         var outcome = await CreateProcessor().ProcessAsync(
             Envelope<AnnotatedCommand>(age: TimeSpan.FromMinutes(30)), "task-1", CancellationToken.None);
 
@@ -335,7 +307,7 @@ public class QueueDeliveryProcessorTests
     {
         _dispatcher.Throw = new QueueHandlerRetryAfterException(TimeSpan.FromMinutes(45));
 
-        // DiscardOnExhaustion policy: MaxAge 1h. Age 30m + 45m deferral exceeds it.
+        // MaxAge 1h: 30m old plus a 45m deferral exceeds it.
         var outcome = await CreateProcessor().ProcessAsync(
             Envelope<DiscardOnExhaustionCommand>(age: TimeSpan.FromMinutes(30)), "task-1", CancellationToken.None);
 
@@ -357,10 +329,6 @@ public class QueueDeliveryProcessorTests
         await Assert.That(outcome.RetryAfter).IsEqualTo(TimeSpan.FromMinutes(5));
         await Assert.That(_deadLetters.Entries).IsEmpty();
     }
-
-    // -----------------------------------------------------------------------------------------
-    // Unknown types and dead-letter plumbing
-    // -----------------------------------------------------------------------------------------
 
     [Test]
     public async Task ProcessAsync_unknown_request_type_within_the_rollout_window_is_redelivered_by_the_transport()
@@ -419,10 +387,6 @@ public class QueueDeliveryProcessorTests
         await Assert.That(outcome.Ack).IsFalse();
         await Assert.That(outcome.RetryAfter).IsEqualTo(TimeSpan.FromMinutes(1));
     }
-
-    // -----------------------------------------------------------------------------------------
-    // QueueDeliveryOutcome
-    // -----------------------------------------------------------------------------------------
 
     [Test]
     public async Task QueueDeliveryOutcome_acked_has_no_retry_delay()

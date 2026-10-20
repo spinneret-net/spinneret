@@ -1,9 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <!-- Helpers shared by the queue and scheduler test suites: container fixtures, recording doubles
-       and polling. A library, not a test application — tests/Directory.Build.props leaves out the
-       TUnit engine and the Exe output for this project, so it carries only TUnit.Core for the
-       fixture interfaces. -->
+  <!-- A library, not a test app: only TUnit.Core, for the fixture interfaces. -->
   <PropertyGroup>
     <OutputType>Library</OutputType>
   </PropertyGroup>

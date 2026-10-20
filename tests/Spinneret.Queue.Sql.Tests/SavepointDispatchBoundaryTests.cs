@@ -3,10 +3,6 @@ using Spinneret.Queue.Sql;
 
 namespace Spinneret.Queue.Sql.Tests;
 
-/// <summary>
-/// What the boundary asks of the dialect around a handler: a savepoint before, a rollback to it
-/// when the handler fails — including when it "succeeds" on a transaction the database aborted.
-/// </summary>
 public sealed class SavepointDispatchBoundaryTests
 {
     private static readonly QueueDeliveryContext Context = new()
@@ -58,9 +54,7 @@ public sealed class SavepointDispatchBoundaryTests
     [Test]
     public async Task A_handler_that_returned_on_an_aborted_transaction_fails_and_is_rolled_back()
     {
-        // The handler caught a database error itself. Its writes cannot commit — the database
-        // refuses the transaction — so reporting success would lose them along with the
-        // acknowledge. Failing the attempt keeps the retry and dead-letter accounting honest.
+        // The database aborted the transaction, so reporting success would silently lose the handler's writes.
         var (boundary, dialect) = Create();
         dialect.Aborted = true;
 

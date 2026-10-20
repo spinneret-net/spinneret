@@ -3,32 +3,19 @@ using Microsoft.Extensions.DependencyInjection;
 using Spinneret.Scheduler;
 using Spinneret.Scheduler.AspNetCore;
 
-// ReSharper disable once CheckNamespace — deliberate: endpoint extensions live in the
-// builder namespace so Map* calls are discoverable without a using directive.
+// ReSharper disable once CheckNamespace — builder namespace for discoverability.
 namespace Microsoft.AspNetCore.Builder;
 
 public static class SchedulerSweepEndpointRouteBuilderExtensions
 {
     /// <summary>
-    /// Maps an endpoint that runs one scheduler sweep per request, guarded by
-    /// <paramref name="authorizationPolicy"/>. The counterpart to <c>UseInHostSweeper()</c>:
-    /// use this where an external scheduler owns the clock — notably on a host that scales to
-    /// zero, which has no thread of its own to tick.
+    /// Maps an authorized endpoint that runs one scheduler sweep per request, for hosts driven by an external cron.
     /// </summary>
     /// <param name="endpoints">The route builder.</param>
     /// <param name="authorizationPolicy">
-    /// Name of the authorization policy protecting the endpoint. The sweep dispatches every due
-    /// job, so it must never be reachable unauthenticated. Hosts on Cloud Tasks pass
-    /// <c>CloudTasksAuth.PolicyName</c> to reuse the queue's OIDC scheme; any other host passes its
-    /// own policy. Required rather than defaulted, because this package cannot know what
-    /// authenticates the trigger — and guessing wrong would silently leave the sweep open.
+    /// Policy protecting the endpoint, e.g. <c>CloudTasksAuth.PolicyName</c>; required so the sweep is never left open.
     /// </param>
-    /// <param name="pattern">
-    /// Route for the endpoint; must match the scheduler trigger's target path. Defaults to
-    /// <c>/internal/scheduler/sweep</c>. Resolved here rather than declared as the parameter's
-    /// default value, because an optional-parameter default is copied into the calling assembly —
-    /// changing it later would move the route only for consumers who happened to recompile.
-    /// </param>
+    /// <param name="pattern">Route for the endpoint; defaults to <c>/internal/scheduler/sweep</c>.</param>
     public static IEndpointRouteBuilder MapSchedulerSweep(
         this IEndpointRouteBuilder endpoints,
         string authorizationPolicy,
@@ -39,14 +26,14 @@ public static class SchedulerSweepEndpointRouteBuilderExtensions
                 "An authorization policy name is required: the sweep endpoint dispatches every due job.",
                 nameof(authorizationPolicy));
 
-        // Exercised only when the trigger fires — in production, possibly long after deploy — so a
-        // missing scheduler must fail here rather than 500 on the first tick.
+        // Fail at startup rather than 500 on the first tick, possibly long after deploy.
         if (endpoints.ServiceProvider.GetService<ISchedulerSweep>() is null)
             throw new InvalidOperationException(
                 "MapSchedulerSweep requires a scheduler storage provider to be registered "
                 + "(AddScheduler with s.UseMssqlStorage, s.UsePostgresStorage, s.UseFirestoreStorage, or another): this package only exposes "
                 + "the trigger, and something has to tell it what is due.");
 
+        // Default resolved here, not as a parameter default, which would be baked into callers.
         return SchedulerSweepEndpoint.Map(
             endpoints, authorizationPolicy, pattern ?? SchedulerSweepEndpoint.DefaultRoutePattern);
     }

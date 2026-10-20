@@ -2,8 +2,7 @@ using Spinneret.Sql.Conformance;
 
 namespace Spinneret.Queue.Mssql.Tests;
 
-// The shared conformance suites (tests/Spinneret.Sql.Conformance/Queue), run on Mssql.
-// Each class only binds a suite to this database; the scenarios live in the base class.
+// Binds the shared suites in tests/Spinneret.Sql.Conformance/Queue to SQL Server.
 
 [InheritsTests]
 [ClassDataSource<MssqlContainerFixture>(Shared = SharedType.PerTestSession)]

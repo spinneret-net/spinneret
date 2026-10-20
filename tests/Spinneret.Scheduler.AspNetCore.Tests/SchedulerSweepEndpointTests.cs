@@ -8,10 +8,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Spinneret.Scheduler.AspNetCore.Tests;
 
-/// <summary>
-/// The endpoint is a trigger and nothing else: it resolves whatever <see cref="ISchedulerSweep"/>
-/// the host registered, so these tests use a fake and never touch a storage provider.
-/// </summary>
 public class SchedulerSweepEndpointTests
 {
     private const string TestPolicy = "TestSweepPolicy";
@@ -122,8 +118,6 @@ public class SchedulerSweepEndpointTests
     [Test]
     public async Task The_response_reports_what_the_sweep_dispatched()
     {
-        // The external scheduler is the only thing that knows a sweep happened, so the count has to
-        // travel back to it — otherwise a cron reports success identically whether it did work or not.
         var builder = RouteBuilder(new FakeSweep { JobsDispatched = 3 });
         builder.MapSchedulerSweep(TestPolicy);
         var endpoint = builder.DataSources.Single().Endpoints.Single();
@@ -156,7 +150,7 @@ public class SchedulerSweepEndpointTests
 
         var ex = Assert.Throws<InvalidOperationException>(() => builder.MapSchedulerSweep(TestPolicy));
 
-        // The message names the fix, not the missing type — that is what the reader needs.
+        // The message names the fix, not the missing type.
         await Assert.That(ex.Message).Contains("s.UseFirestoreStorage");
         await Assert.That(ex.Message).Contains("s.UseMssqlStorage");
     }

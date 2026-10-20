@@ -5,16 +5,7 @@ using Spinneret.Mediator;
 
 namespace Spinneret.Scheduler.Firestore.Tests;
 
-/// <summary>
-/// Registration and retirement against a real Firestore (the emulator, via Testcontainers): the
-/// register-or-refresh transaction, the cadence it must not disturb, and what many instances
-/// asserting the same job at once converge on.
-/// </summary>
-/// <remarks>
-/// What the emulator does not prove: it never enforces composite-index requirements, so a query it
-/// serves happily can still be rejected in production with FAILED_PRECONDITION. These tests pin
-/// document shape and transaction semantics — not index provisioning.
-/// </remarks>
+// The emulator never enforces composite indexes, so these tests don't cover index provisioning.
 [ClassDataSource<FirestoreEmulatorFixture>(Shared = SharedType.PerTestSession)]
 public sealed class FirestoreSchedulerIntegrationTests(FirestoreEmulatorFixture fixture)
 {
@@ -23,14 +14,8 @@ public sealed class FirestoreSchedulerIntegrationTests(FirestoreEmulatorFixture 
     private static readonly Schedule Hourly = Schedule.Cron("0 * * * *", Stockholm);
     private static readonly Schedule EveryTwoHours = Schedule.Cron("0 */2 * * *", Stockholm);
 
-    /// <summary>
-    /// Half past every hour. Paired with <see cref="Hourly"/> for the re-arm test because the two
-    /// can never fall due at the same instant — an every-N-hours expression coincides with the
-    /// hourly one for part of every day, which would make that test pass or fail by clock time.
-    /// </summary>
+    /// <summary>Never falls due together with <see cref="Hourly"/>, so the re-arm test is independent of clock time.</summary>
     private static readonly Schedule HalfPastEveryHour = Schedule.Cron("30 * * * *", Stockholm);
-
-    // ------------------------------------------------------------------------ registration ---
 
     [Test]
     public async Task RegisterAsync_creates_a_job_with_the_first_run_armed()
@@ -64,7 +49,6 @@ public sealed class FirestoreSchedulerIntegrationTests(FirestoreEmulatorFixture 
     [Test]
     public async Task RegisterAsync_with_unchanged_schedule_keeps_the_cadence()
     {
-        // Frequent restarts must not keep resetting a job's next run, or a slow cadence never fires.
         await using var host = await SchedulerTestHost.StartAsync(fixture);
 
         await host.Scheduler.RegisterAsync("stable", new TestRequest("v1"), Hourly);
@@ -72,7 +56,6 @@ public sealed class FirestoreSchedulerIntegrationTests(FirestoreEmulatorFixture 
 
         await host.Scheduler.RegisterAsync("stable", new TestRequest("v2"), Hourly);
 
-        // The definition refreshed in place but the already-scheduled run did not move.
         await Assert.That(await host.JobNextExecuteAt("stable")).IsEqualTo(armed);
         await Assert.That(await host.JobField<string>("stable", ScheduledJob.Fields.PayloadJson))
             .Contains("v2");
@@ -81,9 +64,7 @@ public sealed class FirestoreSchedulerIntegrationTests(FirestoreEmulatorFixture 
     [Test]
     public async Task RegisterAsync_that_changes_nothing_writes_nothing()
     {
-        // The ordinary case: every instance re-asserts every job on every startup. Firestore bills
-        // a write for a commit that sets identical values, and during a rolling deploy all of them
-        // land on the same document at once, so the no-op refresh must not reach the document.
+        // Firestore bills a write even for identical values, and every instance re-asserts every job at startup.
         await using var host = await SchedulerTestHost.StartAsync(fixture);
 
         await host.Scheduler.RegisterAsync("settled", new TestRequest("v1"), Hourly);
@@ -112,8 +93,6 @@ public sealed class FirestoreSchedulerIntegrationTests(FirestoreEmulatorFixture 
     [Test]
     public async Task RegisterAsync_recreates_a_job_that_is_gone()
     {
-        // A job that went terminal was deleted, so the register path must re-create rather than
-        // assume a document to update.
         await using var host = await SchedulerTestHost.StartAsync(fixture);
         await host.Scheduler.RegisterAsync("revived", new TestRequest("r"), Hourly);
         await host.Job("revived").DeleteAsync();
@@ -128,16 +107,8 @@ public sealed class FirestoreSchedulerIntegrationTests(FirestoreEmulatorFixture 
     [Test]
     public async Task RegisterAsync_from_many_instances_at_once_yields_one_job()
     {
-        // Ten instances of the same application all assert the same job as they start. The
-        // register-or-refresh runs in a Firestore transaction, so the concurrent attempts converge
-        // on one document instead of racing into duplicates.
-        //
-        // An individual attempt is allowed to fail: past a couple of writers the emulator
-        // serializes same-document transactions with a pessimistic lock and returns Aborted
-        // ("Transaction lock timeout") to whichever ones wait too long. That is emulator vocabulary,
-        // not a library fault, so the assertion is the invariant that holds either way — however
-        // many attempts got through, there is exactly one job. An instance whose attempt lost
-        // simply retries, which Parallel_installers_converge_on_one_job_per_key covers.
+        // The emulator may abort contending transactions ("Transaction lock timeout"); that is emulator
+        // behaviour, so only the one-job invariant is asserted.
         await using var host = await SchedulerTestHost.StartAsync(fixture);
 
         var outcomes = await Task.WhenAll(Enumerable.Range(0, 10).Select(async i =>
@@ -158,8 +129,6 @@ public sealed class FirestoreSchedulerIntegrationTests(FirestoreEmulatorFixture 
         await Assert.That(await host.JobCount()).IsEqualTo(1);
         await Assert.That(await host.JobExists("contested-parallel")).IsTrue();
     }
-
-    // -------------------------------------------------------------------- declared jobs ---
 
     [Test]
     public async Task RecurringJobInstaller_installs_declared_jobs_at_startup()
@@ -190,8 +159,6 @@ public sealed class FirestoreSchedulerIntegrationTests(FirestoreEmulatorFixture 
     [Test]
     public async Task Parallel_installers_converge_on_one_job_per_key()
     {
-        // The same contention one level up: ten hosts sharing a collection, each running its own
-        // installer against it.
         var collection = $"jobs_{Guid.NewGuid():N}";
         var hosts = await Task.WhenAll(Enumerable.Range(0, 10).Select(_ => SchedulerTestHost.StartAsync(
             fixture,
@@ -211,8 +178,6 @@ public sealed class FirestoreSchedulerIntegrationTests(FirestoreEmulatorFixture 
                 await host.DisposeAsync();
         }
     }
-
-    // ---------------------------------------------------------------------------- retiring ---
 
     [Test]
     public async Task UnregisterAsync_removes_a_recurring_job()
@@ -238,8 +203,7 @@ public sealed class FirestoreSchedulerIntegrationTests(FirestoreEmulatorFixture 
     [Test]
     public async Task UnregisterAsync_leaves_a_one_shot_job_untouched()
     {
-        // One-shot handles live in the same collection and carry no schedule field. Unregister is
-        // for recurring jobs, so it must not delete one by key collision.
+        // One-shots share the collection, so a key collision must not delete one.
         await using var host = await SchedulerTestHost.StartAsync(fixture);
         var handle = await ScheduleOneShot(host, new TestRequest("once"), DateTimeOffset.UtcNow.AddHours(1));
 
@@ -248,7 +212,6 @@ public sealed class FirestoreSchedulerIntegrationTests(FirestoreEmulatorFixture 
         await Assert.That(await host.JobExists(handle)).IsTrue();
     }
 
-    /// <summary>Commits a one-shot through the transactional scheduler and returns its handle.</summary>
     private static async Task<string> ScheduleOneShot(
         SchedulerTestHost host, IRequest<Unit> request, DateTimeOffset executeAt)
     {

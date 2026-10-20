@@ -4,13 +4,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Spinneret.Mediator.Tests;
 
-/// <summary>
-/// Behaviors wrap every send, in registration order, inside the send's own span.
-/// </summary>
-/// <remarks>
-/// Request types are exclusive to this class for the same reason as in <see cref="MediatorTracingTests"/>:
-/// the collecting listener is process-wide.
-/// </remarks>
 public class MediatorBehaviorTests
 {
     [Test]
@@ -138,8 +131,6 @@ public class MediatorBehaviorTests
     }
 }
 
-// --- Behaviors ---------------------------------------------------------------------
-
 internal sealed class RecordingBehavior(string name, ConcurrentQueue<string> log) : IMediatorBehavior
 {
     public async Task<TResponse> Handle<TResponse>(IRequest<TResponse> request, Func<Task<TResponse>> next, CancellationToken cancellationToken)
@@ -205,7 +196,7 @@ internal sealed class TokenCapturingBehavior(Action<CancellationToken> capture) 
     }
 }
 
-// --- Requests exclusive to this class ---------------------------------------------
+// Exclusive to this class: the tracing listener is process-wide.
 
 internal sealed record BehaviorEchoQuery(int Value) : IRequest<int>;
 

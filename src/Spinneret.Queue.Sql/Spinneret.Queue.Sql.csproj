@@ -21,11 +21,7 @@
     </ItemGroup>
 
     <ItemGroup>
-        <!-- SqlQueueDialect, SqlQueueStorage and the registration helper: a dialect package supplies
-             the statements and the data source, and registers the storage through the helper. The
-             SQL scheduler dispatches inside the same unit of work as the queue it feeds, so it
-             shares the storage, the unit of work and the command helpers, and a scheduler dialect
-             follows its queue dialect's identifier rules. -->
+        <!-- Dialect and scheduler packages share the internal storage, unit of work and command helpers. -->
         <InternalsVisibleTo Include="Spinneret.Queue.Sql.Tests" />
         <InternalsVisibleTo Include="Spinneret.Queue.Mssql" />
         <InternalsVisibleTo Include="Spinneret.Queue.Mssql.Tests" />

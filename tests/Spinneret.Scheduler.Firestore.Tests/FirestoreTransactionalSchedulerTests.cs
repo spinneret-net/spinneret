@@ -2,12 +2,6 @@ using Google.Cloud.Firestore;
 
 namespace Spinneret.Scheduler.Firestore.Tests;
 
-/// <summary>
-/// One-shot jobs enlisted in a caller-owned Firestore transaction, against a real Firestore (the
-/// emulator, via Testcontainers): that the job commits or vanishes with the caller's own changes,
-/// which is the whole reason the interface takes a <see cref="Transaction"/> rather than doing its
-/// own write.
-/// </summary>
 [ClassDataSource<FirestoreEmulatorFixture>(Shared = SharedType.PerTestSession)]
 public sealed class FirestoreTransactionalSchedulerTests(FirestoreEmulatorFixture fixture)
 {
@@ -33,8 +27,6 @@ public sealed class FirestoreTransactionalSchedulerTests(FirestoreEmulatorFixtur
     [Test]
     public async Task A_one_shot_commits_atomically_with_the_callers_own_write()
     {
-        // The reason the interface exists: scheduling the follow-up work and recording what caused
-        // it land together or not at all.
         await using var host = await SchedulerTestHost.StartAsync(fixture);
         var businessDoc = host.Db.Collection($"business_{Guid.NewGuid():N}").Document("termination");
 
@@ -92,9 +84,7 @@ public sealed class FirestoreTransactionalSchedulerTests(FirestoreEmulatorFixtur
     [Test]
     public async Task Cancelling_a_job_that_already_ran_is_a_silent_no_op()
     {
-        // A delete needs no read and does not care whether the document is there, which is what
-        // keeps CancelJob write-only — Firestore requires every read to precede every write, and the
-        // caller may already have written to this transaction.
+        // Firestore requires reads before writes, so CancelJob stays write-only; a delete needs no read.
         await using var host = await SchedulerTestHost.StartAsync(fixture);
         var handle = await Commit(host, tx =>
             host.TransactionalScheduler.ScheduleJob(tx, new TestRequest("gone"), DateTimeOffset.UtcNow));
@@ -112,9 +102,7 @@ public sealed class FirestoreTransactionalSchedulerTests(FirestoreEmulatorFixtur
     [Test]
     public async Task Cancelling_with_a_recurring_key_is_rejected_and_leaves_the_schedule_intact()
     {
-        // Recurring keys share this collection, so an unguarded cancel would silently destroy a
-        // schedule. The guard is on the handle itself rather than on the stored document, because
-        // reading here would break the write-only contract.
+        // Guarded on the handle, since reading the document would break the write-only contract.
         await using var host = await SchedulerTestHost.StartAsync(fixture);
         await host.Scheduler.RegisterAsync("nightly", new TestRequest("n"), Hourly);
 
@@ -141,7 +129,7 @@ public sealed class FirestoreTransactionalSchedulerTests(FirestoreEmulatorFixtur
     [Test]
     public async Task A_one_shot_carries_no_schedule_field()
     {
-        // Its absence is what marks a document as one-shot, for both the dispatcher and unregister.
+        // Its absence is what marks a document as one-shot.
         await using var host = await SchedulerTestHost.StartAsync(fixture);
 
         var handle = await Commit(host, tx =>
@@ -181,7 +169,6 @@ public sealed class FirestoreTransactionalSchedulerTests(FirestoreEmulatorFixtur
         })).Throws<ArgumentException>();
     }
 
-    /// <summary>Runs <paramref name="work"/> in a committed transaction and returns what it produced.</summary>
     private static async Task<string> Commit(SchedulerTestHost host, Func<Transaction, string> work)
     {
         string result = null!;

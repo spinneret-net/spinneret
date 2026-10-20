@@ -2,11 +2,7 @@ using Google.Cloud.Firestore;
 
 namespace Spinneret.Queue.Firestore.Tests;
 
-/// <summary>
-/// The document shape is a data contract: readers bind to these field names, so a rename here
-/// silently breaks every existing dead-letter page. These tests pin the names and the value forms.
-/// Talking to Firestore itself needs a live server and is intentionally out of scope.
-/// </summary>
+// Readers bind to these field names, so a rename silently breaks existing dead-letter pages.
 public class DeadLetterDocumentTests
 {
     internal static readonly DateTimeOffset At = new(2026, 8, 15, 10, 30, 0, TimeSpan.Zero);
@@ -65,8 +61,7 @@ public class DeadLetterDocumentTests
     [Test]
     public async Task Reads_a_document_written_before_the_trace_id_existed()
     {
-        // Optional on read, unlike every required field: entries already in the store predate the
-        // column, and an old dead letter must stay readable rather than throw on the admin page.
+        // Entries already in the store predate the trace id, so it is optional on read.
         var fields = DeadLetterDocument.From(Entry(), At);
         fields.Remove("traceId");
 
@@ -80,7 +75,7 @@ public class DeadLetterDocumentTests
     [Arguments(DeadLetterSource.Scheduler, "Scheduler")]
     public async Task Persists_the_source_as_its_member_name(DeadLetterSource source, string expected)
     {
-        // Matches the MSSQL writer's column value, so one reader serves either store.
+        // Matches the MSSQL writer's value, so one reader serves either store.
         var fields = DeadLetterDocument.From(Entry(source), At);
 
         await Assert.That(fields["source"]).IsEqualTo(expected);
@@ -97,8 +92,6 @@ public class DeadLetterDocumentTests
     [Test]
     public async Task Keeps_a_null_description_as_an_explicit_null()
     {
-        // Present-but-null rather than absent, so a reader binding the field sees a consistent
-        // shape across entries instead of a missing-field error on some of them.
         var fields = DeadLetterDocument.From(Entry(description: null), At);
 
         await Assert.That(fields.ContainsKey("description")).IsTrue();

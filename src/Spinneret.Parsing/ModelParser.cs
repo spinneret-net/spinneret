@@ -2,11 +2,7 @@ using Spinneret.Functional;
 
 namespace Spinneret.Parsing;
 
-/// <summary>
-/// Parses an input model into a typed result in one pass, producing either the parsed value
-/// or the complete list of invalid properties. Implemented by the library — inject and call;
-/// register with AddModelParser.
-/// </summary>
+/// <summary>Parses a model into either the parsed value or the full list of invalid properties.</summary>
 public interface IModelParser<TError>
 {
     Result<TParsed, IReadOnlyList<InvalidProperty<TError>>> Parse<TModel, TParsed>(

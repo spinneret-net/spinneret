@@ -72,8 +72,7 @@ public class DirectQueueTests
     [Test]
     public async Task Re_enqueued_envelope_keeps_its_history_and_gets_no_name()
     {
-        // A booked retry is a fresh generation: anonymous, so it can never collide with the task it
-        // replaces, while PriorFailures and EnqueuedAtUtc travel unchanged.
+        // Anonymous so it can't collide with the task it replaces.
         var (_, envelopes) = Create();
         var envelope = new QueueEnvelope
         {

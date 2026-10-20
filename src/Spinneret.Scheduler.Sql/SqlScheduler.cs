@@ -23,8 +23,7 @@ internal sealed class SqlScheduler(
         var now = timeProvider.GetUtcNow();
         var timestamps = storage.Queue.Dialect;
 
-        // One statement, so an idempotent refresh racing another host's — every replica registers
-        // its declared jobs at startup — converges on one row instead of colliding on the insert.
+        // One statement, so replicas registering concurrently at startup converge instead of colliding.
         await using var connection = await storage.Queue.DataSource.OpenConnectionAsync(ct);
         await using var command = connection.CreateCommand(transaction: null, storage.Statements.UpsertRecurring);
         command.AddParameter("@JobKey", key);
@@ -49,28 +48,22 @@ internal sealed class SqlScheduler(
 }
 
 /// <summary>
-/// Schedules and cancels one-shot jobs as part of a caller-owned SQL transaction, so the job row
-/// commits atomically with the caller's other changes (e.g. scheduling an employee's removal in
-/// the same transaction that records the termination). The job row is identical to those the
-/// standalone scheduler writes, so the shared dispatch sweep picks it up uniformly.
+/// Schedules and cancels one-shot jobs in a caller-owned SQL transaction, committing atomically with the caller's changes.
 /// </summary>
 public interface ISqlTransactionalScheduler
 {
     /// <summary>
-    /// Inserts a one-shot job — to run once at <paramref name="executeAt"/> — on the given
-    /// <paramref name="transaction"/>. Returns the handle to pass to <see cref="CancelJobAsync"/>.
+    /// Inserts a one-shot job to run once at <paramref name="executeAt"/> on <paramref name="transaction"/>.
     /// </summary>
+    /// <returns>The handle to pass to <see cref="CancelJobAsync"/>.</returns>
     Task<string> ScheduleJobAsync<TResponse>(
         DbTransaction transaction, IRequest<TResponse> request, DateTimeOffset executeAt, CancellationToken ct = default);
 
     /// <summary>
-    /// Cancels the job identified by <paramref name="handle"/> within the transaction, by deleting
-    /// its row. Cancelling a job that already ran, or an unknown handle, is a silent no-op.
+    /// Cancels the job identified by <paramref name="handle"/>; an unknown or already-run handle is a no-op.
     /// </summary>
     /// <exception cref="ArgumentException">
-    /// <paramref name="handle"/> was not issued by <see cref="ScheduleJobAsync{TResponse}"/>. Recurring keys
-    /// share this table, so this guards against a cancel silently destroying a schedule; retire
-    /// those with <c>IRecurringJobScheduler.UnregisterAsync</c> instead.
+    /// <paramref name="handle"/> was not issued by <see cref="ScheduleJobAsync{TResponse}"/>; use <c>UnregisterAsync</c> for recurring jobs.
     /// </exception>
     Task CancelJobAsync(DbTransaction transaction, string handle, CancellationToken ct = default);
 }

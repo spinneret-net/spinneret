@@ -89,7 +89,7 @@ public class QueuePolicyTests
     [Arguments(int.MaxValue)]
     public async Task BackoffFor_large_min_backoff_at_high_attempt_caps_without_overflow(int attempt)
     {
-        // 30 min * 2^30 overflows TimeSpan tick arithmetic; the cap must win before multiplying.
+        // 30 min * 2^30 overflows TimeSpan; the cap must win before multiplying.
         var policy = new QueuePolicy { MinBackoff = TimeSpan.FromMinutes(30), MaxBackoff = TimeSpan.FromHours(1) };
 
         var backoff = policy.BackoffFor(attempt);

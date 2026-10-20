@@ -4,7 +4,6 @@ using Spinneret.Queue.Sql;
 
 namespace Spinneret.Queue.Sql.Tests;
 
-/// <summary>Minimal DbTransaction stand-in; nothing here ever reaches a database.</summary>
 internal sealed class FakeTransaction : DbTransaction
 {
     public override IsolationLevel IsolationLevel => IsolationLevel.ReadCommitted;
@@ -13,7 +12,6 @@ internal sealed class FakeTransaction : DbTransaction
     public override void Rollback() { }
 }
 
-/// <summary>A data source that records its disposal and never connects.</summary>
 internal sealed class FakeDataSource : DbDataSource
 {
     public bool Disposed { get; private set; }
@@ -31,15 +29,10 @@ internal sealed class FakeDataSource : DbDataSource
     }
 }
 
-/// <summary>
-/// A dialect whose statements are placeholders and whose savepoint calls are recorded, for testing
-/// what the shared code asks of a dialect rather than what a database does with it.
-/// </summary>
 internal sealed class FakeDialect(int maxIdentifierLength = 30) : SqlQueueDialect
 {
     public List<string> Calls { get; } = [];
 
-    /// <summary>What <see cref="IsAbortedAsync"/> reports.</summary>
     public bool Aborted { get; set; }
 
     public override string Name => "fake";

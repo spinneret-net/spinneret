@@ -4,10 +4,6 @@ using Spinneret.Mediator;
 
 namespace Spinneret.Scheduler.Tests;
 
-// ---------------------------------------------------------------------------------------------
-// Hand-rolled fakes for the scheduler abstractions. No mocking library is used.
-// ---------------------------------------------------------------------------------------------
-
 public sealed record TestRequest(string Name) : IRequest<Unit>;
 
 public sealed record OtherTestRequest(int Number) : IRequest<Unit>;
@@ -67,7 +63,6 @@ public sealed class FakeRecurringJob(string key, Schedule schedule, IRequest<Uni
     public IRequest<Unit> CreateRequest() => request;
 }
 
-/// <summary>A job whose request returns something other than <see cref="Unit"/>.</summary>
 public sealed class FakeStringResponseJob(string key, Schedule schedule, IRequest<string> request)
     : IRecurringJob<string>
 {
@@ -92,10 +87,7 @@ public sealed class ThrowingCreateRequestJob(string key) : IRecurringJob<Unit>
 
 internal static class TestSchedulerStorage
 {
-    /// <summary>
-    /// A storage for the builder that is nothing but the given sweep and a recording scheduler — the
-    /// clock and the installer are what is under test, not where jobs live.
-    /// </summary>
+    /// <summary>Storage that is just the given sweep and a recording scheduler.</summary>
     public static SchedulerBuilder UseTestStorage(this SchedulerBuilder scheduler, ISchedulerSweep sweep) =>
         scheduler.UseStorage(new SchedulerStorageRole("UseTestStorage", services =>
         {

@@ -1,32 +1,19 @@
 using System.Reflection;
 using Spinneret.Mediator;
 
-// ReSharper disable once CheckNamespace — deliberate: registration extensions live in the
-// DI namespace so every Add* call is discoverable without a using directive.
+// ReSharper disable once CheckNamespace — discoverable without a using
 namespace Microsoft.Extensions.DependencyInjection;
 
 public static class MediatorServiceCollectionExtensions
 {
-    /// <summary>
-    /// Registers the mediator, its response cache, and every <see cref="IRequestHandler{TRequest, TResponse}"/>
-    /// found in the entry assembly. Fails at startup on duplicate handlers or invalid
-    /// <see cref="CacheAttribute"/> / <see cref="InvalidateCacheAttribute"/> declarations.
-    /// </summary>
+    /// <summary>Registers the mediator, its cache, and every <see cref="IRequestHandler{TRequest, TResponse}"/> in the entry assembly.</summary>
     public static IServiceCollection AddMediator(this IServiceCollection services) =>
         services.AddMediator([
             Assembly.GetEntryAssembly() ?? throw new InvalidOperationException(
                 "Entry assembly could not be determined. Specify mediator assemblies explicitly: "
                 + "AddMediator([typeof(Program).Assembly]).")]);
 
-    /// <summary>
-    /// Registers the mediator, its response cache, and every <see cref="IRequestHandler{TRequest, TResponse}"/>
-    /// found in <paramref name="mediatorAssemblies"/>. Fails at startup on duplicate handlers or
-    /// invalid <see cref="CacheAttribute"/> / <see cref="InvalidateCacheAttribute"/> declarations.
-    /// </summary>
-    /// <remarks>
-    /// Takes a collection rather than a <c>params</c> array deliberately: a <c>params</c> parameter
-    /// must come last, which would permanently block adding anything to this signature.
-    /// </remarks>
+    /// <summary>Registers the mediator, its cache, and every <see cref="IRequestHandler{TRequest, TResponse}"/> in <paramref name="mediatorAssemblies"/>.</summary>
     public static IServiceCollection AddMediator(
         this IServiceCollection services, IReadOnlyCollection<Assembly> mediatorAssemblies)
     {
@@ -62,18 +49,14 @@ public static class MediatorServiceCollectionExtensions
         return services.AddScoped<ISpinneretMediator, SpinneretMediator>();
     }
 
-    /// <summary>
-    /// Registers an <see cref="IMediatorBehavior"/> that wraps every send. Behaviors run in the
-    /// order they are added, the first added outermost. Scoped, like the mediator itself.
-    /// </summary>
+    /// <summary>Registers a scoped <see cref="IMediatorBehavior"/>; the first added runs outermost.</summary>
     public static IServiceCollection AddMediatorBehavior<TBehavior>(this IServiceCollection services)
         where TBehavior : class, IMediatorBehavior =>
         services.AddScoped<IMediatorBehavior, TBehavior>();
 
     private static void ValidateCacheAttributes(Type requestType)
     {
-        // Attribute constructors validate duration and tag types; instantiating them here
-        // surfaces a bad declaration at startup instead of on the first Send.
+        // Instantiating the attributes runs their validation at startup, not on the first Send.
         try
         {
             _ = requestType.GetCustomAttribute<CacheAttribute>();

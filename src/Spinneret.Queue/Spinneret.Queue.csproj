@@ -20,26 +20,20 @@
 
     <ItemGroup>
         <InternalsVisibleTo Include="Spinneret.Queue.Tests" />
-        <!-- AddQueueCore: provider suites compose the core around recording doubles (an IQueue that
-             only records), which AddQueue rightly refuses. -->
+        <!-- AddQueueCore: provider suites compose the core around test doubles AddQueue refuses. -->
         <InternalsVisibleTo Include="Spinneret.Queue.CloudTasks.Tests" />
         <InternalsVisibleTo Include="Spinneret.Queue.Firestore.Tests" />
         <InternalsVisibleTo Include="Spinneret.Queue.Mssql.Tests" />
         <InternalsVisibleTo Include="Spinneret.Queue.Postgres.Tests" />
         <InternalsVisibleTo Include="Spinneret.Scheduler.Firestore.Tests" />
-        <!-- ResolvedRequestEnqueuer: the scheduler sweeps enqueue requests they read back from a
-             store, so their response type is only known at runtime. -->
+        <!-- ResolvedRequestEnqueuer. -->
         <InternalsVisibleTo Include="Spinneret.Scheduler.Firestore" />
         <InternalsVisibleTo Include="Spinneret.Scheduler.Sql" />
-        <!-- DeadLetterStorage and DeadLetterCursor: the source spelling and the cursor encoding are
-             one contract shared by every dead-letter store, not a per-provider decision. -->
+        <!-- DeadLetterStorage and DeadLetterCursor: one contract for every dead-letter store. -->
         <InternalsVisibleTo Include="Spinneret.Queue.Firestore" />
-        <!-- The unit-of-work seam, the delivery pipeline and the envelope factory: the SQL storage
-             supplies the transaction a delivery runs in and builds envelopes the same way the
-             transports do. -->
+        <!-- Unit of work, delivery pipeline and envelope factory. -->
         <InternalsVisibleTo Include="Spinneret.Queue.Sql" />
-        <!-- QueueTracing: the consumer parses back exactly what the producer wrote, so publishing a
-             span and stamping trace context is one shared contract, not a per-transport decision. -->
+        <!-- QueueTracing: producer and consumer share one trace-context contract. -->
         <InternalsVisibleTo Include="Spinneret.Queue.CloudTasks" />
     </ItemGroup>
 

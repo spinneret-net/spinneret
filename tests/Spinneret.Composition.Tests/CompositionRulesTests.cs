@@ -7,7 +7,6 @@ using Spinneret.Sql.Conformance;
 
 namespace Spinneret.Composition.Tests;
 
-/// <summary>Which compositions hold together, asserted on registrations — no database needed.</summary>
 public sealed class CompositionRulesTests
 {
     private static IConfiguration Configuration() => new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
@@ -130,9 +129,7 @@ public sealed class CompositionRulesTests
     [Test]
     public async Task A_scheduler_on_one_database_beside_a_queue_on_another_fails_when_the_host_starts()
     {
-        // A due job's booking and its enqueue commit in one transaction, which no two databases can
-        // share. Registration order is free, so the check runs as the host starts — before any
-        // hosted service, so the schema initializer never creates a table in the wrong database.
+        // Checked as the host starts, before the schema initializer could create a table in the wrong database.
         using var host = new HostBuilder()
             .ConfigureServices(services =>
             {

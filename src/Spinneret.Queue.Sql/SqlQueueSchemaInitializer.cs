@@ -3,9 +3,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Spinneret.Queue.Sql;
 
-/// <summary>
-/// Creates the queue tables idempotently at startup, before the worker and producers touch them.
-/// </summary>
 internal sealed class SqlQueueSchemaInitializer(
     SqlQueueStorage storage,
     ILogger<SqlQueueSchemaInitializer> logger)

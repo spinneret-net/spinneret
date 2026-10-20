@@ -3,11 +3,7 @@ using Spinneret.Mediator;
 
 namespace Spinneret.Queue;
 
-/// <summary>
-/// <see cref="IQueue"/> straight onto a push transport, for hosts with no message storage. Each
-/// enqueue is a call to the transport, so it is not atomic with anything else the caller writes —
-/// that guarantee needs a storage package, whose outbox the transport is then fed from.
-/// </summary>
+// Sends straight to the transport; not atomic with the caller's other writes (that needs an outbox).
 internal sealed class DirectQueue(
     IQueueTransport transport,
     QueueEnvelopeFactory envelopes,
@@ -34,7 +30,7 @@ internal sealed class DirectQueue(
 
         var created = await transport.SendAsync(new OutboundMessage(envelope, channel, deliverAt, messageName), ct);
 
-        // The documented DedupeKey contract is "only one delivery", so a duplicate is success.
+        // DedupeKey promises one delivery, so a duplicate counts as success.
         if (!created)
             logger.LogDebug(
                 "Skipped enqueue of {RequestType} on channel {Channel}: dedupe key {DedupeKey} already enqueued",
