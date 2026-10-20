@@ -20,88 +20,9 @@ public sealed record PingCommand(string Name) : IRequest<Unit>;
 
 public sealed record ReportCommand(string Name) : IRequest<string>;
 
-/// <summary>Records what a resend put back on the queue, so the enqueue can be asserted without a transport.</summary>
-public sealed class RecordingQueue : IQueue
-{
-    private readonly ConcurrentQueue<object> _enqueued = new();
-
-    /// <summary>Set to fail the next enqueue, for the "resend leaves the entry in place" paths.</summary>
-    public Exception? FailWith { get; set; }
-
-    public IReadOnlyCollection<object> Enqueued => [.. _enqueued];
-
-    public Task Enqueue<TResponse>(IRequest<TResponse> request, QueueOptions? options = null, CancellationToken ct = default)
-    {
-        if (FailWith is { } failure)
-            return Task.FromException(failure);
-
-        _enqueued.Enqueue(request);
-        return Task.CompletedTask;
-    }
-}
-
-/// <summary>
-/// A real JSON serializer rather than a stub: a resend round-trips the stored payload back into the
-/// command, and only a real one proves the payload the writer stored is still deserializable.
-/// </summary>
-public sealed class JsonPayloadSerializer : IQueuePayloadSerializer
-{
-    private static readonly JsonSerializerOptions Options = new(JsonSerializerDefaults.Web);
-
-    public string Serialize(object request, Type requestType) => JsonSerializer.Serialize(request, requestType, Options);
-
-    public object? Deserialize(string json, Type requestType) => JsonSerializer.Deserialize(json, requestType, Options);
-}
-
-/// <summary>A clock frozen at a known instant, so stored timestamps are assertable.</summary>
-public sealed class FixedTimeProvider(DateTimeOffset now) : TimeProvider
-{
-    public DateTimeOffset Now { get; set; } = now;
-
-    public override DateTimeOffset GetUtcNow() => Now;
-}
-
 // ---------------------------------------------------------------------------------------------
 // Docker fixture and host harness.
 // ---------------------------------------------------------------------------------------------
-
-/// <summary>
-/// One Firestore emulator for the whole test session; each test isolates itself with a unique
-/// collection name, mirroring how the MSSQL suites isolate with unique table names.
-/// </summary>
-/// <remarks>
-/// The emulator is reached through <c>FIRESTORE_EMULATOR_HOST</c> and
-/// <see cref="EmulatorDetection.EmulatorOnly"/> rather than an explicit endpoint, because that is
-/// the wiring <c>docs/queue-firestore.md</c> tells hosts to use — so the fixture exercises the
-/// documented path. The environment variable is process-global, which is safe here: it is set once,
-/// before any <see cref="FirestoreDb"/> in this assembly is built.
-/// </remarks>
-public sealed class FirestoreEmulatorFixture : IAsyncInitializer, IAsyncDisposable
-{
-    /// <summary>
-    /// Pinned rather than floating, the same way the MSSQL fixture pins its server image: an
-    /// emulator that changes underneath the suite turns a red build into a mystery.
-    /// </summary>
-    private const string Image = "gcr.io/google.com/cloudsdktool/google-cloud-cli:580.0.0-emulators";
-
-    public const string ProjectId = "spinneret-tests";
-
-    private readonly FirestoreContainer _container = new FirestoreBuilder(Image).Build();
-
-    public async Task InitializeAsync()
-    {
-        await _container.StartAsync();
-
-        // GetEmulatorEndpoint() renders "http://host:port/"; the variable wants a bare host:port.
-        var endpoint = new Uri(_container.GetEmulatorEndpoint());
-        Environment.SetEnvironmentVariable("FIRESTORE_EMULATOR_HOST", $"{endpoint.Host}:{endpoint.Port}");
-    }
-
-    public FirestoreDb CreateDb() =>
-        new FirestoreDbBuilder { ProjectId = ProjectId, EmulatorDetection = EmulatorDetection.EmulatorOnly }.Build();
-
-    public async ValueTask DisposeAsync() => await _container.DisposeAsync();
-}
 
 /// <summary>
 /// A DI container with the Firestore dead-letter writer and store registered against a collection
@@ -144,7 +65,7 @@ public sealed class DeadLetterTestHost : IAsyncDisposable
         services.AddSingleton<IQueue>(sp => sp.GetRequiredService<RecordingQueue>());
         services.AddSingleton<IQueuePayloadSerializer, JsonPayloadSerializer>();
         services.AddQueueCore([typeof(DeadLetterTestHost).Assembly]);
-        services.AddFirestoreDeadLetters(o => o.Collection = collection);
+        services.AddDeadLetters(q => q.UseFirestoreDeadLetters(o => o.Collection = collection));
 
         return new DeadLetterTestHost(services.BuildServiceProvider(), db, collection);
     }
@@ -212,4 +133,17 @@ public sealed class DeadLetterTestHost : IAsyncDisposable
     }
 
     public async ValueTask DisposeAsync() => await _provider.DisposeAsync();
+}
+
+internal static class TestRegistration
+{
+    /// <summary>
+    /// Registers only the dead-letter role a builder call chose, as <c>AddQueue</c> would — so the
+    /// store's own registrations are assertable without composing a whole queue around them.
+    /// </summary>
+    public static IServiceCollection AddDeadLetters(this IServiceCollection services, Func<QueueBuilder, QueueBuilder> use)
+    {
+        use(new QueueBuilder(services)).DeadLetters!.Register(services);
+        return services;
+    }
 }

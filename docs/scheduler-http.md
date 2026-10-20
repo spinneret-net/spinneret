@@ -2,7 +2,7 @@
 
 An authorized endpoint that runs one scheduler sweep per request.
 
-The counterpart to `AddSchedulerSweeper()`: use it where an external scheduler owns the clock. That is
+The counterpart to `s.UseSweeper()`: use it where an external scheduler owns the clock. That is
 the normal arrangement on a host that scales to zero, which has no thread of its own to tick — and
 where an inbound request conveniently both wakes the service and triggers the sweep.
 
@@ -15,12 +15,15 @@ dotnet add package Spinneret.Scheduler.Http
 ```
 
 ```csharp
-services.AddGcpQueue(configuration, o => o.RequestAssemblies = [typeof(SyncCustomer).Assembly]);
-services.AddFirestoreScheduler(configuration);
+services.AddQueue(q => q
+    .AddRequestAssemblies(typeof(SyncCustomer).Assembly)
+    .UseCloudTasksDelivery(configuration)
+    .UseFirestoreDeadLetters(configuration));
+services.AddScheduler(s => s.UseFirestore(configuration));   // no UseSweeper: the endpoint is the clock
 
 app.UseAuthentication();
 app.UseAuthorization();
-app.MapSchedulerSweep(OidcAuthSetup.PolicyName);   // using Spinneret.Queue.Gcp;
+app.MapSchedulerSweep(CloudTasksAuth.PolicyName);   // using Spinneret.Queue.CloudTasks;
 ```
 
 ```csharp
@@ -34,7 +37,7 @@ app.MapSchedulerSweep(
 
 | | |
 |---|---|
-| **A storage provider** | `AddFirestoreScheduler` or `AddMssqlScheduler`. Mapping without one throws — a sweep endpoint with nothing to sweep looks healthy while doing nothing. |
+| **A scheduler storage** | `AddScheduler(s => s.UseFirestore(...))` or `s.UseMssql(...)`. Mapping without one throws — a sweep endpoint with nothing to sweep looks healthy while doing nothing. |
 | **An authorization policy** | Required, not defaulted. Passing a blank one throws. |
 | **Auth middleware** | `UseAuthentication()` / `UseAuthorization()` before endpoints. |
 
@@ -44,8 +47,8 @@ The sweep dispatches **every due job**, so an unauthenticated endpoint hands tha
 the URL. This package cannot know what authenticates your trigger, and guessing wrong would silently
 leave the route open — so it makes you say.
 
-On Cloud Tasks, pass `OidcAuthSetup.PolicyName` to reuse the queue's OIDC scheme, which `AddGcpQueue`
-already registered. Any other host passes its own policy name.
+On Cloud Tasks, pass `CloudTasksAuth.PolicyName` to reuse the queue's OIDC scheme, which
+`UseCloudTasksDelivery` already registered. Any other host passes its own policy name.
 
 ## Responses
 
@@ -85,7 +88,7 @@ resource "google_cloud_scheduler_job" "scheduler_dispatch" {
 Two things to get right:
 
 - **The `audience` must be whatever the queue's OIDC policy validates** — that is
-  `Queue:Gcp:OidcAudience`, or `Queue:Gcp:DispatcherUrl` when you have not set an audience explicitly
+  `Queue:CloudTasks:OidcAudience`, or `Queue:CloudTasks:DispatcherUrl` when you have not set an audience explicitly
   (the example above shows the latter). It is *not* the scheduler URL. Set an audience explicitly,
   copy this example verbatim, and every tick returns 401.
 - **The Cloud Scheduler service agent needs `roles/iam.serviceAccountTokenCreator`** on the invoker
@@ -116,7 +119,7 @@ the app rides this one sweep, one cron covers all of them — do not add a cron 
 
 - **Nothing dispatches if you map neither trigger.** The storage packages register the sweep *engine*
   only; both triggers are opt-in, and a scheduler with no trigger is silent rather than loud.
-- **Do not map this and `AddSchedulerSweeper()` on the same host** unless you mean it. Both would drive
+- **Do not map this and `s.UseSweeper()` on the same host** unless you mean it. Both would drive
   the same sweep — and unlike two timer ticks, an inbound request can land *during* a timer sweep, so
   the two genuinely overlap. That is safe (sweeps already race safely across hosts) but you are paying
   twice for one cadence.

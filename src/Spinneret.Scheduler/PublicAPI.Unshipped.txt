@@ -37,9 +37,6 @@ override Spinneret.Scheduler.SweepResult.Equals(object? obj) -> bool
 override Spinneret.Scheduler.SweepResult.GetHashCode() -> int
 override Spinneret.Scheduler.SweepResult.ToString() -> string!
 static Microsoft.Extensions.DependencyInjection.SchedulerServiceCollectionExtensions.AddRecurringJob<TResponse>(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, string! key, Spinneret.Scheduler.Schedule! schedule, System.Func<Spinneret.Mediator.IRequest<TResponse>!>! requestFactory) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
-static Microsoft.Extensions.DependencyInjection.SchedulerServiceCollectionExtensions.AddRecurringJobInstaller(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
-static Microsoft.Extensions.DependencyInjection.SchedulerServiceCollectionExtensions.AddSchedulerSweeper(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
-static Microsoft.Extensions.DependencyInjection.SchedulerServiceCollectionExtensions.AddSchedulerSweeper(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Spinneret.Scheduler.SchedulerOptions!>! configure) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
 static Microsoft.Extensions.DependencyInjection.SchedulerServiceCollectionExtensions.RetireRecurringJob(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, string! key) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
 static Spinneret.Scheduler.Schedule.Cron(string! expression, System.TimeZoneInfo! zone) -> Spinneret.Scheduler.Schedule!
 static Spinneret.Scheduler.Schedule.Cron(string! expression, string! timeZoneId) -> Spinneret.Scheduler.Schedule!
@@ -52,3 +49,7 @@ static Spinneret.Scheduler.SweepResult.Nothing.get -> Spinneret.Scheduler.SweepR
 static Spinneret.Scheduler.SweepResult.operator !=(Spinneret.Scheduler.SweepResult? left, Spinneret.Scheduler.SweepResult? right) -> bool
 static Spinneret.Scheduler.SweepResult.operator ==(Spinneret.Scheduler.SweepResult? left, Spinneret.Scheduler.SweepResult? right) -> bool
 static readonly Spinneret.Scheduler.SchedulerOptions.SectionName -> string!
+static Microsoft.Extensions.DependencyInjection.SchedulerServiceCollectionExtensions.AddScheduler(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Spinneret.Scheduler.SchedulerBuilder!>! configure) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+Spinneret.Scheduler.SchedulerBuilder
+Spinneret.Scheduler.SchedulerBuilder.Services.get -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+Spinneret.Scheduler.SchedulerBuilder.UseSweeper(System.Action<Spinneret.Scheduler.SchedulerOptions!>? configure = null) -> Spinneret.Scheduler.SchedulerBuilder!

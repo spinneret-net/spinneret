@@ -3,10 +3,10 @@
 A Firestore-backed dead-letter store: one document per task the queue gave up on, written by
 `IDeadLetterWriter` and read back through `IDeadLetterStore`.
 
-It exists because a transport is not always a store. SQL Server keeps dead letters in a table beside
-the queue; Cloud Tasks stores nothing you can query, so a host on Cloud Tasks needs somewhere to put
-them. This package depends only on the provider-agnostic core, so it works behind any transport — not
-just Cloud Tasks.
+It exists because a delivery is not always a store. A SQL storage keeps dead letters in a table beside
+the outbox; Cloud Tasks on its own stores nothing you can query, so a host on Cloud Tasks without a
+SQL storage needs somewhere to put them. This package depends only on the provider-agnostic core, so
+it composes with any queue — and, chosen alongside a SQL storage, takes over from its table.
 
 ## Install
 
@@ -15,12 +15,14 @@ dotnet add package Spinneret.Queue.Firestore
 ```
 
 ```csharp
-services.AddGcpQueue(configuration, o => o.RequestAssemblies = [typeof(SyncCustomer).Assembly]);
-services.AddFirestoreDeadLetters(configuration);
+services.AddQueue(q => q
+    .AddRequestAssemblies(typeof(SyncCustomer).Assembly)
+    .UseCloudTasksDelivery(configuration)
+    .UseFirestoreDeadLetters(configuration));
 ```
 
-That one call registers both the writer and the store. Registration order does not matter, and both
-are registered with `TryAdd` — anything you registered yourself always wins.
+That one call registers both the writer and the store, ahead of anything the queue's storage would
+register — and anything you registered yourself before `AddQueue` still wins.
 
 ## Requires
 
@@ -30,7 +32,7 @@ A host-registered `FirestoreDb`. This package does not create one, because how y
 ```csharp
 services.AddSingleton(_ => new FirestoreDbBuilder
 {
-    ProjectId = configuration["Queue:Gcp:ProjectId"],
+    ProjectId = configuration["Queue:CloudTasks:ProjectId"],
     EmulatorDetection = EmulatorDetection.EmulatorOrProduction,
 }.Build());
 ```
@@ -47,7 +49,7 @@ development needs.
 Or in code:
 
 ```csharp
-services.AddFirestoreDeadLetters(o => o.Collection = "failed_tasks");
+q.UseFirestoreDeadLetters(o => o.Collection = "failed_tasks");
 ```
 
 ## Document shape
@@ -74,7 +76,7 @@ does the MSSQL one to its columns, so treat a rename as a breaking change.
 
 ## Reading them back
 
-`AddFirestoreDeadLetters` also registers `IDeadLetterStore`, so listing, discarding and
+`UseFirestoreDeadLetters` also registers `IDeadLetterStore`, so listing, discarding and
 [resending](queue.md#the-dead-letter-page) work against this collection with nothing further to wire.
 
 Entries come back newest first, paged by an opaque cursor:
@@ -99,16 +101,18 @@ policy on a field you populate yourself.
 
 ## Gotchas
 
-- **Nothing is atomic with the delivery.** Firestore and the queue transport are separate systems, so
-  unlike the MSSQL writer — which joins the delivery transaction — a dead letter here commits on its
-  own. The delivery processor accounts for that by retrying rather than acknowledging a failed write,
-  which is why the write must stay idempotent.
+- **Nothing is atomic with the delivery.** Firestore and the queue are separate systems, so unlike a
+  SQL storage's table — which joins the delivery transaction — a dead letter here commits on its own.
+  The delivery processor accounts for that by retrying rather than acknowledging a failed write,
+  which is why the write must stay idempotent. Over a SQL storage this also means a delivery whose
+  commit fails after the dead letter was written leaves an entry behind for an attempt that is
+  redelivered; prefer the storage's own table unless your admin tooling lives in Firestore.
 - **Availability is on the critical path.** A task whose dead-letter write keeps failing keeps being
   redelivered rather than dropped, logged at Critical with the full payload.
 - **A writer or store you register yourself always wins.** Both are `TryAdd`, so registering your own
-  before `AddFirestoreDeadLetters` means this one is never added; registering it after shadows this
-  one, since the container resolves the last registration. Either order works.
+  before `AddQueue` means this one is never added; registering it after shadows this one, since the
+  container resolves the last registration. Either order works.
 - **A resend here is ordered, not atomic.** The enqueue goes to the transport and the delete to
   Firestore, and no transaction spans the two. The enqueue happens first, so an interruption between
-  them leaves an entry that can be resent again rather than a payload that is gone. The SQL Server
-  store, sharing a database with its queue, commits both together.
+  them leaves an entry that can be resent again rather than a payload that is gone. A SQL storage's
+  own table, sharing a database with its outbox, commits both together.

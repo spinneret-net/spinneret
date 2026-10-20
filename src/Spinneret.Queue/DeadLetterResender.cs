@@ -6,14 +6,14 @@ namespace Spinneret.Queue;
 /// <summary>
 /// Resend, in terms every transport already provides: read the entry, resolve its command type,
 /// deserialize, enqueue, delete. Transport-specific only in how tightly the enqueue and the delete
-/// are bound together, which <see cref="IQueueTransactionScope"/> supplies.
+/// are bound together, which <see cref="IQueueUnitOfWorkFactory"/> supplies.
 /// </summary>
 internal sealed class DeadLetterResender(
     IDeadLetterStore store,
     IQueue queue,
     QueueTypeRegistry registry,
     IQueuePayloadSerializer serializer,
-    IQueueTransactionScope transactionScope)
+    IQueueUnitOfWorkFactory unitOfWork)
     : IDeadLetterResender
 {
     public async Task<Result<ResendDeadLetterError>> ResendAsync(
@@ -54,11 +54,11 @@ internal sealed class DeadLetterResender(
                 new ResendDeadLetterError.InvalidPayload(
                     $"Payload deserialized to null for command type '{deadLetter.CommandTypeName}'."));
 
-        await transactionScope.ExecuteAsync(async token =>
+        await unitOfWork.ExecuteAndCommitAsync(async token =>
         {
             // Enqueue first: should the delete not happen, the entry is still there to resend, which
             // beats a delete that succeeded ahead of an enqueue that did not and took the payload
-            // with it. Under a transactional scope neither is visible until both have committed.
+            // with it. In a transactional unit of work neither is visible until both have committed.
             await ResolvedRequestEnqueuer.Enqueue(queue, request, registered.ResponseType, token);
             await store.DeleteAsync(idempotencyKey, token);
         }, ct);

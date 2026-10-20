@@ -157,8 +157,8 @@ public class SchedulerSweepEndpointTests
         var ex = Assert.Throws<InvalidOperationException>(() => builder.MapSchedulerSweep(TestPolicy));
 
         // The message names the fix, not the missing type — that is what the reader needs.
-        await Assert.That(ex.Message).Contains("AddFirestoreScheduler");
-        await Assert.That(ex.Message).Contains("AddMssqlScheduler");
+        await Assert.That(ex.Message).Contains("s.UseFirestore");
+        await Assert.That(ex.Message).Contains("s.UseMssql");
     }
 
     [Test]

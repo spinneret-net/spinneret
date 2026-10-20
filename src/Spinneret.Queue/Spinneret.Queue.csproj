@@ -9,8 +9,8 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.9" />
-        <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.9" />
+        <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.13" />
+        <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.13" />
     </ItemGroup>
 
     <ItemGroup>
@@ -20,18 +20,28 @@
 
     <ItemGroup>
         <InternalsVisibleTo Include="Spinneret.Queue.Tests" />
+        <!-- AddQueueCore: provider suites compose the core around recording doubles (an IQueue that
+             only records), which AddQueue rightly refuses. -->
+        <InternalsVisibleTo Include="Spinneret.Queue.CloudTasks.Tests" />
+        <InternalsVisibleTo Include="Spinneret.Queue.Firestore.Tests" />
+        <InternalsVisibleTo Include="Spinneret.Queue.Mssql.Tests" />
+        <InternalsVisibleTo Include="Spinneret.Scheduler.Firestore.Tests" />
         <!-- ResolvedRequestEnqueuer: the scheduler sweeps enqueue requests they read back from a
              store, so their response type is only known at runtime. -->
         <InternalsVisibleTo Include="Spinneret.Scheduler.Firestore" />
-        <InternalsVisibleTo Include="Spinneret.Scheduler.Mssql" />
+        <InternalsVisibleTo Include="Spinneret.Scheduler.Sql" />
         <!-- DeadLetterStorage and DeadLetterCursor: the source spelling and the cursor encoding are
              one contract shared by every dead-letter store, not a per-provider decision.
              IQueueTransactionScope additionally lets the MSSQL store make a resend atomic. -->
         <InternalsVisibleTo Include="Spinneret.Queue.Firestore" />
         <InternalsVisibleTo Include="Spinneret.Queue.Mssql" />
+        <!-- The unit-of-work seam, the delivery pipeline and the envelope factory: the SQL storage
+             supplies the transaction a delivery runs in and builds envelopes the same way the
+             transports do. -->
+        <InternalsVisibleTo Include="Spinneret.Queue.Sql" />
         <!-- QueueTracing: the consumer parses back exactly what the producer wrote, so publishing a
              span and stamping trace context is one shared contract, not a per-transport decision. -->
-        <InternalsVisibleTo Include="Spinneret.Queue.Gcp" />
+        <InternalsVisibleTo Include="Spinneret.Queue.CloudTasks" />
     </ItemGroup>
 
     <PropertyGroup>

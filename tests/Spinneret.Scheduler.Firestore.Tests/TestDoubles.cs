@@ -32,9 +32,3 @@ public sealed class FakePayloadSerializer : IQueuePayloadSerializer
         return DeserializeResult;
     }
 }
-
-/// <summary>A clock frozen at a known instant, so timestamps written into documents are assertable.</summary>
-internal sealed class FixedTimeProvider(DateTimeOffset now) : TimeProvider
-{
-    public override DateTimeOffset GetUtcNow() => now;
-}

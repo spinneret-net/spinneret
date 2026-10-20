@@ -9,16 +9,18 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="Microsoft.Data.SqlClient" Version="6.1.1" />
-        <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.9" />
+        <PackageReference Include="Microsoft.Data.SqlClient" Version="7.1.1" />
+        <!-- SqlClient 7.1.1 still depends on a Pkcs with known advisories (GHSA-846f-f764-76mx). -->
+        <PackageReference Include="System.Security.Cryptography.Pkcs" Version="10.0.13" />
         <!-- Configuration.Binder is where ConfigurationBinder.Bind lives, which is what the
-             IConfiguration overloads of AddMssqlQueue call. -->
-        <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="10.0.9" />
-        <PackageReference Include="Microsoft.Extensions.Options" Version="10.0.9" />
+             IConfiguration overloads of UseMssqlStorage call. -->
+        <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="10.0.13" />
+        <PackageReference Include="Microsoft.Extensions.Options" Version="10.0.13" />
     </ItemGroup>
 
     <ItemGroup>
         <ProjectReference Include="..\Spinneret.Queue\Spinneret.Queue.csproj" />
+        <ProjectReference Include="..\Spinneret.Queue.Sql\Spinneret.Queue.Sql.csproj" />
         <ProjectReference Include="..\Spinneret.Mediator\Spinneret.Mediator.csproj" />
         <ProjectReference Include="..\Spinneret.Functional\Spinneret.Functional.csproj" />
     </ItemGroup>
@@ -30,7 +32,7 @@
     </ItemGroup>
 
     <PropertyGroup>
-        <Description>SQL Server transport for Spinneret.Queue: transactional enqueue and dequeue in the application database, with polling workers, retries and dead-lettering.</Description>
+        <Description>SQL Server dialect for Spinneret.Queue.Sql: the queue's outbox and dead-letter tables in the application database, so an enqueue commits atomically with the business write that caused it.</Description>
         <PackageTags>$(PackageTags) queue mssql sql-server transactional background-jobs</PackageTags>
     </PropertyGroup>
 

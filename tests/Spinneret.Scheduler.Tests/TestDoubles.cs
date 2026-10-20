@@ -1,3 +1,4 @@
+using Microsoft.Extensions.DependencyInjection;
 using Spinneret.Functional;
 using Spinneret.Mediator;
 
@@ -87,4 +88,18 @@ public sealed class ThrowingCreateRequestJob(string key) : IRecurringJob<Unit>
     public string Key => key;
     public Schedule Schedule => Schedule.Cron("* * * * *", "Europe/Stockholm");
     public IRequest<Unit> CreateRequest() => throw new InvalidOperationException($"CreateRequest failed for '{key}'.");
+}
+
+internal static class TestSchedulerStorage
+{
+    /// <summary>
+    /// A storage for the builder that is nothing but the given sweep and a recording scheduler — the
+    /// clock and the installer are what is under test, not where jobs live.
+    /// </summary>
+    public static SchedulerBuilder UseTestStorage(this SchedulerBuilder scheduler, ISchedulerSweep sweep) =>
+        scheduler.UseStorage(new SchedulerStorageRole("UseTestStorage", services =>
+        {
+            services.AddSingleton(sweep);
+            services.AddSingleton<IRecurringJobScheduler, RecordingRecurringJobScheduler>();
+        }));
 }

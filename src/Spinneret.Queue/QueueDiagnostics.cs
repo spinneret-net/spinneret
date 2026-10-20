@@ -28,8 +28,8 @@ internal static class QueueTags
     /// <summary>
     /// The caller's idempotency key, when one was supplied. Kept out of
     /// <see cref="MessageId"/> because that one means the id the transport assigned: Cloud Tasks
-    /// happens to build its task name from the dedupe key, so the two coincide there, while the
-    /// MSSQL transport's id is an identity column and does not.
+    /// happens to build its task name from the dedupe key, so the two coincide there, while a SQL
+    /// storage's id is the row's own message id and does not.
     /// </summary>
     internal const string DedupeKey = "spinneret.queue.dedupe_key";
 

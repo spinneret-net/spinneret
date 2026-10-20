@@ -3,17 +3,21 @@
   <ItemGroup>
     <!-- The package itself needs only the DI abstractions now that the HTTP trigger has moved out;
          building a provider to assert what the Add* call registered is a test-only concern. -->
-    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.9" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.13" />
     <!-- Hosting, so the integration suite can start the hosted services (the recurring-job
          installer, the sweeper) the way a real host does. -->
-    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.9" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.13" />
     <!-- The Firestore emulator, so the register-or-refresh transaction, the dispatch lease and the
          one-shot enlistment are exercised against a real Firestore rather than argued from source. -->
-    <PackageReference Include="Testcontainers.Firestore" Version="4.14.0" />
+    <PackageReference Include="Testcontainers.Firestore" Version="4.16.0" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Spinneret.Scheduler.Firestore\Spinneret.Scheduler.Firestore.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Spinneret.Testing\Spinneret.Testing.csproj" />
+    <Using Include="Spinneret.Testing" />
   </ItemGroup>
 
 </Project>

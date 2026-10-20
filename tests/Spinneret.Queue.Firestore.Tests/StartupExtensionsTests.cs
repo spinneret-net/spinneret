@@ -16,7 +16,7 @@ public class StartupExtensionsTests
     {
         var services = new ServiceCollection();
 
-        services.AddFirestoreDeadLetters();
+        services.AddDeadLetters(q => q.UseFirestoreDeadLetters());
 
         var descriptor = services.Single(d => d.ServiceType == typeof(IDeadLetterWriter));
         await Assert.That(descriptor.ImplementationType?.Name).IsEqualTo("FirestoreDeadLetterWriter");
@@ -28,7 +28,7 @@ public class StartupExtensionsTests
     {
         var services = new ServiceCollection();
 
-        services.AddFirestoreDeadLetters();
+        services.AddDeadLetters(q => q.UseFirestoreDeadLetters());
 
         var descriptor = services.Single(d => d.ServiceType == typeof(IDeadLetterStore));
         await Assert.That(descriptor.ImplementationType?.Name).IsEqualTo("FirestoreDeadLetterStore");
@@ -41,7 +41,7 @@ public class StartupExtensionsTests
         var services = new ServiceCollection();
         services.AddSingleton<IDeadLetterStore, FakeDeadLetterStore>();
 
-        services.AddFirestoreDeadLetters();
+        services.AddDeadLetters(q => q.UseFirestoreDeadLetters());
 
         var descriptor = services.Single(d => d.ServiceType == typeof(IDeadLetterStore));
         await Assert.That(descriptor.ImplementationType).IsEqualTo(typeof(FakeDeadLetterStore));
@@ -51,7 +51,7 @@ public class StartupExtensionsTests
     public async Task Defaults_the_collection_to_dead_letters()
     {
         var services = new ServiceCollection();
-        services.AddFirestoreDeadLetters();
+        services.AddDeadLetters(q => q.UseFirestoreDeadLetters());
 
         var options = services.BuildServiceProvider()
             .GetRequiredService<IOptions<FirestoreDeadLetterOptions>>().Value;
@@ -63,7 +63,7 @@ public class StartupExtensionsTests
     public async Task Binds_the_collection_from_configuration()
     {
         var services = new ServiceCollection();
-        services.AddFirestoreDeadLetters(Config(("Queue:Firestore:Collection", "failed_tasks")));
+        services.AddDeadLetters(q => q.UseFirestoreDeadLetters(Config(("Queue:Firestore:Collection", "failed_tasks"))));
 
         var options = services.BuildServiceProvider()
             .GetRequiredService<IOptions<FirestoreDeadLetterOptions>>().Value;
@@ -79,7 +79,7 @@ public class StartupExtensionsTests
         var services = new ServiceCollection();
         services.AddSingleton<IDeadLetterWriter, FakeDeadLetterWriter>();
 
-        services.AddFirestoreDeadLetters();
+        services.AddDeadLetters(q => q.UseFirestoreDeadLetters());
 
         var descriptor = services.Single(d => d.ServiceType == typeof(IDeadLetterWriter));
         await Assert.That(descriptor.ImplementationType).IsEqualTo(typeof(FakeDeadLetterWriter));
@@ -89,7 +89,7 @@ public class StartupExtensionsTests
     public async Task A_blank_collection_fails_validation()
     {
         var services = new ServiceCollection();
-        services.AddFirestoreDeadLetters(o => o.Collection = "  ");
+        services.AddDeadLetters(q => q.UseFirestoreDeadLetters(o => o.Collection = "  "));
 
         var options = services.BuildServiceProvider()
             .GetRequiredService<IOptions<FirestoreDeadLetterOptions>>();

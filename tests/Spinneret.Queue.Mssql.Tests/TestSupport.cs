@@ -11,6 +11,7 @@ using Spinneret.Mediator;
 using Spinneret.Queue;
 using Testcontainers.MsSql;
 using TUnit.Core.Interfaces;
+using Spinneret.Queue.Sql;
 
 namespace Spinneret.Queue.Mssql.Tests;
 
@@ -100,7 +101,7 @@ public sealed class DeferOnceHandler(DeliveryLog log) : IRequestHandler<DeferOnc
     }
 }
 
-public sealed class WriteThenFailHandler(IMssqlTransactionProvider transactions)
+public sealed class WriteThenFailHandler(ISqlTransactionProvider transactions)
     : IRequestHandler<WriteThenFailCommand, Unit>
 {
     public async Task<Unit> Handle(WriteThenFailCommand request, CancellationToken cancellationToken)
@@ -110,7 +111,7 @@ public sealed class WriteThenFailHandler(IMssqlTransactionProvider transactions)
     }
 }
 
-public sealed class WriteHandler(IMssqlTransactionProvider transactions) : IRequestHandler<WriteCommand, Unit>
+public sealed class WriteHandler(ISqlTransactionProvider transactions) : IRequestHandler<WriteCommand, Unit>
 {
     public async Task<Unit> Handle(WriteCommand request, CancellationToken cancellationToken)
     {
@@ -148,7 +149,7 @@ public sealed class BulkChannelHandler(DeliveryLog log) : IRequestHandler<BulkCh
 
 internal static class SideEffects
 {
-    public static async Task Insert(IMssqlTransactionProvider transactions, string table, CancellationToken ct)
+    public static async Task Insert(ISqlTransactionProvider transactions, string table, CancellationToken ct)
     {
         var transaction = transactions.Current
             ?? throw new InvalidOperationException("Expected the delivery's ambient transaction.");
@@ -159,43 +160,9 @@ internal static class SideEffects
     }
 }
 
-/// <summary>Thread-safe record of handler activity, shared through DI as a singleton.</summary>
-public sealed class DeliveryLog
-{
-    private readonly ConcurrentDictionary<string, int> _attempts = new();
-    private readonly ConcurrentQueue<string> _deliveries = new();
-
-    public int RecordAttempt(string key) => _attempts.AddOrUpdate(key, 1, (_, n) => n + 1);
-    public void RecordDelivery(string tag) => _deliveries.Enqueue(tag);
-
-    public int Attempts(string key) => _attempts.GetValueOrDefault(key);
-    public IReadOnlyCollection<string> Deliveries => [.. _deliveries];
-    public int DeliveryCount(string tag) => _deliveries.Count(d => d == tag);
-}
-
 // ---------------------------------------------------------------------------------------------
 // Docker fixture and host harness.
 // ---------------------------------------------------------------------------------------------
-
-/// <summary>
-/// One SQL Server container for the whole test session; each test isolates itself with unique
-/// table names inside the shared database.
-/// </summary>
-public sealed class MssqlContainerFixture : IAsyncInitializer, IAsyncDisposable
-{
-    private readonly MsSqlContainer _container =
-        new MsSqlBuilder("mcr.microsoft.com/mssql/server:2022-latest").Build();
-
-    public string ConnectionString { get; private set; } = string.Empty;
-
-    public async Task InitializeAsync()
-    {
-        await _container.StartAsync();
-        ConnectionString = _container.GetConnectionString();
-    }
-
-    public async ValueTask DisposeAsync() => await _container.DisposeAsync();
-}
 
 /// <summary>
 /// A running queue host: DI container with the Mssql queue registered and all hosted services
@@ -207,7 +174,7 @@ public sealed class QueueTestHost : IAsyncDisposable
     private readonly IHostedService[] _hostedServices;
 
     public string Suffix { get; }
-    public MssqlQueueOptions Options { get; }
+    public MssqlStorageOptions Options { get; }
     public DeliveryLog Log { get; }
 
     private QueueTestHost(ServiceProvider provider, IHostedService[] hostedServices, string suffix)
@@ -215,14 +182,14 @@ public sealed class QueueTestHost : IAsyncDisposable
         _provider = provider;
         _hostedServices = hostedServices;
         Suffix = suffix;
-        Options = provider.GetRequiredService<IOptions<MssqlQueueOptions>>().Value;
+        Options = provider.GetRequiredService<IOptions<MssqlStorageOptions>>().Value;
         Log = provider.GetRequiredService<DeliveryLog>();
     }
 
     public IServiceProvider Services => _provider;
     public IQueue Queue => _provider.GetRequiredService<IQueue>();
-    public IMssqlTransactionalQueue TransactionalQueue => _provider.GetRequiredService<IMssqlTransactionalQueue>();
-    public IMssqlTransactionProvider Transactions => _provider.GetRequiredService<IMssqlTransactionProvider>();
+    public ISqlTransactionalQueue TransactionalQueue => _provider.GetRequiredService<ISqlTransactionalQueue>();
+    public ISqlTransactionProvider Transactions => _provider.GetRequiredService<ISqlTransactionProvider>();
 
     public static async Task<QueueTestHost> StartAsync(
         string connectionString,
@@ -236,7 +203,7 @@ public sealed class QueueTestHost : IAsyncDisposable
             ["Queue:Mssql:ConnectionString"] = connectionString,
             ["Queue:Mssql:QueueTableName"] = $"Q_{suffix}",
             ["Queue:Mssql:DeadLetterTableName"] = $"DL_{suffix}",
-            ["Queue:Mssql:PollInterval"] = "00:00:00.050",
+            ["Queue:InHost:PollInterval"] = "00:00:00.050",
         };
         foreach (var (key, value) in extraConfig ?? [])
             settings[key] = value;
@@ -247,9 +214,12 @@ public sealed class QueueTestHost : IAsyncDisposable
         services.AddSingleton(typeof(ILogger<>), typeof(NullLogger<>));
         services.AddSingleton<DeliveryLog>();
         services.AddMediator([typeof(QueueTestHost).Assembly]);
-        services.AddMssqlQueue(configuration, o => o.RequestAssemblies = [typeof(QueueTestHost).Assembly]);
-        if (worker)
-            services.AddMssqlQueueWorker();
+        services.AddQueue(q =>
+        {
+            q.AddRequestAssemblies(typeof(QueueTestHost).Assembly).UseMssqlStorage(configuration);
+            if (worker)
+                q.UseInHostDelivery(configuration);
+        });
         configure?.Invoke(services);
 
         var provider = services.BuildServiceProvider();
@@ -297,24 +267,4 @@ public sealed class QueueTestHost : IAsyncDisposable
             await hostedService.StopAsync(CancellationToken.None);
         await _provider.DisposeAsync();
     }
-}
-
-internal static class Wait
-{
-    /// <summary>Polls until <paramref name="condition"/> holds; fails the test on timeout.</summary>
-    public static async Task Until(Func<Task<bool>> condition, string because, int timeoutSeconds = 20)
-    {
-        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(timeoutSeconds);
-        while (DateTime.UtcNow < deadline)
-        {
-            if (await condition())
-                return;
-            await Task.Delay(25);
-        }
-
-        throw new TimeoutException($"Timed out waiting for: {because}");
-    }
-
-    public static Task Until(Func<bool> condition, string because, int timeoutSeconds = 20) =>
-        Until(() => Task.FromResult(condition()), because, timeoutSeconds);
 }

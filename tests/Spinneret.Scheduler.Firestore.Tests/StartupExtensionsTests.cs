@@ -7,7 +7,7 @@ using Spinneret.Queue;
 namespace Spinneret.Scheduler.Firestore.Tests;
 
 /// <summary>
-/// Verifies the DI surface of <c>AddFirestoreScheduler</c> against the
+/// Verifies the DI surface of <c>UseFirestore</c> against the
 /// referenced assembly. Internal implementation types cannot be named here (the source-linked
 /// copies compiled into this test assembly are distinct types), so registrations are asserted
 /// via descriptor inspection by type name.
@@ -20,21 +20,21 @@ public class StartupExtensionsTests
     {
         var services = new ServiceCollection();
         services.AddSingleton(new QueueTypeRegistry([]));
-        services.AddFirestoreScheduler(configuration ?? EmptyConfiguration);
+        services.AddScheduler(s => s.UseFirestore(configuration ?? EmptyConfiguration));
         return services;
     }
 
     [Test]
-    public async Task AddFirestoreScheduler_composes_in_either_order_relative_to_the_queue()
+    public async Task UseFirestore_composes_in_either_order_relative_to_the_queue()
     {
         // Previously this threw when the scheduler was registered first, even though the resulting
         // container was identical. Nothing here reads the collection, so the calls commute.
         var before = new ServiceCollection();
         before.AddSingleton(new QueueTypeRegistry([]));
-        before.AddFirestoreScheduler(EmptyConfiguration);
+        before.AddScheduler(s => s.UseFirestore(EmptyConfiguration));
 
         var after = new ServiceCollection();
-        after.AddFirestoreScheduler(EmptyConfiguration);
+        after.AddScheduler(s => s.UseFirestore(EmptyConfiguration));
         after.AddSingleton(new QueueTypeRegistry([]));
 
         await Assert.That(after.Select(d => d.ServiceType.FullName).OrderBy(n => n))
@@ -42,7 +42,7 @@ public class StartupExtensionsTests
     }
 
     [Test]
-    public async Task AddFirestoreScheduler_registers_the_sweep_engine_but_not_a_trigger()
+    public async Task UseFirestore_registers_the_sweep_engine_but_not_a_trigger()
     {
         var services = AddScheduler();
 
@@ -56,7 +56,7 @@ public class StartupExtensionsTests
     }
 
     [Test]
-    public async Task AddFirestoreScheduler_registers_recurring_job_scheduler_as_firestore_singleton()
+    public async Task UseFirestore_registers_recurring_job_scheduler_as_firestore_singleton()
     {
         var services = AddScheduler();
 
@@ -68,7 +68,7 @@ public class StartupExtensionsTests
     }
 
     [Test]
-    public async Task AddFirestoreScheduler_registers_transactional_scheduler_as_singleton()
+    public async Task UseFirestore_registers_transactional_scheduler_as_singleton()
     {
         var services = AddScheduler();
 
@@ -80,7 +80,7 @@ public class StartupExtensionsTests
     }
 
     [Test]
-    public async Task AddFirestoreScheduler_registers_document_factory_and_dispatcher_as_singletons()
+    public async Task UseFirestore_registers_document_factory_and_dispatcher_as_singletons()
     {
         var services = AddScheduler();
 
@@ -93,7 +93,7 @@ public class StartupExtensionsTests
     }
 
     [Test]
-    public async Task AddFirestoreScheduler_registers_recurring_job_installer_as_hosted_service()
+    public async Task UseFirestore_registers_recurring_job_installer_as_hosted_service()
     {
         var services = AddScheduler();
 
@@ -104,7 +104,7 @@ public class StartupExtensionsTests
     }
 
     [Test]
-    public async Task AddFirestoreScheduler_binds_options_from_the_scheduler_gcp_section()
+    public async Task UseFirestore_binds_options_from_the_scheduler_gcp_section()
     {
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
@@ -122,7 +122,7 @@ public class StartupExtensionsTests
     }
 
     [Test]
-    public async Task AddFirestoreScheduler_without_configuration_section_keeps_option_defaults()
+    public async Task UseFirestore_without_configuration_section_keeps_option_defaults()
     {
         await using var provider = AddScheduler().BuildServiceProvider();
 
@@ -133,13 +133,9 @@ public class StartupExtensionsTests
     }
 
     [Test]
-    public async Task AddFirestoreScheduler_called_twice_does_not_duplicate_registrations()
+    public async Task UseFirestore_registers_the_storage_and_the_installer_once()
     {
-        var services = new ServiceCollection();
-        services.AddSingleton(new QueueTypeRegistry([]));
-
-        services.AddFirestoreScheduler(EmptyConfiguration);
-        services.AddFirestoreScheduler(EmptyConfiguration);
+        var services = AddScheduler();
 
         await Assert.That(services.Count(d => d.ServiceType == typeof(IRecurringJobScheduler))).IsEqualTo(1);
         await Assert.That(services.Count(d => d.ServiceType == typeof(IFirestoreTransactionalScheduler))).IsEqualTo(1);
@@ -148,7 +144,7 @@ public class StartupExtensionsTests
     }
 
     [Test]
-    public async Task AddFirestoreScheduler_document_factory_resolves_once_queue_dependencies_exist()
+    public async Task UseFirestore_document_factory_resolves_once_queue_dependencies_exist()
     {
         var services = AddScheduler();
         services.AddSingleton(new QueueTypeRegistry([]));

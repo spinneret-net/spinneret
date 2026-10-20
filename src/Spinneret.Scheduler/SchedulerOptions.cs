@@ -15,7 +15,7 @@ public sealed class SchedulerOptions
     public static readonly string SectionName = "Scheduler:Sweeper";
 
     /// <summary>
-    /// How long <c>AddSchedulerSweeper()</c> waits between sweeps. Sweeps race safely across hosts,
+    /// How long <c>UseSweeper()</c> waits between sweeps. Sweeps race safely across hosts,
     /// so every instance may run its own.
     /// </summary>
     /// <remarks>

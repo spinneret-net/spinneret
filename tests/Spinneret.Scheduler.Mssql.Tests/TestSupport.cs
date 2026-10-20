@@ -11,6 +11,7 @@ using Spinneret.Mediator;
 using Spinneret.Queue.Mssql;
 using Testcontainers.MsSql;
 using TUnit.Core.Interfaces;
+using Spinneret.Scheduler.Sql;
 
 namespace Spinneret.Scheduler.Mssql.Tests;
 
@@ -45,33 +46,9 @@ public sealed class ReportHandler(DeliveryLog log) : IRequestHandler<ReportComma
     }
 }
 
-public sealed class DeliveryLog
-{
-    private readonly ConcurrentQueue<string> _deliveries = new();
-
-    public void RecordDelivery(string tag) => _deliveries.Enqueue(tag);
-    public int DeliveryCount(string tag) => _deliveries.Count(d => d == tag);
-}
-
 // ---------------------------------------------------------------------------------------------
 // Docker fixture and host harness.
 // ---------------------------------------------------------------------------------------------
-
-public sealed class MssqlContainerFixture : IAsyncInitializer, IAsyncDisposable
-{
-    private readonly MsSqlContainer _container =
-        new MsSqlBuilder("mcr.microsoft.com/mssql/server:2022-latest").Build();
-
-    public string ConnectionString { get; private set; } = string.Empty;
-
-    public async Task InitializeAsync()
-    {
-        await _container.StartAsync();
-        ConnectionString = _container.GetConnectionString();
-    }
-
-    public async ValueTask DisposeAsync() => await _container.DisposeAsync();
-}
 
 /// <summary>
 /// A running scheduler host: queue + scheduler registered against test-unique tables, with the
@@ -83,7 +60,7 @@ public sealed class SchedulerTestHost : IAsyncDisposable
     private readonly IHostedService[] _hostedServices;
 
     public string Suffix { get; }
-    public MssqlQueueOptions QueueOptions { get; }
+    public MssqlStorageOptions QueueOptions { get; }
     public MssqlSchedulerOptions SchedulerOptions { get; }
     public DeliveryLog Log { get; }
 
@@ -92,15 +69,15 @@ public sealed class SchedulerTestHost : IAsyncDisposable
         _provider = provider;
         _hostedServices = hostedServices;
         Suffix = suffix;
-        QueueOptions = provider.GetRequiredService<IOptions<MssqlQueueOptions>>().Value;
+        QueueOptions = provider.GetRequiredService<IOptions<MssqlStorageOptions>>().Value;
         SchedulerOptions = provider.GetRequiredService<IOptions<MssqlSchedulerOptions>>().Value;
         Log = provider.GetRequiredService<DeliveryLog>();
     }
 
     public IServiceProvider Services => _provider;
     public IRecurringJobScheduler Scheduler => _provider.GetRequiredService<IRecurringJobScheduler>();
-    public IMssqlTransactionalScheduler TransactionalScheduler =>
-        _provider.GetRequiredService<IMssqlTransactionalScheduler>();
+    public ISqlTransactionalScheduler TransactionalScheduler =>
+        _provider.GetRequiredService<ISqlTransactionalScheduler>();
 
     public static async Task<SchedulerTestHost> StartAsync(
         string connectionString,
@@ -114,7 +91,7 @@ public sealed class SchedulerTestHost : IAsyncDisposable
             ["Queue:Mssql:ConnectionString"] = connectionString,
             ["Queue:Mssql:QueueTableName"] = $"Q_{suffix}",
             ["Queue:Mssql:DeadLetterTableName"] = $"DL_{suffix}",
-            ["Queue:Mssql:PollInterval"] = "00:00:00.050",
+            ["Queue:InHost:PollInterval"] = "00:00:00.050",
             ["Scheduler:Mssql:TableName"] = $"Jobs_{suffix}",
         }).Build();
 
@@ -122,12 +99,17 @@ public sealed class SchedulerTestHost : IAsyncDisposable
         services.AddSingleton(typeof(ILogger<>), typeof(NullLogger<>));
         services.AddSingleton<DeliveryLog>();
         services.AddMediator([typeof(SchedulerTestHost).Assembly]);
-        services.AddMssqlQueue(configuration, o => o.RequestAssemblies = [typeof(SchedulerTestHost).Assembly]);
-        services.AddMssqlQueueWorker();
-        services.AddMssqlScheduler(configuration);
-        if (sweeper)
-            // Fast ticks so integration tests do not wait out the 15s default.
-            services.AddSchedulerSweeper(o => o.SweepInterval = TimeSpan.FromMilliseconds(100));
+        services.AddQueue(q => q
+            .AddRequestAssemblies(typeof(SchedulerTestHost).Assembly)
+            .UseMssqlStorage(configuration)
+            .UseInHostDelivery(configuration));
+        services.AddScheduler(s =>
+        {
+            s.UseMssql(configuration);
+            if (sweeper)
+                // Fast ticks so integration tests do not wait out the 15s default.
+                s.UseSweeper(o => o.SweepInterval = TimeSpan.FromMilliseconds(100));
+        });
         configure?.Invoke(services);
 
         var provider = services.BuildServiceProvider();
@@ -185,23 +167,4 @@ public sealed class SchedulerTestHost : IAsyncDisposable
             await hostedService.StopAsync(CancellationToken.None);
         await _provider.DisposeAsync();
     }
-}
-
-internal static class Wait
-{
-    public static async Task Until(Func<Task<bool>> condition, string because, int timeoutSeconds = 20)
-    {
-        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(timeoutSeconds);
-        while (DateTime.UtcNow < deadline)
-        {
-            if (await condition())
-                return;
-            await Task.Delay(25);
-        }
-
-        throw new TimeoutException($"Timed out waiting for: {because}");
-    }
-
-    public static Task Until(Func<bool> condition, string because, int timeoutSeconds = 20) =>
-        Until(() => Task.FromResult(condition()), because, timeoutSeconds);
 }

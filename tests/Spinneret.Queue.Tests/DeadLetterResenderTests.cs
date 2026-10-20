@@ -23,7 +23,7 @@ public class DeadLetterResenderTests
         };
 
     private static (DeadLetterResender Resender, FakeQueue Queue, FakeDeadLetterStore Store,
-        FakeSerializer Serializer, RecordingQueueTransactionScope Scope) Build(
+        FakeSerializer Serializer, RecordingUnitOfWorkFactory Scope) Build(
         params DeadLetter[] stored)
     {
         var store = new FakeDeadLetterStore();
@@ -32,7 +32,7 @@ public class DeadLetterResenderTests
 
         var queue = new FakeQueue();
         var serializer = new FakeSerializer();
-        var scope = new RecordingQueueTransactionScope();
+        var scope = new RecordingUnitOfWorkFactory();
         var registry = new QueueTypeRegistry([typeof(DeadLetterResenderTests).Assembly]);
 
         return (new DeadLetterResender(store, queue, registry, serializer, scope), queue, store, serializer, scope);
@@ -75,9 +75,9 @@ public class DeadLetterResenderTests
     }
 
     [Test]
-    public async Task Groups_the_enqueue_and_the_delete_into_one_scope()
+    public async Task Groups_the_enqueue_and_the_delete_into_one_committed_unit_of_work()
     {
-        // The MSSQL scope turns this grouping into a single commit; here it only has to be the case
+        // The SQL unit of work turns this grouping into a single commit; here it only has to be the case
         // that both operations happen inside it rather than around it.
         var (resender, queue, store, _, scope) = Build(DeadLetter());
         var insideAtEnqueue = false;
@@ -93,6 +93,7 @@ public class DeadLetterResenderTests
         await observing.ResendAsync("task-1");
 
         await Assert.That(scope.Executions).IsEqualTo(1);
+        await Assert.That(scope.Commits).IsEqualTo(1);
         await Assert.That(insideAtEnqueue).IsTrue();
         await Assert.That(insideAtDelete).IsTrue();
     }

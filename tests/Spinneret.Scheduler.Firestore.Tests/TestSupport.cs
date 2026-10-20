@@ -25,104 +25,9 @@ namespace Spinneret.Scheduler.Firestore.Tests;
 /// </summary>
 public sealed record ReportRequest(string Name) : IRequest<string>;
 
-/// <summary>What the sweep handed to the queue. The scheduler's job ends at the enqueue.</summary>
-public sealed class RecordingQueue : IQueue
-{
-    private readonly ConcurrentQueue<object> _enqueued = new();
-
-    /// <summary>Set to make every enqueue fail, for the dead-letter compensation paths.</summary>
-    public Exception? FailWith { get; set; }
-
-    public IReadOnlyCollection<object> Enqueued => [.. _enqueued];
-    public int CountOf<T>(Func<T, bool> predicate) => _enqueued.OfType<T>().Count(predicate);
-
-    public Task Enqueue<TResponse>(IRequest<TResponse> request, QueueOptions? options = null, CancellationToken ct = default)
-    {
-        if (FailWith is { } failure)
-            return Task.FromException(failure);
-
-        _enqueued.Enqueue(request);
-        return Task.CompletedTask;
-    }
-}
-
-/// <summary>
-/// Records dead letters in memory. <see cref="FailWith"/> covers the branch where the dispatcher
-/// must keep a job document because the write that would have preserved its payload did not land.
-/// </summary>
-public sealed class RecordingDeadLetterWriter : IDeadLetterWriter
-{
-    private readonly ConcurrentQueue<DeadLetterEntry> _entries = new();
-
-    public Exception? FailWith { get; set; }
-
-    public IReadOnlyCollection<DeadLetterEntry> Entries => [.. _entries];
-
-    public Task WriteAsync(DeadLetterEntry entry, CancellationToken ct = default)
-    {
-        if (FailWith is { } failure)
-            return Task.FromException(failure);
-
-        _entries.Enqueue(entry);
-        return Task.CompletedTask;
-    }
-}
-
-/// <summary>
-/// A real JSON serializer rather than a stub: the sweep resolves a stored type name and
-/// deserializes the stored payload back into a request, and only a real round trip proves the
-/// document the scheduler wrote is one the dispatcher can still read.
-/// </summary>
-public sealed class JsonPayloadSerializer : IQueuePayloadSerializer
-{
-    private static readonly JsonSerializerOptions Options = new(JsonSerializerDefaults.Web);
-
-    public string Serialize(object request, Type requestType) => JsonSerializer.Serialize(request, requestType, Options);
-
-    public object? Deserialize(string json, Type requestType) => JsonSerializer.Deserialize(json, requestType, Options);
-}
-
 // ---------------------------------------------------------------------------------------------
 // Docker fixture and host harness.
 // ---------------------------------------------------------------------------------------------
-
-/// <summary>
-/// One Firestore emulator for the whole test session; each test isolates itself with a unique
-/// collection name, mirroring how the MSSQL suites isolate with unique table names.
-/// </summary>
-/// <remarks>
-/// The emulator is reached through <c>FIRESTORE_EMULATOR_HOST</c> and
-/// <see cref="EmulatorDetection.EmulatorOnly"/> rather than an explicit endpoint, because that is
-/// the wiring <c>docs/scheduler-firestore.md</c> tells hosts to use — so the fixture exercises the
-/// documented path. The environment variable is process-global, which is safe here: it is set once,
-/// before any <see cref="FirestoreDb"/> in this assembly is built.
-/// </remarks>
-public sealed class FirestoreEmulatorFixture : IAsyncInitializer, IAsyncDisposable
-{
-    /// <summary>
-    /// Pinned rather than floating, the same way the MSSQL fixture pins its server image: an
-    /// emulator that changes underneath the suite turns a red build into a mystery.
-    /// </summary>
-    private const string Image = "gcr.io/google.com/cloudsdktool/google-cloud-cli:580.0.0-emulators";
-
-    public const string ProjectId = "spinneret-tests";
-
-    private readonly FirestoreContainer _container = new FirestoreBuilder(Image).Build();
-
-    public async Task InitializeAsync()
-    {
-        await _container.StartAsync();
-
-        // GetEmulatorEndpoint() renders "http://host:port/"; the variable wants a bare host:port.
-        var endpoint = new Uri(_container.GetEmulatorEndpoint());
-        Environment.SetEnvironmentVariable("FIRESTORE_EMULATOR_HOST", $"{endpoint.Host}:{endpoint.Port}");
-    }
-
-    public FirestoreDb CreateDb() =>
-        new FirestoreDbBuilder { ProjectId = ProjectId, EmulatorDetection = EmulatorDetection.EmulatorOnly }.Build();
-
-    public async ValueTask DisposeAsync() => await _container.DisposeAsync();
-}
 
 /// <summary>
 /// A running scheduler host: DI container with the Firestore scheduler registered against a
@@ -179,10 +84,13 @@ public sealed class SchedulerTestHost : IAsyncDisposable
         services.AddSingleton<IDeadLetterWriter>(sp => sp.GetRequiredService<RecordingDeadLetterWriter>());
         services.AddSingleton<IQueuePayloadSerializer, JsonPayloadSerializer>();
         services.AddQueueCore([typeof(SchedulerTestHost).Assembly]);
-        services.AddFirestoreScheduler(o => o.Collection = collection);
-        if (sweeper)
-            // Fast ticks so integration tests do not wait out the 15s default.
-            services.AddSchedulerSweeper(o => o.SweepInterval = TimeSpan.FromMilliseconds(100));
+        services.AddScheduler(s =>
+        {
+            s.UseFirestore(o => o.Collection = collection);
+            if (sweeper)
+                // Fast ticks so integration tests do not wait out the 15s default.
+                s.UseSweeper(o => o.SweepInterval = TimeSpan.FromMilliseconds(100));
+        });
         configure?.Invoke(services);
 
         var provider = services.BuildServiceProvider();
@@ -234,24 +142,4 @@ public sealed class SchedulerTestHost : IAsyncDisposable
             await hostedService.StopAsync(CancellationToken.None);
         await _provider.DisposeAsync();
     }
-}
-
-internal static class Wait
-{
-    /// <summary>Polls until <paramref name="condition"/> holds; fails the test on timeout.</summary>
-    public static async Task Until(Func<Task<bool>> condition, string because, int timeoutSeconds = 20)
-    {
-        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(timeoutSeconds);
-        while (DateTime.UtcNow < deadline)
-        {
-            if (await condition())
-                return;
-            await Task.Delay(25);
-        }
-
-        throw new TimeoutException($"Timed out waiting for: {because}");
-    }
-
-    public static Task Until(Func<bool> condition, string because, int timeoutSeconds = 20) =>
-        Until(() => Task.FromResult(condition()), because, timeoutSeconds);
 }

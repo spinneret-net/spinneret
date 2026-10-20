@@ -144,25 +144,35 @@ internal sealed class FakeDeadLetterStore : IDeadLetterStore
 }
 
 /// <summary>
-/// Records whether the work ran inside the scope, so tests can tell a resend that grouped its
-/// enqueue and delete from one that ran them loose.
+/// Records whether the work ran inside the unit of work and whether it committed, so tests can tell
+/// a resend that grouped its enqueue and delete from one that ran them loose.
 /// </summary>
-internal sealed class RecordingQueueTransactionScope : IQueueTransactionScope
+internal sealed class RecordingUnitOfWorkFactory : IQueueUnitOfWorkFactory
 {
     public int Executions { get; private set; }
+    public int Commits { get; private set; }
     public bool IsInside { get; private set; }
 
-    public async Task ExecuteAsync(Func<CancellationToken, Task> work, CancellationToken ct)
+    public async Task<T> ExecuteAsync<T>(Func<IQueueUnitOfWork, CancellationToken, Task<T>> work, CancellationToken ct)
     {
         Executions++;
         IsInside = true;
         try
         {
-            await work(ct);
+            return await work(new Unit(this), ct);
         }
         finally
         {
             IsInside = false;
+        }
+    }
+
+    private sealed class Unit(RecordingUnitOfWorkFactory owner) : IQueueUnitOfWork
+    {
+        public Task CommitAsync(CancellationToken ct)
+        {
+            owner.Commits++;
+            return Task.CompletedTask;
         }
     }
 }

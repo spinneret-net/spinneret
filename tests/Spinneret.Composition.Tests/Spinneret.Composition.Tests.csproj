@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Compositions across packages: the guarantees that only exist once a storage, a delivery and a
+       scheduler are put together — Cloud Tasks over a SQL outbox above all. -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.TestHost" Version="10.0.13" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="10.0.13" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.13" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Spinneret.Queue.CloudTasks\Spinneret.Queue.CloudTasks.csproj" />
+    <ProjectReference Include="..\..\src\Spinneret.Queue.Mssql\Spinneret.Queue.Mssql.csproj" />
+    <ProjectReference Include="..\..\src\Spinneret.Queue.Firestore\Spinneret.Queue.Firestore.csproj" />
+    <ProjectReference Include="..\..\src\Spinneret.Scheduler.Mssql\Spinneret.Scheduler.Mssql.csproj" />
+    <ProjectReference Include="..\Spinneret.Testing\Spinneret.Testing.csproj" />
+    <Using Include="Spinneret.Testing" />
+  </ItemGroup>
+
+</Project>

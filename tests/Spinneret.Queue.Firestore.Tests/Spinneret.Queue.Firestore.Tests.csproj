@@ -3,14 +3,18 @@
   <ItemGroup>
     <!-- The package itself needs only the DI abstractions; building a provider to assert what the
          Add* call registered is a test-only concern. -->
-    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.9" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.13" />
     <!-- The Firestore emulator, so the store's query, cursors and preconditions are exercised
          against a real Firestore rather than argued from the source. -->
-    <PackageReference Include="Testcontainers.Firestore" Version="4.14.0" />
+    <PackageReference Include="Testcontainers.Firestore" Version="4.16.0" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Spinneret.Queue.Firestore\Spinneret.Queue.Firestore.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Spinneret.Testing\Spinneret.Testing.csproj" />
+    <Using Include="Spinneret.Testing" />
   </ItemGroup>
 
 </Project>

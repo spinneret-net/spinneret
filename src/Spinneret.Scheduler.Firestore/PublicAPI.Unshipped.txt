@@ -1,5 +1,4 @@
 #nullable enable
-Microsoft.Extensions.DependencyInjection.FirestoreSchedulerServiceCollectionExtensions
 Spinneret.Scheduler.Firestore.FirestoreSchedulerOptions
 Spinneret.Scheduler.Firestore.FirestoreSchedulerOptions.Collection.get -> string!
 Spinneret.Scheduler.Firestore.FirestoreSchedulerOptions.Collection.set -> void
@@ -9,6 +8,8 @@ Spinneret.Scheduler.Firestore.FirestoreSchedulerOptions.OneShotLeaseWindow.set -
 Spinneret.Scheduler.Firestore.IFirestoreTransactionalScheduler
 Spinneret.Scheduler.Firestore.IFirestoreTransactionalScheduler.CancelJob(Google.Cloud.Firestore.Transaction! transaction, string! handle) -> void
 Spinneret.Scheduler.Firestore.IFirestoreTransactionalScheduler.ScheduleJob<TResponse>(Google.Cloud.Firestore.Transaction! transaction, Spinneret.Mediator.IRequest<TResponse>! request, System.DateTimeOffset executeAt) -> string!
-static Microsoft.Extensions.DependencyInjection.FirestoreSchedulerServiceCollectionExtensions.AddFirestoreScheduler(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, Microsoft.Extensions.Configuration.IConfiguration! configuration) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
-static Microsoft.Extensions.DependencyInjection.FirestoreSchedulerServiceCollectionExtensions.AddFirestoreScheduler(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Spinneret.Scheduler.Firestore.FirestoreSchedulerOptions!>! configure) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
 static readonly Spinneret.Scheduler.Firestore.FirestoreSchedulerOptions.SectionName -> string!
+Microsoft.Extensions.DependencyInjection.FirestoreSchedulerBuilderExtensions
+static Microsoft.Extensions.DependencyInjection.FirestoreSchedulerBuilderExtensions.UseFirestore(this Spinneret.Scheduler.SchedulerBuilder! scheduler, Microsoft.Extensions.Configuration.IConfiguration! configuration) -> Spinneret.Scheduler.SchedulerBuilder!
+static Microsoft.Extensions.DependencyInjection.FirestoreSchedulerBuilderExtensions.UseFirestore(this Spinneret.Scheduler.SchedulerBuilder! scheduler) -> Spinneret.Scheduler.SchedulerBuilder!
+static Microsoft.Extensions.DependencyInjection.FirestoreSchedulerBuilderExtensions.UseFirestore(this Spinneret.Scheduler.SchedulerBuilder! scheduler, System.Action<Spinneret.Scheduler.Firestore.FirestoreSchedulerOptions!>! configure) -> Spinneret.Scheduler.SchedulerBuilder!

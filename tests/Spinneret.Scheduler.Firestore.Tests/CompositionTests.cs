@@ -39,8 +39,7 @@ public class CompositionTests
         // credentials, and what matters here is that the wiring lines up across three packages.
         var services = AnotherTransportsQueue();
 
-        services.AddFirestoreScheduler(EmptyConfiguration);
-        services.AddSchedulerSweeper();
+        services.AddScheduler(s => s.UseFirestore(EmptyConfiguration).UseSweeper());
 
         var sweep = services.Single(d => d.ServiceType == typeof(ISchedulerSweep));
         await Assert.That(sweep.ImplementationType!.FullName)
@@ -52,23 +51,21 @@ public class CompositionTests
     }
 
     [Test]
-    public async Task The_three_registrations_commute()
+    public async Task The_queue_and_scheduler_registrations_commute()
     {
-        // Sweeper first, storage second, transport last — the order a reader would naturally write,
-        // and one that used to throw.
-        var sweeperFirst = new ServiceCollection();
-        sweeperFirst.AddSingleton(typeof(ILogger<>), typeof(NullLogger<>));
-        sweeperFirst.AddSchedulerSweeper();
-        sweeperFirst.AddFirestoreScheduler(EmptyConfiguration);
-        sweeperFirst.AddSingleton(new QueueTypeRegistry([]));
-        sweeperFirst.AddSingleton<IQueuePayloadSerializer, FakeQueuePayloadSerializer>();
+        // Scheduler first, queue last — the order a reader would naturally write, and one that used
+        // to throw.
+        var schedulerFirst = new ServiceCollection();
+        schedulerFirst.AddSingleton(typeof(ILogger<>), typeof(NullLogger<>));
+        schedulerFirst.AddScheduler(s => s.UseFirestore(EmptyConfiguration).UseSweeper());
+        schedulerFirst.AddSingleton(new QueueTypeRegistry([]));
+        schedulerFirst.AddSingleton<IQueuePayloadSerializer, FakeQueuePayloadSerializer>();
 
-        var storageFirst = AnotherTransportsQueue();
-        storageFirst.AddFirestoreScheduler(EmptyConfiguration);
-        storageFirst.AddSchedulerSweeper();
+        var queueFirst = AnotherTransportsQueue();
+        queueFirst.AddScheduler(s => s.UseFirestore(EmptyConfiguration).UseSweeper());
 
-        await Assert.That(sweeperFirst.Select(d => d.ServiceType.FullName).OrderBy(n => n))
-            .IsEquivalentTo(storageFirst.Select(d => d.ServiceType.FullName).OrderBy(n => n));
+        await Assert.That(schedulerFirst.Select(d => d.ServiceType.FullName).OrderBy(n => n))
+            .IsEquivalentTo(queueFirst.Select(d => d.ServiceType.FullName).OrderBy(n => n));
     }
 
     [Test]

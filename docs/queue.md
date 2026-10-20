@@ -1,11 +1,11 @@
 # Spinneret.Queue
 
-The model every transport shares: enqueue a mediator request, have it executed later on a worker,
-and decide per command type how hard to try before giving up. You do not install this package
-directly — a transport package ([Cloud Tasks](queue-gcp.md), [SQL Server](queue-mssql.md)) brings it
-in and registers its half.
+The model every queue shares: enqueue a mediator request, have it executed later on a worker, and
+decide per command type how hard to try before giving up. You do not install this package directly —
+the storage and delivery packages you compose with `AddQueue` ([SQL](queue-sql.md),
+[Cloud Tasks](queue-cloudtasks.md)) bring it in.
 
-Read this page for the parts you write regardless of transport: the retry policy, what a handler
+Read this page for the parts you write regardless of composition: the retry policy, what a handler
 throws, and where failures end up.
 
 ## The application owns termination
@@ -40,13 +40,13 @@ per-call settings:
 | `DedupeKey` | `string?` | Enqueuing the same key twice yields one delivery; a duplicate is silently skipped, not an error. Constraints and the deduplication window are transport-specific — see below. |
 | `Description` | `string?` | Human-readable label carried for observability and shown on dead letters. Never affects dispatch. |
 
-`DedupeKey` is passed straight to the transport, so its rules are the transport's:
+`DedupeKey` is enforced where the message waits, so its rules are that place's:
 
-| | Cloud Tasks | SQL Server |
-|---|---|---|
-| Allowed characters | `A-Z a-z 0-9 _ -` only — it becomes the task name | any, stored as `NVARCHAR(200)` |
-| Max length | 500 | 200 |
-| Window | roughly an hour after the task completes | only while the message is still pending, since the row is deleted on dequeue |
+| | Cloud Tasks alone | SQL storage, in-host | SQL storage over Cloud Tasks |
+|---|---|---|---|
+| Allowed characters | `A-Z a-z 0-9 _ -` only — it becomes the task name | any, stored as `NVARCHAR(200)` | `A-Z a-z 0-9 _ -` — it becomes the task name |
+| Max length | 500 | 200 | 200 |
+| Window | roughly an hour after the task completes | only while the message is still pending, since the row is deleted on dequeue | while pending in the outbox, and then roughly an hour after the task completes |
 
 A key outside those rules fails the enqueue rather than silently skipping deduplication.
 
@@ -100,14 +100,14 @@ When the queue gives up, it writes a `DeadLetterEntry` through `IDeadLetterWrite
 
 | Field | Notes |
 |---|---|
-| `IdempotencyKey` | Transport task id — stable across redeliveries, so a retried dead-letter write cannot duplicate. |
+| `IdempotencyKey` | The message's task id — stable across redeliveries, so a retried dead-letter write cannot duplicate. |
 | `Source` | `Queue` or `Scheduler`. Member names are persisted; they are a data contract. |
 | `CommandTypeName`, `PayloadJson`, `Error`, `Attempts` | |
 | `Description` | From `QueueOptions.Description`, when supplied. |
 | `TraceId` | The failed execution's 32-hex trace id — paste it into your log query to reach the request that caused this. See [Tracing](#tracing). |
 
-Which package supplies the writer depends on your transport: SQL Server
-[ships one](queue-mssql.md), Cloud Tasks does not — pair it with
+Which package supplies the writer depends on your composition: a [SQL storage](queue-sql.md) has
+its own table; Cloud Tasks on its own has none — pair it with
 [`Spinneret.Queue.Firestore`](queue-firestore.md) or write your own.
 
 **A delivery naming a type the consumer does not know is redelivered for 15 minutes, then
@@ -143,9 +143,9 @@ public sealed class DeadLetterEndpoints(IDeadLetterStore store, IDeadLetterResen
 }
 ```
 
-The store comes from whichever package holds your dead letters — [SQL Server](queue-mssql.md) or
-[Firestore](queue-firestore.md) — and the resender is registered by the transport, so both are
-available once you have called the two `Add*` methods you already needed.
+The store comes from whichever holds your dead letters — a [SQL storage](queue-sql.md)'s own table,
+or [Firestore](queue-firestore.md) — and the resender is registered by `AddQueue`, so both are
+available once the queue is composed.
 
 **Paging is by cursor, not offset.** `ListAsync` returns entries newest first plus a `NextCursor`;
 feed it back to get the next page, and stop when it comes back null — not when a page comes back
@@ -157,10 +157,10 @@ the JSON; they cannot redirect it at a different command. A payload that no long
 a command type the queue no longer knows, comes back as a `ResendDeadLetterError` with the entry left
 in place, so nothing recoverable is thrown away.
 
-**How tightly the resend binds its two halves depends on the transport.** On SQL Server the enqueue
-and the delete commit together. On a transport that does not share a database with its store they are
-merely ordered — enqueue first, so an interruption leaves an entry to resend again rather than losing
-the payload.
+**How tightly the resend binds its two halves depends on the storage.** With a SQL storage — whatever
+the delivery, Cloud Tasks included — the enqueue lands in the outbox and the delete in the dead-letter
+table, and both commit together. Without one, they are merely ordered — enqueue first, so an
+interruption leaves an entry to resend again rather than losing the payload.
 
 ## Tracing
 
@@ -197,10 +197,10 @@ services.AddOpenTelemetry().WithTracing(t => t.AddSource(QueueDiagnostics.Activi
 and `defer` leave it unset. These strings are a contract — dashboards query them.
 
 The dedupe key is deliberately not reported as `messaging.message.id`: that attribute means the id
-the transport assigned, and only Cloud Tasks derives one from the dedupe key (it becomes the task
-name). The MSSQL transport's id is an identity column, unrelated to whatever key you passed, so
-folding the two together would make a producer-to-consumer join work on one transport and silently
-not on the other.
+the delivery assigned, and only Cloud Tasks derives one from the dedupe key (it becomes the task
+name). A SQL storage's id is the row's own `MessageId`, unrelated to whatever key you passed, so
+folding the two together would make a producer-to-consumer join work on one composition and
+silently not on another.
 
 Two properties are worth knowing:
 
@@ -215,35 +215,42 @@ Two properties are worth knowing:
 A consequence worth expecting: a task deferred or retried over hours belongs to a trace that stays
 open for hours. That is intended, not a leak.
 
-## What you must register
+## Composing the queue
 
-Whichever transport you choose, the host supplies:
+The queue is registered by one call, `AddQueue`, which composes it from up to three choices — see
+[the setup guide](README.md) for which to pick:
 
-- **`ISpinneretMediator` and the handlers** — `services.AddMediator([typeof(Program).Assembly])`.
-- **The assemblies containing your `IRequest<>` command types**, set on the transport's options as
-  `RequestAssemblies`:
+```csharp
+services.AddQueue(q => q
+    .AddRequestAssemblies(typeof(SyncCustomer).Assembly)   // the command types, once
+    .UseMssqlStorage(configuration)                        // storage: where messages wait
+    .UseInHostDelivery(configuration));                    // delivery: how they reach handlers
+```
 
-  ```csharp
-  services.AddGcpQueue(configuration, o => o.RequestAssemblies = [typeof(SyncCustomer).Assembly]);
-  ```
+| Choice | Options |
+|---|---|
+| **Storage** | `UseMssqlStorage` ([SQL](queue-sql.md)) — or none, with a push delivery. |
+| **Delivery** | `UseInHostDelivery` (drains a SQL storage in this host), `UseCloudTasksDelivery` ([Cloud Tasks](queue-cloudtasks.md)) — or none, on a producer-only host with a storage. |
+| **Dead letters** | The storage's own table, `UseFirestoreDeadLetters` ([Firestore](queue-firestore.md)), or your own `IDeadLetterWriter`. |
 
-  They live on the options object rather than as a parameter so the registration signature never
-  has to grow again. Types are indexed by `Type.FullName`, which is the name on the wire — so
-  renaming or moving a queued command type breaks messages already in flight.
-- **`IDeadLetterWriter`**, unless your transport ships one.
+Each choice is made at most once. `AddQueue` checks the combination when it returns — no request
+assemblies, nowhere to put messages, two storages or two deliveries, or an in-host delivery with no
+SQL storage all fail there, rather than at the first enqueue.
 
-Two commands implementing `IRequest<>` twice, or two types with the same full name across the scanned
-assemblies, fail at startup.
+The host also supplies **`ISpinneretMediator` and the handlers** on every host that consumes —
+`services.AddMediator([typeof(Program).Assembly])`.
+
+Command types are indexed by `Type.FullName`, which is the name on the wire — so renaming or moving a
+queued command type breaks messages already in flight. Two commands implementing `IRequest<>` twice,
+or two types with the same full name across the scanned assemblies, fail at startup.
 
 ## Replacing a default
 
 Defaults are registered with `TryAdd`, so your own implementation always wins: registered **before**
-the transport's `Add*` call, the default is never added at all; registered **after**, yours shadows
-it, because the container resolves the last registration for a service type.
+`AddQueue`, the default is never added at all; registered **after**, yours shadows it, because the
+container resolves the last registration for a service type. Registering first is the clearer habit —
+the container then holds exactly one registration.
 
-Either order works. Registering first is the clearer habit — the container then holds exactly one
-registration — and it is required for the one seam that is inspected rather than `TryAdd`ed, the
-MSSQL transport's `IQueueDispatchBoundary`.
-
-That applies to `IQueuePayloadSerializer`, `IDeadLetterWriter`, and the transport-specific seams each
-page lists.
+That applies to `IQueuePayloadSerializer` (or choose one with `q.UsePayloadSerializer<T>()`),
+`IDeadLetterWriter`, and the provider-specific seams each page lists. `IQueue` itself is the one
+exception: it is composed by `AddQueue` alone, and an `IQueue` registered beforehand fails it.

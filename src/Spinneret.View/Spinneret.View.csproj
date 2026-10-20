@@ -16,7 +16,7 @@
              runtime pack for the browser-wasm RID, so one here would make this package impossible
              to restore from a Blazor WebAssembly app. Anything needing the shared framework —
              HttpContext and friends — belongs in Spinneret.View.Server instead. -->
-        <PackageReference Include="Microsoft.AspNetCore.Components.Web" Version="10.0.9" />
+        <PackageReference Include="Microsoft.AspNetCore.Components.Web" Version="10.0.13" />
     </ItemGroup>
 
     <ItemGroup>

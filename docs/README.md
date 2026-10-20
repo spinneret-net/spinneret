@@ -1,88 +1,126 @@
 # Queue and scheduler setup
 
-Spinneret's queue and scheduler are assembled from small packages, one per decision. Pick along four
-axes; each choice is one registration call, and the calls can be written in any order.
+Spinneret's queue and scheduler are assembled from small packages, one per decision. The queue is
+composed in one call, `AddQueue`, from up to three choices; the scheduler in another, `AddScheduler`,
+from two. The two calls can be written in either order.
 
-| Axis | Choices |
+| Decision | Choices |
 |---|---|
-| **Transport** — how queued work is delivered | [`Spinneret.Queue.Gcp`](queue-gcp.md) (Cloud Tasks) · [`Spinneret.Queue.Mssql`](queue-mssql.md) (SQL Server) |
-| **Dead letters** — where given-up work lands | built into `Spinneret.Queue.Mssql` · [`Spinneret.Queue.Firestore`](queue-firestore.md) |
-| **Schedule storage** — where job definitions live | [`Spinneret.Scheduler.Firestore`](scheduler-firestore.md) · [`Spinneret.Scheduler.Mssql`](scheduler-mssql.md) |
-| **Trigger** — what decides when to sweep | `AddSchedulerSweeper()` from [`Spinneret.Scheduler`](scheduler.md) (timer) · [`Spinneret.Scheduler.Http`](scheduler-http.md) (endpoint + external cron) |
+| **Queue storage** — where messages wait | [`Spinneret.Queue.Mssql`](queue-mssql.md) (SQL Server, via [`Spinneret.Queue.Sql`](queue-sql.md)) · none |
+| **Queue delivery** — how messages reach handlers | `UseInHostDelivery()` ([in-host workers](queue-sql.md#in-host-delivery)) · [`Spinneret.Queue.CloudTasks`](queue-cloudtasks.md) · none, on a producer-only host |
+| **Dead letters** — where given-up work lands | the SQL storage's own table · [`Spinneret.Queue.Firestore`](queue-firestore.md) |
+| **Schedule storage** — where job definitions live | [`Spinneret.Scheduler.Mssql`](scheduler-mssql.md) · [`Spinneret.Scheduler.Firestore`](scheduler-firestore.md) |
+| **Sweep trigger** — what decides when to sweep | `UseSweeper()` from [`Spinneret.Scheduler`](scheduler.md) (timer) · [`Spinneret.Scheduler.Http`](scheduler-http.md) (endpoint + external cron) |
 
-The axes are mostly independent. SQL Server happens to be transport *and* storage — the queue table is
-the store — but Cloud Tasks stores nothing you can query, which is why its dead letters and schedules
-need a store of their own.
+What a SQL storage buys is atomicity: with one, every enqueue commits with the business write that
+caused it, and every delivery's writes, cascades and outcome commit together — whether in-host
+workers or Cloud Tasks deliver it. Without one, Cloud Tasks is called directly and nothing spans the
+two systems. See [the guarantees](queue-sql.md#guarantees).
 
-One exception worth knowing before you plan a combination: **`Spinneret.Scheduler.Mssql` requires the
-SQL Server queue specifically**, because it stores jobs in that queue's database and dispatches onto
-it inside a single transaction. Everything else composes freely — `Spinneret.Scheduler.Firestore` and
-`Spinneret.Queue.Firestore` depend only on the provider-agnostic core, so they sit behind any
-transport.
+The combinations that do not hold together fail at `AddQueue` or `AddScheduler`, with the reason:
+
+- **In-host delivery needs a SQL storage** — the workers drain its table.
+- **One storage, one delivery.** Choosing two of either fails, naming both.
+- **`Spinneret.Scheduler.Mssql` needs the queue's storage in the same SQL Server database**, because a
+  due job's booking and its enqueue commit in one transaction. `Spinneret.Scheduler.Firestore`
+  composes with any queue.
 
 ## Typical combinations
 
-**Cloud Run, all GCP.** Scales to zero, so the trigger is an external cron rather than a timer.
+**Cloud Run, no SQL.** Scales to zero, so the sweep trigger is an external cron rather than a timer.
 
 ```csharp
 services.AddMediator([typeof(SomeCommand).Assembly]);           // handlers
 services.AddSingleton(_ => new FirestoreDbBuilder { ProjectId = "…" }.Build());
-services.AddGcpQueue(config, o => o.RequestAssemblies = [typeof(SomeCommand).Assembly]);   // Cloud Tasks
-services.AddFirestoreDeadLetters(config);                     // dead letters
-services.AddFirestoreScheduler(config);                       // schedules
+services.AddQueue(q => q
+    .AddRequestAssemblies(typeof(SomeCommand).Assembly)
+    .UseCloudTasksDelivery(config)                              // Cloud Tasks, called directly
+    .UseFirestoreDeadLetters(config));                          // dead letters
+services.AddScheduler(s => s.UseFirestore(config));             // schedules
 
 app.UseAuthentication();
 app.UseAuthorization();
-app.MapGcpQueueDispatch();                                    // receives tasks
-app.MapSchedulerSweep(OidcAuthSetup.PolicyName);              // Cloud Scheduler calls this
+app.MapCloudTasksDispatch();                                    // receives tasks
+app.MapSchedulerSweep(CloudTasksAuth.PolicyName);               // Cloud Scheduler calls this
 ```
 
-Read: [queue.md](queue.md) · [queue-gcp.md](queue-gcp.md) · [queue-firestore.md](queue-firestore.md) ·
-[scheduler.md](scheduler.md) · [scheduler-firestore.md](scheduler-firestore.md) ·
-[scheduler-http.md](scheduler-http.md)
+Read: [queue.md](queue.md) · [queue-cloudtasks.md](queue-cloudtasks.md) ·
+[queue-firestore.md](queue-firestore.md) · [scheduler.md](scheduler.md) ·
+[scheduler-firestore.md](scheduler-firestore.md) · [scheduler-http.md](scheduler-http.md)
 
-**A single always-on service, all SQL Server.** One database, one process, a timer inside it.
+**Cloud Run over SQL Server.** Cloud Tasks delivers, but the outbox and the schedules live in the
+application's database, so enqueues are transactional and deliveries atomic. The host is
+CPU-throttled outside requests, so Cloud Scheduler drives both the relay and the sweep.
 
 ```csharp
-services.AddMediator([typeof(SomeCommand).Assembly]);   // handlers
-services.AddMssqlQueue(config, o => o.RequestAssemblies = [typeof(SomeCommand).Assembly]);
-services.AddMssqlQueueWorker();                       // this host consumes
-services.AddMssqlScheduler(config);
-services.AddSchedulerSweeper();                       // timer
+services.AddMediator([typeof(SomeCommand).Assembly]);
+services.AddQueue(q => q
+    .AddRequestAssemblies(typeof(SomeCommand).Assembly)
+    .UseMssqlStorage(config)                                    // the outbox
+    .UseCloudTasksDelivery(config, o => o.Relay.RunInBackground = false));
+services.AddScheduler(s => s.UseMssql(config));
+
+app.UseAuthentication();
+app.UseAuthorization();
+app.MapCloudTasksDispatch();
+app.MapQueueRelay(CloudTasksAuth.PolicyName);                   // Cloud Scheduler calls these two
+app.MapSchedulerSweep(CloudTasksAuth.PolicyName);
 ```
 
-Read: [queue.md](queue.md) · [queue-mssql.md](queue-mssql.md) · [scheduler.md](scheduler.md) ·
-[scheduler-mssql.md](scheduler-mssql.md)
+Messages committed by a delivery, a sweep or an enqueue outside a transaction are forwarded to Cloud
+Tasks as they commit; the relay endpoint picks up the ones committed in your own transactions.
 
-**Mixed.** Nothing forces one vendor. Firestore schedules dispatched onto a SQL Server queue is a
-supported combination, because `Spinneret.Scheduler.Firestore` depends on the provider-agnostic core
-queue rather than on any transport:
+Read: [queue.md](queue.md) · [queue-sql.md](queue-sql.md) · [queue-mssql.md](queue-mssql.md) ·
+[queue-cloudtasks.md](queue-cloudtasks.md#over-a-sql-storage) · [scheduler-mssql.md](scheduler-mssql.md) ·
+[scheduler-http.md](scheduler-http.md)
+
+**A single always-on service on SQL Server.** One database, one process, timers inside it.
+
+```csharp
+services.AddMediator([typeof(SomeCommand).Assembly]);
+services.AddQueue(q => q
+    .AddRequestAssemblies(typeof(SomeCommand).Assembly)
+    .UseMssqlStorage(config)
+    .UseInHostDelivery(config));                                // this host consumes
+services.AddScheduler(s => s.UseMssql(config).UseSweeper());    // timer
+```
+
+A producer-only host — a public API in front of this worker — composes the same storage without
+`UseInHostDelivery`.
+
+Read: [queue.md](queue.md) · [queue-sql.md](queue-sql.md) · [queue-mssql.md](queue-mssql.md) ·
+[scheduler.md](scheduler.md) · [scheduler-mssql.md](scheduler-mssql.md)
+
+**Mixed.** Nothing forces one vendor. Firestore schedules dispatched onto a SQL Server outbox is a
+supported combination, because `Spinneret.Scheduler.Firestore` depends only on the core queue:
 
 ```csharp
 services.AddSingleton(_ => new FirestoreDbBuilder { ProjectId = "…" }.Build());
-services.AddMssqlQueue(config, o => o.RequestAssemblies = [typeof(SomeCommand).Assembly]);
-services.AddMssqlQueueWorker();
-services.AddFirestoreScheduler(config);
-services.AddSchedulerSweeper();
+services.AddQueue(q => q
+    .AddRequestAssemblies(typeof(SomeCommand).Assembly)
+    .UseMssqlStorage(config)
+    .UseInHostDelivery(config));
+services.AddScheduler(s => s.UseFirestore(config).UseSweeper());
 ```
 
 The `FirestoreDb` registration is easy to forget here — the SQL packages need nothing like it, and
 without it the host fails at first resolve.
 
-Read: [queue.md](queue.md) · [queue-mssql.md](queue-mssql.md) · [scheduler.md](scheduler.md) ·
+Read: [queue.md](queue.md) · [queue-sql.md](queue-sql.md) · [scheduler.md](scheduler.md) ·
 [scheduler-firestore.md](scheduler-firestore.md)
 
 ## Reference
 
 | Page | Package |
 |---|---|
-| [queue.md](queue.md) | `Spinneret.Queue` — the model every transport shares: `IQueue`, `[QueuePolicy]`, dead-lettering |
-| [queue-gcp.md](queue-gcp.md) | `Spinneret.Queue.Gcp` — Cloud Tasks, OIDC dispatch, IAM, emulator |
-| [queue-mssql.md](queue-mssql.md) | `Spinneret.Queue.Mssql` — transactional enqueue, polling workers, schema |
+| [queue.md](queue.md) | `Spinneret.Queue` — the model every queue shares: `IQueue`, `[QueuePolicy]`, dead-lettering, `AddQueue` |
+| [queue-sql.md](queue-sql.md) | `Spinneret.Queue.Sql` — the outbox, transactional enqueue, units of work, in-host delivery, guarantees |
+| [queue-mssql.md](queue-mssql.md) | `Spinneret.Queue.Mssql` — SQL Server storage: configuration, schema, permissions |
+| [queue-cloudtasks.md](queue-cloudtasks.md) | `Spinneret.Queue.CloudTasks` — Cloud Tasks delivery, OIDC dispatch, the relay, IAM, emulator |
 | [queue-firestore.md](queue-firestore.md) | `Spinneret.Queue.Firestore` — Firestore dead-letter store |
-| [scheduler.md](scheduler.md) | `Spinneret.Scheduler` — declaring jobs, cron schedules, the timer trigger |
+| [scheduler.md](scheduler.md) | `Spinneret.Scheduler` — declaring jobs, cron schedules, `AddScheduler`, the timer trigger |
 | [scheduler-firestore.md](scheduler-firestore.md) | `Spinneret.Scheduler.Firestore` — schedules in Firestore |
-| [scheduler-mssql.md](scheduler-mssql.md) | `Spinneret.Scheduler.Mssql` — schedules in SQL Server |
+| [scheduler-mssql.md](scheduler-mssql.md) | `Spinneret.Scheduler.Mssql` — schedules in SQL Server, via `Spinneret.Scheduler.Sql` |
 | [scheduler-http.md](scheduler-http.md) | `Spinneret.Scheduler.Http` — sweep endpoint for externally-clocked hosts |
 
 Every page follows the same shape: what it is, install, what it requires, configuration,

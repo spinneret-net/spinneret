@@ -50,7 +50,7 @@ public sealed class MssqlQueueIntegrationTests(MssqlContainerFixture fixture)
     {
         await using var host = await QueueTestHost.StartAsync(
             fixture.ConnectionString,
-            extraConfig: new() { ["Queue:Mssql:ChannelParallelism:default"] = "4" });
+            extraConfig: new() { ["Queue:InHost:ChannelParallelism:default"] = "4" });
 
         for (var i = 0; i < 25; i++)
             await host.Queue.Enqueue(new PingCommand($"n{i}"));

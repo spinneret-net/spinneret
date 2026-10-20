@@ -1,10 +1,14 @@
 # Spinneret.Scheduler.Mssql
 
-Scheduled jobs stored as rows beside the SQL Server queue, plus the sweep that dispatches them.
+Scheduled jobs stored as rows beside the queue's SQL Server storage, plus the sweep that dispatches
+them.
 
-Unlike the Firestore scheduler, this one requires *its own* transport: it stores jobs in the queue's
-database and dispatches onto the queue inside one transaction, so a run can neither be lost nor
-double-enqueued.
+Unlike the Firestore scheduler, this one requires the queue's *storage* to be SQL Server: it stores
+jobs in the same database and dispatches onto the outbox inside one transaction, so a run can neither
+be lost nor double-enqueued. The delivery is free — in-host workers or Cloud Tasks.
+
+The engine — the sweep, the recurring and one-shot schedulers — is written once against ADO.NET in
+`Spinneret.Scheduler.Sql`; this package is its SQL Server dialect and brings it in.
 
 Read [scheduler.md](scheduler.md) first for declaring jobs and schedules; this page is the SQL half.
 
@@ -15,23 +19,24 @@ dotnet add package Spinneret.Scheduler.Mssql
 ```
 
 ```csharp
-services.AddMssqlQueue(configuration, o => o.RequestAssemblies = [typeof(SyncCustomer).Assembly]);
-services.AddMssqlQueueWorker();
-services.AddMssqlScheduler(configuration);
-services.AddSchedulerSweeper();
+services.AddQueue(q => q
+    .AddRequestAssemblies(typeof(SyncCustomer).Assembly)
+    .UseMssqlStorage(configuration)
+    .UseInHostDelivery(configuration));   // or .UseCloudTasksDelivery(configuration)
+services.AddScheduler(s => s.UseMssql(configuration).UseSweeper());
 ```
 
-Registration order does not matter.
+`AddQueue` and `AddScheduler` can be called in either order.
 
 ## Requires
 
 | | |
 |---|---|
-| **`AddMssqlQueue`** | Not merely any transport — this one. Connection string, schema name and schema creation are all inherited from `Queue:Mssql`. |
-| **A trigger** | `AddSchedulerSweeper()` for a timer, or [`Spinneret.Scheduler.Http`](scheduler-http.md) for an endpoint. |
-| **A host running `AddMssqlQueueWorker()`** | The sweep only enqueues. |
+| **`q.UseMssqlStorage(...)`** | Not merely any queue — one stored in this database. Connection string, schema name and schema creation are all inherited from `Queue:Mssql`. A different storage fails the host at startup. |
+| **A trigger** | `s.UseSweeper()` for a timer, or [`Spinneret.Scheduler.Http`](scheduler-http.md) for an endpoint. |
+| **A delivery somewhere** | The sweep only enqueues; an in-host worker or Cloud Tasks delivers. |
 
-The dead-letter writer comes from the queue package; nothing extra is needed.
+The dead-letter writer comes from the queue's storage; nothing extra is needed.
 
 ## Configuration — `Scheduler:Mssql`
 
@@ -39,8 +44,8 @@ The dead-letter writer comes from the queue package; nothing extra is needed.
 |---|---|---|---|
 | `TableName` | `string` | `"SpinneretScheduledJobs"` | Must be a plain SQL identifier. |
 
-That is the whole surface. Three more settings are read from the queue's own section, bound by
-`AddMssqlQueue`:
+That is the whole surface. Three more settings are read from the queue storage's own section, bound
+by `UseMssqlStorage`:
 
 | Key | What |
 |---|---|
@@ -55,10 +60,10 @@ yourself, or set it in code:
 ```csharp
 services.Configure<SchedulerOptions>(
     configuration.GetSection(SchedulerOptions.SectionName));
-services.AddSchedulerSweeper();
+services.AddScheduler(s => s.UseMssql(configuration).UseSweeper());
 
 // or, without configuration:
-services.AddSchedulerSweeper(o => o.SweepInterval = TimeSpan.FromMinutes(1));
+services.AddScheduler(s => s.UseMssql(configuration).UseSweeper(o => o.SweepInterval = TimeSpan.FromMinutes(1)));
 ```
 
 See [scheduler.md](scheduler.md#driving-the-sweep).
@@ -93,11 +98,12 @@ Owning the schema yourself means setting `Queue:Mssql:CreateSchema = false` — 
 queue's tables too — and emitting both scripts from your migrations:
 
 ```csharp
-var queueDdl     = MssqlQueueSchema.CreateScript(queueOptions);
-var schedulerDdl = MssqlSchedulerSchema.CreateScript(queueOptions, schedulerOptions);
+var queueDdl     = MssqlQueueSchema.CreateScript(storageOptions);
+var schedulerDdl = MssqlSchedulerSchema.CreateScript(storageOptions, schedulerOptions);
 ```
 
-Note the scheduler script takes the queue's options as well, since it inherits the schema name.
+Note the scheduler script takes the queue storage's options as well, since it inherits the schema
+name.
 
 Runtime permissions: `SELECT`, `INSERT`, `UPDATE`, `DELETE` on the table — plus DDL rights only if
 `CreateSchema` is on.
@@ -127,7 +133,8 @@ it always manages its own. Only one-shot scheduling is enlistable.
 ## How the sweep behaves
 
 Each due job is claimed under a row lock and dispatched in its own transaction: the claim, the booking
-and the queue insert commit together. Competing hosts skip locked rows (`READPAST`) and dispatch other
+and the outbox insert commit together. Over Cloud Tasks the relay forwards the message as that
+transaction commits. Competing hosts skip locked rows (`READPAST`) and dispatch other
 due jobs in parallel, so running the sweep on several instances is expected rather than merely
 tolerated.
 
@@ -141,8 +148,8 @@ dead-letters that occurrence but keeps its schedule armed.
 
 ## Gotchas
 
-- **Same database as the queue.** The one-transaction guarantee is the entire reason this package
-  exists; a separate scheduler database would need MSDTC and would lose it.
+- **Same database as the queue's storage.** The one-transaction guarantee is the entire reason this
+  package exists; a separate scheduler database would need MSDTC and would lose it.
 - **Job keys are compared case-insensitively.** Under the usual SQL Server collation `Sync` and `sync`
   are one row, so a pair that would coexist in Firestore silently collapses here. The installer
   therefore rejects such pairs at startup on *every* provider — a case-sensitive collation does not
@@ -154,5 +161,7 @@ dead-letters that occurrence but keeps its schedule armed.
   `JobKey` namespace and are exactly the rows with no schedule.
 - **A missing row is not an error.** Since a finished job leaves nothing behind, "the job is gone" and
   "the job never existed" are the same observation. `RegisterAsync` treats both as "create it".
+- **Registration is one statement.** `RegisterAsync` is a single `MERGE … WITH (HOLDLOCK)`, so every
+  replica registering its declared jobs at startup converges on one row per key.
 - **`Scheduler:Mssql:SweepInterval` no longer exists.** The cadence moved to `Scheduler:Sweeper:SweepInterval`
   along with the trigger. A leftover key binds to nothing and silently does nothing.

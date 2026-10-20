@@ -8,12 +8,15 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
-    <OutputType>Exe</OutputType>
+    <!-- The shared helper library is not itself a test application. Keyed on the project name
+         because a property set in the project file is not yet visible when this file evaluates. -->
+    <IsSharedTestSupport Condition="'$(MSBuildProjectName)' == 'Spinneret.Testing'">true</IsSharedTestSupport>
+    <OutputType Condition="'$(IsSharedTestSupport)' != 'true'">Exe</OutputType>
   </PropertyGroup>
 
-  <ItemGroup>
-    <PackageReference Include="TUnit" Version="1.64.13" />
-    <PackageReference Include="Microsoft.Testing.Extensions.CodeCoverage" Version="18.9.0" />
+  <ItemGroup Condition="'$(IsSharedTestSupport)' != 'true'">
+    <PackageReference Include="TUnit" Version="1.75.0" />
+    <PackageReference Include="Microsoft.Testing.Extensions.CodeCoverage" Version="18.12.0" />
   </ItemGroup>
 
 </Project>

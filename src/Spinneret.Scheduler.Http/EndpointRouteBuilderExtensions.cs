@@ -11,7 +11,7 @@ public static class SchedulerSweepEndpointRouteBuilderExtensions
 {
     /// <summary>
     /// Maps an endpoint that runs one scheduler sweep per request, guarded by
-    /// <paramref name="authorizationPolicy"/>. The counterpart to <c>AddSchedulerSweeper()</c>:
+    /// <paramref name="authorizationPolicy"/>. The counterpart to <c>UseSweeper()</c>:
     /// use this where an external scheduler owns the clock — notably on a host that scales to
     /// zero, which has no thread of its own to tick.
     /// </summary>
@@ -19,7 +19,7 @@ public static class SchedulerSweepEndpointRouteBuilderExtensions
     /// <param name="authorizationPolicy">
     /// Name of the authorization policy protecting the endpoint. The sweep dispatches every due
     /// job, so it must never be reachable unauthenticated. Hosts on Cloud Tasks pass
-    /// <c>OidcAuthSetup.PolicyName</c> to reuse the queue's OIDC scheme; any other host passes its
+    /// <c>CloudTasksAuth.PolicyName</c> to reuse the queue's OIDC scheme; any other host passes its
     /// own policy. Required rather than defaulted, because this package cannot know what
     /// authenticates the trigger — and guessing wrong would silently leave the sweep open.
     /// </param>
@@ -44,7 +44,7 @@ public static class SchedulerSweepEndpointRouteBuilderExtensions
         if (endpoints.ServiceProvider.GetService<ISchedulerSweep>() is null)
             throw new InvalidOperationException(
                 "MapSchedulerSweep requires a scheduler storage provider to be registered "
-                + "(AddFirestoreScheduler, AddMssqlScheduler, or another): this package only exposes "
+                + "(AddScheduler with s.UseMssql, s.UseFirestore, or another): this package only exposes "
                 + "the trigger, and something has to tell it what is due.");
 
         return SchedulerSweepEndpoint.Map(

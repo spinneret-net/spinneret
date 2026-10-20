@@ -77,7 +77,7 @@ public sealed class QueueTypeRegistry
             throw new InvalidOperationException(
                 $"Request type '{name}' is not registered with the queue. " +
                 $"Ensure its containing assembly was passed to the queue registration " +
-                $"(AddQueueCore, or the transport's AddGcpQueue/AddMssqlQueue).");
+                $"(q.AddRequestAssemblies in AddQueue).");
 
         return name;
     }

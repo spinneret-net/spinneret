@@ -5,7 +5,7 @@ public sealed class MssqlQueueSchemaTests
     [Test]
     public async Task CreateScript_uses_the_configured_names()
     {
-        var options = new MssqlQueueOptions
+        var options = new MssqlStorageOptions
         {
             SchemaName = "queues",
             QueueTableName = "MyQueue",
@@ -21,7 +21,7 @@ public sealed class MssqlQueueSchemaTests
     [Test]
     public async Task CreateScript_is_idempotent_by_guarding_on_object_id()
     {
-        var script = MssqlQueueSchema.CreateScript(new MssqlQueueOptions());
+        var script = MssqlQueueSchema.CreateScript(new MssqlStorageOptions());
 
         await Assert.That(script).Contains("IF OBJECT_ID(N'[dbo].[SpinneretQueue]', N'U') IS NULL");
         await Assert.That(script).Contains("IF OBJECT_ID(N'[dbo].[SpinneretDeadLetters]', N'U') IS NULL");
@@ -30,7 +30,7 @@ public sealed class MssqlQueueSchemaTests
     [Test]
     public async Task CreateScript_indexes_channel_visibility_and_dedupe()
     {
-        var script = MssqlQueueSchema.CreateScript(new MssqlQueueOptions());
+        var script = MssqlQueueSchema.CreateScript(new MssqlStorageOptions());
 
         await Assert.That(script).Contains("(Channel, VisibleAt)");
         await Assert.That(script).Contains("UNIQUE INDEX");
@@ -40,7 +40,7 @@ public sealed class MssqlQueueSchemaTests
     [Test]
     public async Task CreateScript_indexes_the_dead_letter_paging_order()
     {
-        var script = MssqlQueueSchema.CreateScript(new MssqlQueueOptions());
+        var script = MssqlQueueSchema.CreateScript(new MssqlStorageOptions());
 
         await Assert.That(script).Contains("(DeadLetteredAt DESC, IdempotencyKey DESC)");
     }
@@ -56,7 +56,7 @@ public sealed class MssqlQueueSchemaTests
         // table was created by a host that lost the create race before it had run the CREATE INDEX
         // statements. Both are invisible until a query silently goes to a scan — or, for the dedupe
         // index, until deduplication stops happening and says nothing.
-        var script = MssqlQueueSchema.CreateScript(new MssqlQueueOptions());
+        var script = MssqlQueueSchema.CreateScript(new MssqlStorageOptions());
 
         await Assert.That(script).Contains($"AND name = N'{index}'");
     }
@@ -67,7 +67,7 @@ public sealed class MssqlQueueSchemaTests
         // The structural half of the rule above: as many sys.indexes guards as index creations, so
         // no index can be riding on a table block's guard instead of its own. Counted over the
         // statements only — the script's own comments discuss CREATE INDEX and would inflate this.
-        var statements = string.Join('\n', MssqlQueueSchema.CreateScript(new MssqlQueueOptions())
+        var statements = string.Join('\n', MssqlQueueSchema.CreateScript(new MssqlStorageOptions())
             .Split('\n')
             .Where(line => !line.TrimStart().StartsWith("--", StringComparison.Ordinal)));
 
@@ -75,8 +75,21 @@ public sealed class MssqlQueueSchemaTests
         var creates = statements.Split("CREATE INDEX").Length - 1
             + statements.Split("CREATE UNIQUE INDEX").Length - 1;
 
-        await Assert.That(creates).IsEqualTo(3);
+        await Assert.That(creates).IsEqualTo(4);
         await Assert.That(guards).IsEqualTo(creates);
+    }
+
+    [Test]
+    public async Task CreateScript_adds_the_message_id_and_lease_columns_to_an_existing_table()
+    {
+        // Tables created before the relay existed get the columns too, each guarded on its own
+        // existence; the MessageId default fills rows already waiting so they keep their place.
+        var script = MssqlQueueSchema.CreateScript(new MssqlStorageOptions());
+
+        await Assert.That(script).Contains("IF COL_LENGTH(N'[dbo].[SpinneretQueue]', N'MessageId') IS NULL");
+        await Assert.That(script).Contains("DEFAULT NEWID() WITH VALUES");
+        await Assert.That(script).Contains("IF COL_LENGTH(N'[dbo].[SpinneretQueue]', N'LeasedUntil') IS NULL");
+        await Assert.That(script).Contains("[IX_SpinneretQueue_VisibleAt]");
     }
 
     [Test]
@@ -86,7 +99,7 @@ public sealed class MssqlQueueSchemaTests
         // at once. "IF OBJECT_ID(...) IS NULL CREATE TABLE" is not atomic and nothing here shares an
         // implicit transaction, so without the lock two replicas can both decide to create the
         // table. Held for the transaction, so it is released by the commit either way.
-        var script = MssqlQueueSchema.CreateScript(new MssqlQueueOptions());
+        var script = MssqlQueueSchema.CreateScript(new MssqlStorageOptions());
 
         await Assert.That(script).Contains("BEGIN TRANSACTION");
         await Assert.That(script).Contains("sp_getapplock");

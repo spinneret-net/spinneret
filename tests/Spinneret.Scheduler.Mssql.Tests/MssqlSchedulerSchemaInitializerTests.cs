@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Spinneret.Queue.Mssql;
+using Spinneret.Scheduler.Sql;
 
 namespace Spinneret.Scheduler.Mssql.Tests;
 
@@ -13,7 +14,7 @@ namespace Spinneret.Scheduler.Mssql.Tests;
 /// which is what the last test here pins.
 /// </remarks>
 [ClassDataSource<MssqlContainerFixture>(Shared = SharedType.PerTestSession)]
-public sealed class MssqlSchedulerSchemaInitializerTests(MssqlContainerFixture fixture)
+public sealed class SqlSchedulerSchemaInitializerTests(MssqlContainerFixture fixture)
 {
     private const string Stockholm = "Europe/Stockholm";
     private static readonly Schedule Hourly = Schedule.Cron("0 * * * *", Stockholm);
@@ -95,7 +96,7 @@ public sealed class MssqlSchedulerSchemaInitializerTests(MssqlContainerFixture f
         await using var host = await SchedulerTestHost.StartAsync(
             fixture.ConnectionString,
             sweeper: false,
-            configure: services => services.Configure<MssqlQueueOptions>(
+            configure: services => services.Configure<MssqlStorageOptions>(
                 o => o.CreateSchema = false),
             reuseSuffix: suffix);
 

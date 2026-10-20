@@ -2,8 +2,8 @@
 
 Scheduled jobs stored as Firestore documents, plus the sweep that dispatches them onto the queue.
 
-It depends only on the provider-agnostic core queue, so it composes with **any** transport — Firestore
-schedules dispatched onto a SQL Server queue is a supported combination. It is a plain library with no
+It depends only on the provider-agnostic core queue, so it composes with **any** queue — Firestore
+schedules dispatched onto a SQL Server outbox is a supported combination. It is a plain library with no
 web dependency; the HTTP trigger lives in [`Spinneret.Scheduler.Http`](scheduler-http.md).
 
 Read [scheduler.md](scheduler.md) first for declaring jobs and schedules; this page is the Firestore
@@ -16,23 +16,26 @@ dotnet add package Spinneret.Scheduler.Firestore
 ```
 
 ```csharp
-services.AddGcpQueue(configuration, o => o.RequestAssemblies = [typeof(SyncCustomer).Assembly]);
-services.AddFirestoreScheduler(configuration);
+services.AddQueue(q => q
+    .AddRequestAssemblies(typeof(SyncCustomer).Assembly)
+    .UseCloudTasksDelivery(configuration)
+    .UseFirestoreDeadLetters(configuration));
 
 // then pick a trigger — one of:
-services.AddSchedulerSweeper();                     // timer, for an always-on host
-app.MapSchedulerSweep(OidcAuthSetup.PolicyName);    // endpoint, for a host that scales to zero
+services.AddScheduler(s => s.UseFirestore(configuration).UseSweeper());   // timer, for an always-on host
+services.AddScheduler(s => s.UseFirestore(configuration));                // plus, for a host that scales to zero:
+app.MapSchedulerSweep(CloudTasksAuth.PolicyName);                         // an endpoint Cloud Scheduler calls
 ```
 
-Registration order does not matter.
+`AddQueue` and `AddScheduler` can be called in either order.
 
 ## Requires
 
 | | |
 |---|---|
-| **A queue transport** | Any. The sweep enqueues through `IQueue` and needs the type registry and payload serializer. |
+| **A queue** | Any composition. The sweep enqueues through `IQueue` and needs the type registry and payload serializer. |
 | **A host-registered `FirestoreDb`** | See [queue-firestore.md](queue-firestore.md#requires) for the builder snippet. |
-| **An `IDeadLetterWriter`** | A failed occurrence is dead-lettered. `AddFirestoreDeadLetters()` is the natural pairing. |
+| **An `IDeadLetterWriter`** | A failed occurrence is dead-lettered. `q.UseFirestoreDeadLetters()` is the natural pairing; a SQL storage's table works too. |
 | **A trigger** | Nothing dispatches without one. |
 
 ## Configuration — `Scheduler:Firestore`

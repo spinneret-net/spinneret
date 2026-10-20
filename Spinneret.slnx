@@ -1,34 +1,38 @@
 <Solution>
   <Folder Name="/src/">
-    <Project Path="src\Spinneret.Functional\Spinneret.Functional.csproj" Type="Classic C#" />
-    <Project Path="src\Spinneret.Mediator\Spinneret.Mediator.csproj" Type="Classic C#" />
-    <Project Path="src\Spinneret.Parsing\Spinneret.Parsing.csproj" Type="Classic C#" />
-    <Project Path="src\Spinneret.Queue\Spinneret.Queue.csproj" Type="Classic C#" />
-    <Project Path="src\Spinneret.Queue.Firestore\Spinneret.Queue.Firestore.csproj" Type="Classic C#" />
-    <Project Path="src\Spinneret.Queue.Gcp\Spinneret.Queue.Gcp.csproj" Type="Classic C#" />
-    <Project Path="src\Spinneret.Queue.Mssql\Spinneret.Queue.Mssql.csproj" Type="Classic C#" />
-    <Project Path="src\Spinneret.Scheduler\Spinneret.Scheduler.csproj" Type="Classic C#" />
-    <Project Path="src\Spinneret.Scheduler.Firestore\Spinneret.Scheduler.Firestore.csproj" Type="Classic C#" />
-    <Project Path="src\Spinneret.Scheduler.Http\Spinneret.Scheduler.Http.csproj" Type="Classic C#" />
-    <Project Path="src\Spinneret.Scheduler.Mssql\Spinneret.Scheduler.Mssql.csproj" Type="Classic C#" />
-    <Project Path="src\Spinneret.View\Spinneret.View.csproj" Type="Classic C#" />
-    <Project Path="src\Spinneret.View.Server\Spinneret.View.Server.csproj" Type="Classic C#" />
-    <Project Path="src\Spinneret.ViewModel\Spinneret.ViewModel.csproj" Type="Classic C#" />
+    <Project Path="src/Spinneret.Queue.Sql/Spinneret.Queue.Sql.csproj" />
+    <Project Path="src/Spinneret.Scheduler.Sql/Spinneret.Scheduler.Sql.csproj" />
+    <Project Path="src\Spinneret.Functional\Spinneret.Functional.csproj" />
+    <Project Path="src\Spinneret.Mediator\Spinneret.Mediator.csproj" />
+    <Project Path="src\Spinneret.Parsing\Spinneret.Parsing.csproj" />
+    <Project Path="src\Spinneret.Queue\Spinneret.Queue.csproj" />
+    <Project Path="src\Spinneret.Queue.Firestore\Spinneret.Queue.Firestore.csproj" />
+    <Project Path="src\Spinneret.Queue.CloudTasks\Spinneret.Queue.CloudTasks.csproj" />
+    <Project Path="src\Spinneret.Queue.Mssql\Spinneret.Queue.Mssql.csproj" />
+    <Project Path="src\Spinneret.Scheduler\Spinneret.Scheduler.csproj" />
+    <Project Path="src\Spinneret.Scheduler.Firestore\Spinneret.Scheduler.Firestore.csproj" />
+    <Project Path="src\Spinneret.Scheduler.Http\Spinneret.Scheduler.Http.csproj" />
+    <Project Path="src\Spinneret.Scheduler.Mssql\Spinneret.Scheduler.Mssql.csproj" />
+    <Project Path="src\Spinneret.View\Spinneret.View.csproj" />
+    <Project Path="src\Spinneret.View.Server\Spinneret.View.Server.csproj" />
+    <Project Path="src\Spinneret.ViewModel\Spinneret.ViewModel.csproj" />
   </Folder>
   <Folder Name="/tests/">
-    <Project Path="tests\Spinneret.Functional.Tests\Spinneret.Functional.Tests.csproj" Type="Classic C#" />
-    <Project Path="tests\Spinneret.Mediator.Tests\Spinneret.Mediator.Tests.csproj" Type="Classic C#" />
-    <Project Path="tests\Spinneret.Parsing.Tests\Spinneret.Parsing.Tests.csproj" Type="Classic C#" />
-    <Project Path="tests\Spinneret.Queue.Tests\Spinneret.Queue.Tests.csproj" Type="Classic C#" />
-    <Project Path="tests\Spinneret.Queue.Firestore.Tests\Spinneret.Queue.Firestore.Tests.csproj" Type="Classic C#" />
-    <Project Path="tests\Spinneret.Queue.Gcp.Tests\Spinneret.Queue.Gcp.Tests.csproj" Type="Classic C#" />
-    <Project Path="tests\Spinneret.Queue.Mssql.Tests\Spinneret.Queue.Mssql.Tests.csproj" Type="Classic C#" />
-    <Project Path="tests\Spinneret.Scheduler.Tests\Spinneret.Scheduler.Tests.csproj" Type="Classic C#" />
-    <Project Path="tests\Spinneret.Scheduler.Firestore.Tests\Spinneret.Scheduler.Firestore.Tests.csproj" Type="Classic C#" />
-    <Project Path="tests\Spinneret.Scheduler.Http.Tests\Spinneret.Scheduler.Http.Tests.csproj" Type="Classic C#" />
-    <Project Path="tests\Spinneret.Scheduler.Mssql.Tests\Spinneret.Scheduler.Mssql.Tests.csproj" Type="Classic C#" />
-    <Project Path="tests\Spinneret.View.Tests\Spinneret.View.Tests.csproj" Type="Classic C#" />
-    <Project Path="tests\Spinneret.View.Server.Tests\Spinneret.View.Server.Tests.csproj" Type="Classic C#" />
-    <Project Path="tests\Spinneret.ViewModel.Tests\Spinneret.ViewModel.Tests.csproj" Type="Classic C#" />
+    <Project Path="tests/Spinneret.Composition.Tests/Spinneret.Composition.Tests.csproj" />
+    <Project Path="tests/Spinneret.Testing/Spinneret.Testing.csproj" />
+    <Project Path="tests\Spinneret.Functional.Tests\Spinneret.Functional.Tests.csproj" />
+    <Project Path="tests\Spinneret.Mediator.Tests\Spinneret.Mediator.Tests.csproj" />
+    <Project Path="tests\Spinneret.Parsing.Tests\Spinneret.Parsing.Tests.csproj" />
+    <Project Path="tests\Spinneret.Queue.Tests\Spinneret.Queue.Tests.csproj" />
+    <Project Path="tests\Spinneret.Queue.Firestore.Tests\Spinneret.Queue.Firestore.Tests.csproj" />
+    <Project Path="tests\Spinneret.Queue.CloudTasks.Tests\Spinneret.Queue.CloudTasks.Tests.csproj" />
+    <Project Path="tests\Spinneret.Queue.Mssql.Tests\Spinneret.Queue.Mssql.Tests.csproj" />
+    <Project Path="tests\Spinneret.Scheduler.Tests\Spinneret.Scheduler.Tests.csproj" />
+    <Project Path="tests\Spinneret.Scheduler.Firestore.Tests\Spinneret.Scheduler.Firestore.Tests.csproj" />
+    <Project Path="tests\Spinneret.Scheduler.Http.Tests\Spinneret.Scheduler.Http.Tests.csproj" />
+    <Project Path="tests\Spinneret.Scheduler.Mssql.Tests\Spinneret.Scheduler.Mssql.Tests.csproj" />
+    <Project Path="tests\Spinneret.View.Tests\Spinneret.View.Tests.csproj" />
+    <Project Path="tests\Spinneret.View.Server.Tests\Spinneret.View.Server.Tests.csproj" />
+    <Project Path="tests\Spinneret.ViewModel.Tests\Spinneret.ViewModel.Tests.csproj" />
   </Folder>
 </Solution>

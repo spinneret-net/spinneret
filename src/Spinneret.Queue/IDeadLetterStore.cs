@@ -7,8 +7,8 @@ namespace Spinneret.Queue;
 /// <remarks>
 /// <para>
 /// Library-implemented: each store package ships one, and applications inject it. Kept separate
-/// from <see cref="IDeadLetterWriter"/> on purpose — that one is consumer-implementable (a GCP host
-/// must register its own), and folding listing into it would break every out-of-tree writer. A host
+/// from <see cref="IDeadLetterWriter"/> on purpose — that one is consumer-implementable (a host with no
+/// storage-provided one may register its own), and folding listing into it would break every out-of-tree writer. A host
 /// with a custom writer and no admin page simply never registers a store.
 /// </para>
 /// <para>

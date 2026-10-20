@@ -16,8 +16,8 @@
     <ItemGroup>
         <!-- Used directly by this package's public API; declared explicitly instead of
              relying on Spinneret.Parsing's transitive references. -->
-        <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.9" />
-        <PackageReference Include="Microsoft.Extensions.Localization.Abstractions" Version="10.0.9" />
+        <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.13" />
+        <PackageReference Include="Microsoft.Extensions.Localization.Abstractions" Version="10.0.13" />
     </ItemGroup>
 
     <ItemGroup>

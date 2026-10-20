@@ -3,8 +3,8 @@ using System.Diagnostics;
 namespace Spinneret.Queue;
 
 /// <summary>
-/// Persists tasks the queue has given up on. Implemented by transports or hosts (the MSSQL
-/// transport ships one; GCP hosts must register their own). Additions to this interface ship
+/// Persists tasks the queue has given up on. Implemented by storage packages or hosts (a SQL
+/// storage ships one; Firestore offers another; a host may register its own). Additions to this interface ship
 /// as default interface members so existing implementations keep compiling.
 /// </summary>
 public interface IDeadLetterWriter
@@ -52,7 +52,7 @@ public sealed record DeadLetterEntry
 }
 
 /// <summary>
-/// Where a dead letter came from. Member names are persisted (e.g. as strings in the MSSQL
+/// Where a dead letter came from. Member names are persisted (e.g. as strings in the SQL
 /// dead-letter table), so they are a data contract: never rename or renumber.
 /// </summary>
 public enum DeadLetterSource

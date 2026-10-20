@@ -27,7 +27,7 @@ Utility libraries tend to be junk drawers. Spinneret is the opposite: every pack
 - **Parse, don't validate.** A boundary produces a typed model or a complete, localizable list of property errors — never a half-trusted DTO.
 - **Your app owns its behavior.** Retry policy is code on the command type, not YAML in a cloud console. A typo fails the host at boot, not a delivery at 2 a.m.
 - **A wait is not a failure.** Deferred work is re-enqueued without burning retry attempts. Dead letters are for the truly dead.
-- **Infrastructure is a seam.** Core packages are provider-agnostic; GCP and SQL Server adapters live in separate packages. Changing infrastructure means swapping a package, not rewriting your app.
+- **Infrastructure is a seam.** Core packages are provider-agnostic; Cloud Tasks, SQL Server and Firestore adapters live in separate packages, composed one choice at a time. Changing infrastructure means swapping a package, not rewriting your app.
 
 ## The silk
 
@@ -37,12 +37,14 @@ Utility libraries tend to be junk drawers. Spinneret is the opposite: every pack
 | `Spinneret.Mediator` | **The radials** | In-process request dispatch with declarative, tag-invalidated caching. A spider reads the world through vibrations in its radials; so does your app. |
 | `Spinneret.Parsing` | **The sticky spiral** | Parse-don't-validate boundaries: one pass, every invalid property caught and localized. Nothing gets through that shouldn't. |
 | `Spinneret.Queue` | **The egg sac** | A durable command queue where the application owns the retry policy — attempts, backoff, channels, dead-lettering — per command type. Safe until it hatches. |
-| `Spinneret.Queue.Gcp` | | Google Cloud Tasks transport with an OIDC-authenticated dispatch endpoint. |
-| `Spinneret.Queue.Mssql` | | SQL Server-backed durable queue transport. |
-| `Spinneret.Queue.Firestore` | | Firestore-backed dead-letter store, usable behind any transport. |
+| `Spinneret.Queue.Sql` | | Queue storage in your own database: a transactional outbox, in-host delivery and dead letters, over ADO.NET. |
+| `Spinneret.Queue.Mssql` | | SQL Server storage for `Spinneret.Queue.Sql`. |
+| `Spinneret.Queue.CloudTasks` | | Google Cloud Tasks delivery with an OIDC-authenticated dispatch endpoint — directly, or relayed from a SQL outbox. |
+| `Spinneret.Queue.Firestore` | | Firestore-backed dead-letter store, usable with any queue. |
 | `Spinneret.Scheduler` | **The nightly respin** | Recurring jobs declared in code and installed idempotently at startup, swept on a timer. Orb-weavers rebuild their web every night; so do your jobs. |
 | `Spinneret.Scheduler.Firestore` | | Firestore-backed scheduling with transactional dispatch. |
-| `Spinneret.Scheduler.Mssql` | | SQL Server-backed scheduling with transactional dispatch. |
+| `Spinneret.Scheduler.Sql` | | Relational scheduling over ADO.NET, dispatched onto the SQL outbox in the same transaction. |
+| `Spinneret.Scheduler.Mssql` | | SQL Server storage for `Spinneret.Scheduler.Sql`. |
 | `Spinneret.Scheduler.Http` | | An authorized endpoint that sweeps once per request, for hosts whose clock is an external cron. |
 | `Spinneret.ViewModel` | **The attachment discs** | MVVM for Blazor: bindable view models, two-way bindings with conversion and validation state, row collections, nested view models — the silk cement that fastens view to model. |
 | `Spinneret.View` | **The hub** | `ViewBase<T>` components that resolve their view model from DI, with lifecycle state and app-wide refresh coordination. Where the spider sits and feels everything. |
@@ -159,11 +161,18 @@ throw new QueueHandlerPermanentException("Employee no longer exists.");
 throw new QueueHandlerRetryAfterException(TimeSpan.FromMinutes(10));
 ```
 
-`Spinneret.Queue.Gcp` and `Spinneret.Queue.Mssql` provide the transport while the core queue owns delivery semantics. The GCP adapter uses Google Cloud Tasks with OIDC-authenticated dispatch; the MSSQL adapter uses SQL Server. The application-facing queue API stays the same either way.
+The queue is composed from a *storage* — where messages wait — and a *delivery* — how they reach their handlers — while the core queue owns delivery semantics. A SQL storage (`Spinneret.Queue.Mssql`) keeps messages in an outbox in your own database, so an enqueue commits with the business write that caused it and a delivery's writes commit with its outcome. In-host workers drain it, or a relay forwards it to Google Cloud Tasks (`Spinneret.Queue.CloudTasks`), which can also be used on its own. The application-facing queue API stays the same whichever you compose:
+
+```csharp
+services.AddQueue(q => q
+    .AddRequestAssemblies(typeof(PushEmployeeToFortnox).Assembly)
+    .UseMssqlStorage(config)          // the outbox
+    .UseCloudTasksDelivery(config));  // or .UseInHostDelivery(config)
+```
 
 Work keeps its trace across the hop: the envelope carries W3C trace context, so a message is processed — and dead-lettered — in the trace of whatever enqueued it, however many retries later. A dead letter records that trace id, which turns "what caused this failure?" into one log query. See **[Tracing](docs/queue.md#tracing)**.
 
-Dead letters need a store the transport does not always provide: the MSSQL transport writes them to a table in the same database, while Cloud Tasks has nowhere to put them, so `Spinneret.Queue.Firestore` supplies a Firestore-backed writer. It depends on the core queue rather than any transport, so it composes with either. Setup for each package — configuration, infrastructure, Terraform and the local emulator — is documented per package under **[docs/](docs/README.md)**.
+Dead letters need a store the delivery does not always provide: a SQL storage writes them to a table in the same database, inside the delivery's transaction, while Cloud Tasks on its own has nowhere to put them, so `Spinneret.Queue.Firestore` supplies a Firestore-backed writer. It depends on the core queue rather than any delivery, so it composes with any queue. Setup for each package — configuration, infrastructure, Terraform and the local emulator — is documented per package under **[docs/](docs/README.md)**.
 
 ### The nightly respin — `Spinneret.Scheduler`
 
@@ -210,7 +219,7 @@ The installer unregisters retired keys alongside installing the declared ones �
 
 Installing happens in the background and retries with capped, jittered backoff until it succeeds, so a store that is briefly unreachable costs a short delay rather than a missing job — a single always-on host would otherwise carry that gap until its next restart. Startup is never held up by it, and each job stops being retried as soon as it is installed: this is a retry, not a reconciliation loop, so two revisions never fight over a definition during a rolling deploy. Running many instances needs no coordination — registration is idempotent and guarded by the store (the job key is the primary key in SQL Server and the document id in Firestore), so ten instances asserting the same job converge on one job.
 
-The scheduler itself is infrastructure-agnostic. `Spinneret.Scheduler.Firestore` provides Firestore-backed scheduling with transactional dispatch, while `Spinneret.Scheduler.Mssql` provides the SQL Server-backed equivalent. The job declaration and application-facing scheduling model stay the same. Storage and transport are chosen independently — Firestore scheduling depends only on the core queue, so it runs just as happily behind Cloud Tasks as behind SQL Server. What each package needs is documented per package under **[docs/](docs/README.md)**.
+The scheduler itself is infrastructure-agnostic. `Spinneret.Scheduler.Firestore` provides Firestore-backed scheduling, while `Spinneret.Scheduler.Mssql` keeps jobs beside the SQL outbox and commits each due job's booking with its enqueue. The job declaration and application-facing scheduling model stay the same, composed with `services.AddScheduler(s => s.UseMssql(config).UseSweeper())`. Firestore scheduling depends only on the core queue, so it runs with any queue composition; SQL scheduling needs the queue's storage in the same database, whichever delivery drains it. What each package needs is documented per package under **[docs/](docs/README.md)**.
 
 ### The hub — `Spinneret.View` + `Spinneret.ViewModel`
 
@@ -245,19 +254,23 @@ var rate = Binding.Create(ViewModel, x => x.Rate, EmploymentRate.Parse);
 
 ## Anatomy
 
-Each thread stands alone; together they make a web. The core packages remain provider-agnostic — provider-specific packages such as `.Gcp`, `.Mssql` and `.Firestore` keep infrastructure concerns at the edges.
+Each thread stands alone; together they make a web. The core packages remain provider-agnostic — provider-specific packages such as `.CloudTasks`, `.Mssql` and `.Firestore` keep infrastructure concerns at the edges.
 
-Transport, storage and trigger are separate axes, chosen one call at a time and in any order:
+Storage, delivery, dead letters, schedule storage and trigger are separate choices, each made once:
 
 ```csharp
-services.AddMssqlQueue(config, o => o.RequestAssemblies = [typeof(SyncCustomer).Assembly]);
-services.AddFirestoreScheduler(config);       // where schedules live
-services.AddSchedulerSweeper();               // what drives them
+services.AddQueue(q => q
+    .AddRequestAssemblies(typeof(SyncCustomer).Assembly)
+    .UseMssqlStorage(config)                  // where messages wait
+    .UseInHostDelivery(config));              // how they reach handlers
+services.AddScheduler(s => s
+    .UseFirestore(config)                     // where schedules live
+    .UseSweeper());                           // what drives them
 ```
 
-SQL Server is transport and storage at once — the queue table *is* the store — but Cloud Tasks stores nothing you can query, so its dead letters and scheduled jobs live in Firestore. The `.Firestore` packages depend only on the provider-agnostic core, so they compose with any transport rather than with Cloud Tasks specifically.
+A SQL storage is the outbox; in-host workers drain it, or a relay forwards it to Cloud Tasks. Without a storage, Cloud Tasks is called directly — it stores nothing you can query, so its dead letters live in Firestore. The `.Firestore` packages depend only on the provider-agnostic core, so they compose with any queue. A combination that cannot work — in-host delivery with no storage, two deliveries, a SQL scheduler beside a non-SQL queue — fails at registration, naming the reason.
 
-The trigger is likewise independent of where jobs are stored. `AddSchedulerSweeper()` runs a timer inside the host; `Spinneret.Scheduler.Http` exposes an authorized endpoint instead, for a host that scales to zero and has no thread of its own to tick. Both drive the same `ISchedulerSweep`.
+The trigger is likewise independent of where jobs are stored. `UseSweeper()` runs a timer inside the host; `Spinneret.Scheduler.Http` exposes an authorized endpoint instead, for a host that scales to zero and has no thread of its own to tick. Both drive the same `ISchedulerSweep`. See **[docs/](docs/README.md)** for the combinations and their guarantees.
 
 ```mermaid
 graph BT
@@ -265,12 +278,14 @@ graph BT
   Parsing["Spinneret.Parsing"] --> Functional
   Mediator["Spinneret.Mediator"]
   Queue["Spinneret.Queue"] --> Mediator & Functional
-  QueueGcp["Spinneret.Queue.Gcp"] --> Queue
-  QueueMssql["Spinneret.Queue.Mssql"] --> Queue
+  QueueSql["Spinneret.Queue.Sql"] --> Queue
+  QueueMssql["Spinneret.Queue.Mssql"] --> QueueSql
+  QueueCloudTasks["Spinneret.Queue.CloudTasks"] --> Queue
   QueueFirestore["Spinneret.Queue.Firestore"] --> Queue
   Scheduler["Spinneret.Scheduler"] --> Mediator
   SchedulerFirestore["Spinneret.Scheduler.Firestore"] --> Scheduler & Queue
-  SchedulerMssql["Spinneret.Scheduler.Mssql"] --> Scheduler & QueueMssql
+  SchedulerSql["Spinneret.Scheduler.Sql"] --> Scheduler & QueueSql
+  SchedulerMssql["Spinneret.Scheduler.Mssql"] --> SchedulerSql & QueueMssql
   SchedulerHttp["Spinneret.Scheduler.Http"] --> Scheduler
   ViewModel["Spinneret.ViewModel"] --> Functional & Parsing
   View["Spinneret.View"] --> ViewModel

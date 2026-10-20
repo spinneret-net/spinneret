@@ -1,0 +1,17 @@
+#nullable enable
+Spinneret.Queue.Sql.ISqlTransactionProvider
+Spinneret.Queue.Sql.ISqlTransactionProvider.Current.get -> System.Data.Common.DbTransaction?
+Spinneret.Queue.Sql.ISqlTransactionProvider.Use(System.Data.Common.DbTransaction? transaction) -> void
+Spinneret.Queue.Sql.ISqlTransactionalQueue
+Spinneret.Queue.Sql.ISqlTransactionalQueue.Enqueue<TResponse>(Spinneret.Mediator.IRequest<TResponse>! request, System.Data.Common.DbTransaction! transaction, Spinneret.Queue.QueueOptions? options = null, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Spinneret.Queue.Sql.InHostDeliveryOptions
+Spinneret.Queue.Sql.InHostDeliveryOptions.ChannelParallelism.get -> System.Collections.Generic.Dictionary<string!, int>!
+Spinneret.Queue.Sql.InHostDeliveryOptions.ChannelParallelism.set -> void
+Spinneret.Queue.Sql.InHostDeliveryOptions.InHostDeliveryOptions() -> void
+Spinneret.Queue.Sql.InHostDeliveryOptions.PollInterval.get -> System.TimeSpan
+Spinneret.Queue.Sql.InHostDeliveryOptions.PollInterval.set -> void
+Microsoft.Extensions.DependencyInjection.SqlQueueBuilderExtensions
+static readonly Spinneret.Queue.Sql.InHostDeliveryOptions.SectionName -> string!
+static Microsoft.Extensions.DependencyInjection.SqlQueueBuilderExtensions.UseInHostDelivery(this Spinneret.Queue.QueueBuilder! queue) -> Spinneret.Queue.QueueBuilder!
+static Microsoft.Extensions.DependencyInjection.SqlQueueBuilderExtensions.UseInHostDelivery(this Spinneret.Queue.QueueBuilder! queue, Microsoft.Extensions.Configuration.IConfiguration! configuration) -> Spinneret.Queue.QueueBuilder!
+static Microsoft.Extensions.DependencyInjection.SqlQueueBuilderExtensions.UseInHostDelivery(this Spinneret.Queue.QueueBuilder! queue, System.Action<Spinneret.Queue.Sql.InHostDeliveryOptions!>! configure) -> Spinneret.Queue.QueueBuilder!

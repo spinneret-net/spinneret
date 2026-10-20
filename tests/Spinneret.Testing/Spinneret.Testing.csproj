@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Helpers shared by the queue and scheduler test suites: container fixtures, recording doubles
+       and polling. A library, not a test application — tests/Directory.Build.props leaves out the
+       TUnit engine and the Exe output for this project, so it carries only TUnit.Core for the
+       fixture interfaces. -->
+  <PropertyGroup>
+    <OutputType>Library</OutputType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="TUnit.Core" Version="1.75.0" />
+    <PackageReference Include="Testcontainers.MsSql" Version="4.16.0" />
+    <PackageReference Include="Testcontainers.Firestore" Version="4.16.0" />
+    <PackageReference Include="Google.Cloud.Firestore" Version="4.5.0" />
+    <PackageReference Include="Google.Cloud.Tasks.V2" Version="3.7.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Spinneret.Queue\Spinneret.Queue.csproj" />
+  </ItemGroup>
+
+</Project>

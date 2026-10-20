@@ -6,24 +6,43 @@ using Spinneret.Queue;
 // DI namespace so every Add* call is discoverable without a using directive.
 namespace Microsoft.Extensions.DependencyInjection;
 
-public static class QueueCoreServiceCollectionExtensions
+public static class QueueServiceCollectionExtensions
 {
     /// <summary>
-    /// Registers transport-agnostic queue infrastructure: the type registry, the dispatcher and the
-    /// delivery processor. Called by the transport packages' own registration, so applications wire
-    /// up a queue by calling that one instead of this.
+    /// Registers the queue, composed in <paramref name="configure"/> from the request assemblies, a
+    /// storage, a delivery and optionally a separate dead-letter store — see <see cref="QueueBuilder"/>.
     /// </summary>
-    /// <remarks>
-    /// Deliberately registers no <see cref="IQueuePayloadSerializer"/>, <see cref="IQueue"/>,
-    /// <see cref="IEnvelopeQueue"/>, <see cref="IDeadLetterWriter"/> or
-    /// <see cref="IDeadLetterStore"/> — every one of those is a transport or host decision, and each
-    /// transport supplies its own default.
-    /// </remarks>
-    /// <remarks>
-    /// Takes a collection rather than a <c>params</c> array deliberately: a <c>params</c> parameter
-    /// must come last, which would permanently block adding anything to this signature.
-    /// </remarks>
-    public static IServiceCollection AddQueueCore(
+    /// <example>
+    /// <code>
+    /// services.AddQueue(q => q
+    ///     .AddRequestAssemblies(typeof(SyncCustomer).Assembly)
+    ///     .UseMssqlStorage(configuration)
+    ///     .UseInHostDelivery());
+    /// </code>
+    /// </example>
+    /// <exception cref="InvalidOperationException">
+    /// The composition is incomplete or contradictory — no request assemblies, nowhere to put
+    /// messages, two choices for one role, a delivery the storage cannot feed, or invalid provider
+    /// configuration. Thrown here rather than at the first enqueue.
+    /// </exception>
+    public static IServiceCollection AddQueue(this IServiceCollection services, Action<QueueBuilder> configure)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(configure);
+
+        var builder = new QueueBuilder(services);
+        configure(builder);
+        builder.Build();
+        return services;
+    }
+
+    /// <summary>
+    /// Registers transport-agnostic queue infrastructure: the type registry, the dispatcher, the
+    /// delivery processor and pipeline, the resender, and the pass-through defaults for the seams a
+    /// storage can do better at. Called last by <see cref="QueueBuilder"/>, so whatever the storage
+    /// and delivery registered wins.
+    /// </summary>
+    internal static IServiceCollection AddQueueCore(
         this IServiceCollection services, IReadOnlyCollection<Assembly> requestAssemblies)
     {
         ArgumentNullException.ThrowIfNull(requestAssemblies);
@@ -33,22 +52,20 @@ public static class QueueCoreServiceCollectionExtensions
         return services.AddQueueCore(new QueueTypeRegistry(requestAssemblies));
     }
 
-    /// <summary>
-    /// Overload for transports that build the registry themselves so they can validate their
-    /// configuration (e.g. channel mappings) against it at startup.
-    /// </summary>
-    public static IServiceCollection AddQueueCore(this IServiceCollection services, QueueTypeRegistry registry)
+    internal static IServiceCollection AddQueueCore(this IServiceCollection services, QueueTypeRegistry registry)
     {
         services.AddSingleton(registry);
         services.TryAddScoped<IQueueDispatcher, QueueDispatcher>();
         services.TryAddScoped<IQueueDeliveryProcessor, QueueDeliveryProcessor>();
         services.TryAddScoped<IQueueDispatchBoundary, DirectDispatchBoundary>();
+        services.TryAddScoped<QueueDeliveryPipeline>();
+        services.TryAddSingleton<QueueEnvelopeFactory>();
         services.TryAddSingleton(TimeProvider.System);
 
         // Resend is transport-agnostic, so it belongs here beside the dispatcher rather than being
         // repeated by every store package. It resolves only once something asks for it, which keeps
         // a host that registered no IDeadLetterStore — because it has no admin page — working.
-        services.TryAddSingleton<IQueueTransactionScope, PassThroughQueueTransactionScope>();
+        services.TryAddSingleton<IQueueUnitOfWorkFactory, PassThroughQueueUnitOfWorkFactory>();
         services.TryAddSingleton<IDeadLetterResender, DeadLetterResender>();
         return services;
     }

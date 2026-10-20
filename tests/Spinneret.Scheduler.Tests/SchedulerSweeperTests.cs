@@ -44,8 +44,7 @@ public class SchedulerSweeperTests
         IServiceCollection services, ISchedulerSweep sweep, TimeSpan interval)
     {
         services.AddSingleton(typeof(ILogger<>), typeof(NullLogger<>));
-        services.AddSingleton(sweep);
-        services.AddSchedulerSweeper(o => o.SweepInterval = interval);
+        services.AddScheduler(s => s.UseTestStorage(sweep).UseSweeper(o => o.SweepInterval = interval));
 
         var provider = services.BuildServiceProvider();
         var sweeper = provider.GetServices<IHostedService>()
@@ -125,19 +124,13 @@ public class SchedulerSweeperTests
     }
 
     [Test]
-    public async Task Starting_without_a_scheduler_registered_fails()
+    public async Task A_sweeper_without_a_storage_fails_at_registration()
     {
         var services = new ServiceCollection();
-        services.AddSingleton(typeof(ILogger<>), typeof(NullLogger<>));
-        services.AddSchedulerSweeper();
-        var provider = services.BuildServiceProvider();
-        var sweeper = provider.GetServices<IHostedService>()
-            .Single(s => s.GetType().Name == "SchedulerSweeperService");
 
-        var ex = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => sweeper.StartAsync(CancellationToken.None));
+        var ex = Assert.Throws<InvalidOperationException>(() => services.AddScheduler(s => s.UseSweeper()));
 
-        await Assert.That(ex!.Message).Contains("AddFirestoreScheduler");
+        await Assert.That(ex.Message).Contains("nowhere to keep its jobs");
     }
 
     [Test]
@@ -145,7 +138,7 @@ public class SchedulerSweeperTests
     {
         var services = new ServiceCollection();
         services.AddSingleton(typeof(ILogger<>), typeof(NullLogger<>));
-        services.AddSchedulerSweeper(o => o.SweepInterval = TimeSpan.Zero);
+        services.AddScheduler(s => s.UseTestStorage(new RecordingSweep()).UseSweeper(o => o.SweepInterval = TimeSpan.Zero));
 
         var options = services.BuildServiceProvider()
             .GetRequiredService<Microsoft.Extensions.Options.IOptions<SchedulerOptions>>();
@@ -159,7 +152,7 @@ public class SchedulerSweeperTests
     {
         var services = new ServiceCollection();
         services.AddSingleton(typeof(ILogger<>), typeof(NullLogger<>));
-        services.AddSchedulerSweeper();
+        services.AddScheduler(s => s.UseTestStorage(new RecordingSweep()).UseSweeper());
 
         var options = services.BuildServiceProvider()
             .GetRequiredService<Microsoft.Extensions.Options.IOptions<SchedulerOptions>>().Value;

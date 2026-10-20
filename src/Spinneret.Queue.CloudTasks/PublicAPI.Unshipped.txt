@@ -1,0 +1,48 @@
+#nullable enable
+Microsoft.AspNetCore.Builder.CloudTasksEndpointRouteBuilderExtensions
+Spinneret.Queue.CloudTasks.CloudTasksOptions
+Spinneret.Queue.CloudTasks.CloudTasksOptions.Channels.get -> System.Collections.Generic.Dictionary<string!, string!>!
+Spinneret.Queue.CloudTasks.CloudTasksOptions.Channels.set -> void
+Spinneret.Queue.CloudTasks.CloudTasksOptions.DispatcherUrl.get -> string!
+Spinneret.Queue.CloudTasks.CloudTasksOptions.DispatcherUrl.set -> void
+Spinneret.Queue.CloudTasks.CloudTasksOptions.EmulatorEndpoint.get -> string?
+Spinneret.Queue.CloudTasks.CloudTasksOptions.EmulatorEndpoint.set -> void
+Spinneret.Queue.CloudTasks.CloudTasksOptions.CloudTasksOptions() -> void
+Spinneret.Queue.CloudTasks.CloudTasksOptions.LocationId.get -> string!
+Spinneret.Queue.CloudTasks.CloudTasksOptions.LocationId.set -> void
+Spinneret.Queue.CloudTasks.CloudTasksOptions.OidcAudience.get -> string?
+Spinneret.Queue.CloudTasks.CloudTasksOptions.OidcAudience.set -> void
+Spinneret.Queue.CloudTasks.CloudTasksOptions.OidcIssuer.get -> string?
+Spinneret.Queue.CloudTasks.CloudTasksOptions.OidcIssuer.set -> void
+Spinneret.Queue.CloudTasks.CloudTasksOptions.ProjectId.get -> string!
+Spinneret.Queue.CloudTasks.CloudTasksOptions.ProjectId.set -> void
+Spinneret.Queue.CloudTasks.CloudTasksOptions.QueueIdFor(string! channel) -> string!
+Spinneret.Queue.CloudTasks.CloudTasksOptions.ResolvedOidcAudience.get -> string!
+Spinneret.Queue.CloudTasks.CloudTasksOptions.ResolvedOidcIssuer.get -> string!
+Spinneret.Queue.CloudTasks.CloudTasksOptions.ServiceAccountEmail.get -> string!
+Spinneret.Queue.CloudTasks.CloudTasksOptions.ServiceAccountEmail.set -> void
+Spinneret.Queue.CloudTasks.CloudTasksOptions.UsesEmulator.get -> bool
+Spinneret.Queue.CloudTasks.CloudTasksAuth
+const Spinneret.Queue.CloudTasks.CloudTasksAuth.PolicyName = "QueueOIDC" -> string!
+const Spinneret.Queue.CloudTasks.CloudTasksAuth.SchemeName = "QueueOIDC" -> string!
+static Microsoft.AspNetCore.Builder.CloudTasksEndpointRouteBuilderExtensions.MapCloudTasksDispatch(this Microsoft.AspNetCore.Routing.IEndpointRouteBuilder! endpoints, string? pattern = null) -> Microsoft.AspNetCore.Routing.IEndpointRouteBuilder!
+static readonly Spinneret.Queue.CloudTasks.CloudTasksOptions.SectionName -> string!
+Microsoft.Extensions.DependencyInjection.CloudTasksQueueBuilderExtensions
+static Microsoft.Extensions.DependencyInjection.CloudTasksQueueBuilderExtensions.UseCloudTasksDelivery(this Spinneret.Queue.QueueBuilder! queue, Microsoft.Extensions.Configuration.IConfiguration! configuration, System.Action<Spinneret.Queue.CloudTasks.CloudTasksOptions!>? configure = null) -> Spinneret.Queue.QueueBuilder!
+static Microsoft.Extensions.DependencyInjection.CloudTasksQueueBuilderExtensions.UseCloudTasksDelivery(this Spinneret.Queue.QueueBuilder! queue, System.Action<Spinneret.Queue.CloudTasks.CloudTasksOptions!>! configure) -> Spinneret.Queue.QueueBuilder!
+Spinneret.Queue.CloudTasks.CloudTasksOptions.Relay.get -> Spinneret.Queue.CloudTasks.CloudTasksRelayOptions!
+Spinneret.Queue.CloudTasks.CloudTasksOptions.Relay.set -> void
+Spinneret.Queue.CloudTasks.CloudTasksRelayOptions
+Spinneret.Queue.CloudTasks.CloudTasksRelayOptions.BatchSize.get -> int
+Spinneret.Queue.CloudTasks.CloudTasksRelayOptions.BatchSize.set -> void
+Spinneret.Queue.CloudTasks.CloudTasksRelayOptions.CloudTasksRelayOptions() -> void
+Spinneret.Queue.CloudTasks.CloudTasksRelayOptions.ForwardAhead.get -> System.TimeSpan
+Spinneret.Queue.CloudTasks.CloudTasksRelayOptions.ForwardAhead.set -> void
+Spinneret.Queue.CloudTasks.CloudTasksRelayOptions.LeaseDuration.get -> System.TimeSpan
+Spinneret.Queue.CloudTasks.CloudTasksRelayOptions.LeaseDuration.set -> void
+Spinneret.Queue.CloudTasks.CloudTasksRelayOptions.PollInterval.get -> System.TimeSpan
+Spinneret.Queue.CloudTasks.CloudTasksRelayOptions.PollInterval.set -> void
+Spinneret.Queue.CloudTasks.CloudTasksRelayOptions.RunInBackground.get -> bool
+Spinneret.Queue.CloudTasks.CloudTasksRelayOptions.RunInBackground.set -> void
+static Microsoft.AspNetCore.Builder.CloudTasksEndpointRouteBuilderExtensions.MapQueueRelay(this Microsoft.AspNetCore.Routing.IEndpointRouteBuilder! endpoints, string! authorizationPolicy, string? pattern = null) -> Microsoft.AspNetCore.Routing.IEndpointRouteBuilder!
+static readonly Spinneret.Queue.CloudTasks.CloudTasksRelayOptions.MaxForwardAhead -> System.TimeSpan

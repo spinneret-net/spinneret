@@ -1,5 +1,4 @@
 #nullable enable
-Microsoft.Extensions.DependencyInjection.QueueCoreServiceCollectionExtensions
 Spinneret.Queue.DeadLetter
 Spinneret.Queue.DeadLetter.<Clone>$() -> Spinneret.Queue.DeadLetter!
 Spinneret.Queue.DeadLetter.Attempts.get -> int
@@ -61,9 +60,6 @@ Spinneret.Queue.DeadLetterQuery.PageSize.init -> void
 Spinneret.Queue.DeadLetterSource
 Spinneret.Queue.DeadLetterSource.Queue = 0 -> Spinneret.Queue.DeadLetterSource
 Spinneret.Queue.DeadLetterSource.Scheduler = 1 -> Spinneret.Queue.DeadLetterSource
-Spinneret.Queue.DirectDispatchBoundary
-Spinneret.Queue.DirectDispatchBoundary.DirectDispatchBoundary() -> void
-Spinneret.Queue.DirectDispatchBoundary.ExecuteAsync(Spinneret.Queue.QueueDeliveryContext! context, System.Func<System.Threading.Tasks.Task!>! dispatch, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task!
 Spinneret.Queue.ErrorResultAction
 Spinneret.Queue.ErrorResultAction.DeadLetter = 0 -> Spinneret.Queue.ErrorResultAction
 Spinneret.Queue.ErrorResultAction.Discard = 2 -> Spinneret.Queue.ErrorResultAction
@@ -85,8 +81,6 @@ Spinneret.Queue.IQueue
 Spinneret.Queue.IQueue.Enqueue<TResponse>(Spinneret.Mediator.IRequest<TResponse>! request, Spinneret.Queue.QueueOptions? options = null, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
 Spinneret.Queue.IQueueDeliveryProcessor
 Spinneret.Queue.IQueueDeliveryProcessor.ProcessAsync(Spinneret.Queue.QueueDeliveryContext! context, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<Spinneret.Queue.QueueDeliveryOutcome!>!
-Spinneret.Queue.IQueueDispatchBoundary
-Spinneret.Queue.IQueueDispatchBoundary.ExecuteAsync(Spinneret.Queue.QueueDeliveryContext! context, System.Func<System.Threading.Tasks.Task!>! dispatch, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task!
 Spinneret.Queue.IQueueDispatcher
 Spinneret.Queue.IQueueDispatcher.Dispatch(Spinneret.Queue.QueueEnvelope! envelope, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task!
 Spinneret.Queue.IQueuePayloadSerializer
@@ -272,8 +266,6 @@ override Spinneret.Queue.ResendDeadLetterError.UnknownCommandType.ToString() -> 
 override sealed Spinneret.Queue.ResendDeadLetterError.InvalidPayload.Equals(Spinneret.Queue.ResendDeadLetterError? other) -> bool
 override sealed Spinneret.Queue.ResendDeadLetterError.NotFound.Equals(Spinneret.Queue.ResendDeadLetterError? other) -> bool
 override sealed Spinneret.Queue.ResendDeadLetterError.UnknownCommandType.Equals(Spinneret.Queue.ResendDeadLetterError? other) -> bool
-static Microsoft.Extensions.DependencyInjection.QueueCoreServiceCollectionExtensions.AddQueueCore(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, Spinneret.Queue.QueueTypeRegistry! registry) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
-static Microsoft.Extensions.DependencyInjection.QueueCoreServiceCollectionExtensions.AddQueueCore(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Collections.Generic.IReadOnlyCollection<System.Reflection.Assembly!>! requestAssemblies) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
 static Spinneret.Queue.DeadLetter.operator !=(Spinneret.Queue.DeadLetter? left, Spinneret.Queue.DeadLetter? right) -> bool
 static Spinneret.Queue.DeadLetter.operator ==(Spinneret.Queue.DeadLetter? left, Spinneret.Queue.DeadLetter? right) -> bool
 static Spinneret.Queue.DeadLetterEntry.operator !=(Spinneret.Queue.DeadLetterEntry? left, Spinneret.Queue.DeadLetterEntry? right) -> bool
@@ -312,3 +304,25 @@ static readonly Spinneret.Queue.QueuePolicy.DefaultMinBackoff -> string!
 virtual Spinneret.Queue.ResendDeadLetterError.EqualityContract.get -> System.Type!
 virtual Spinneret.Queue.ResendDeadLetterError.Equals(Spinneret.Queue.ResendDeadLetterError? other) -> bool
 virtual Spinneret.Queue.ResendDeadLetterError.PrintMembers(System.Text.StringBuilder! builder) -> bool
+Microsoft.Extensions.DependencyInjection.QueueServiceCollectionExtensions
+static Microsoft.Extensions.DependencyInjection.QueueServiceCollectionExtensions.AddQueue(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Spinneret.Queue.QueueBuilder!>! configure) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+Spinneret.Queue.QueueBuilder
+Spinneret.Queue.QueueBuilder.AddRequestAssemblies(params System.Reflection.Assembly![]! assemblies) -> Spinneret.Queue.QueueBuilder!
+Spinneret.Queue.QueueBuilder.Services.get -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+Spinneret.Queue.QueueBuilder.UsePayloadSerializer<TSerializer>() -> Spinneret.Queue.QueueBuilder!
+Spinneret.Queue.IQueueRelay
+Spinneret.Queue.IQueueRelay.RelayAsync(System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<Spinneret.Queue.RelayResult!>!
+Spinneret.Queue.RelayResult
+Spinneret.Queue.RelayResult.MessagesFailed.get -> int
+Spinneret.Queue.RelayResult.MessagesFailed.init -> void
+Spinneret.Queue.RelayResult.MessagesForwarded.get -> int
+Spinneret.Queue.RelayResult.MessagesForwarded.init -> void
+static Spinneret.Queue.RelayResult.Nothing.get -> Spinneret.Queue.RelayResult!
+Spinneret.Queue.RelayResult.<Clone>$() -> Spinneret.Queue.RelayResult!
+Spinneret.Queue.RelayResult.Equals(Spinneret.Queue.RelayResult? other) -> bool
+Spinneret.Queue.RelayResult.RelayResult() -> void
+override Spinneret.Queue.RelayResult.Equals(object? obj) -> bool
+override Spinneret.Queue.RelayResult.GetHashCode() -> int
+override Spinneret.Queue.RelayResult.ToString() -> string!
+static Spinneret.Queue.RelayResult.operator !=(Spinneret.Queue.RelayResult? left, Spinneret.Queue.RelayResult? right) -> bool
+static Spinneret.Queue.RelayResult.operator ==(Spinneret.Queue.RelayResult? left, Spinneret.Queue.RelayResult? right) -> bool
