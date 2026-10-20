@@ -4,7 +4,7 @@ Scheduled jobs stored as Firestore documents, plus the sweep that dispatches the
 
 It depends only on the provider-agnostic core queue, so it composes with **any** queue — Firestore
 schedules dispatched onto a SQL Server or PostgreSQL outbox is a supported combination. It is a plain library with no
-web dependency; the HTTP trigger lives in [`Spinneret.Scheduler.Http`](scheduler-http.md).
+web dependency; the HTTP trigger lives in [`Spinneret.Scheduler.AspNetCore`](scheduler-aspnetcore.md).
 
 Read [scheduler.md](scheduler.md) first for declaring jobs and schedules; this page is the Firestore
 half.

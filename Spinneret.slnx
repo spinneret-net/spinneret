@@ -12,7 +12,7 @@
     <Project Path="src\Spinneret.Queue.Postgres\Spinneret.Queue.Postgres.csproj" />
     <Project Path="src\Spinneret.Scheduler\Spinneret.Scheduler.csproj" />
     <Project Path="src\Spinneret.Scheduler.Firestore\Spinneret.Scheduler.Firestore.csproj" />
-    <Project Path="src\Spinneret.Scheduler.Http\Spinneret.Scheduler.Http.csproj" />
+    <Project Path="src\Spinneret.Scheduler.AspNetCore\Spinneret.Scheduler.AspNetCore.csproj" />
     <Project Path="src\Spinneret.Scheduler.Mssql\Spinneret.Scheduler.Mssql.csproj" />
     <Project Path="src\Spinneret.Scheduler.Postgres\Spinneret.Scheduler.Postgres.csproj" />
     <Project Path="src\Spinneret.View\Spinneret.View.csproj" />
@@ -35,7 +35,7 @@
     <Project Path="tests\Spinneret.Queue.Mssql.Tests\Spinneret.Queue.Mssql.Tests.csproj" />
     <Project Path="tests\Spinneret.Scheduler.Tests\Spinneret.Scheduler.Tests.csproj" />
     <Project Path="tests\Spinneret.Scheduler.Firestore.Tests\Spinneret.Scheduler.Firestore.Tests.csproj" />
-    <Project Path="tests\Spinneret.Scheduler.Http.Tests\Spinneret.Scheduler.Http.Tests.csproj" />
+    <Project Path="tests\Spinneret.Scheduler.AspNetCore.Tests\Spinneret.Scheduler.AspNetCore.Tests.csproj" />
     <Project Path="tests\Spinneret.Scheduler.Mssql.Tests\Spinneret.Scheduler.Mssql.Tests.csproj" />
     <Project Path="tests\Spinneret.View.Tests\Spinneret.View.Tests.csproj" />
     <Project Path="tests\Spinneret.View.Server.Tests\Spinneret.View.Server.Tests.csproj" />

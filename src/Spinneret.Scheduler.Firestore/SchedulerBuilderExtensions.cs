@@ -18,7 +18,7 @@ public static class FirestoreSchedulerBuilderExtensions
     /// Requires <c>AddQueue</c> (for the type registry and payload serializer the sweep dispatches
     /// through, in any registration order) and a host-registered <c>FirestoreDb</c>. The sweep runs
     /// only when something drives it: <c>s.UseSweeper()</c> for a timer, or the endpoint from
-    /// <c>Spinneret.Scheduler.Http</c> for an external cron. Configuration is read from the
+    /// <c>Spinneret.Scheduler.AspNetCore</c> for an external cron. Configuration is read from the
     /// <c>Scheduler:Firestore</c> section.
     /// </remarks>
     public static SchedulerBuilder UseFirestore(this SchedulerBuilder scheduler, IConfiguration configuration)

@@ -5,7 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Spinneret.Scheduler;
 
-namespace Spinneret.Scheduler.Http;
+namespace Spinneret.Scheduler.AspNetCore;
 
 internal static class SchedulerSweepEndpoint
 {
@@ -14,7 +14,7 @@ internal static class SchedulerSweepEndpoint
     /// <summary>
     /// Maps the route. Deliberately neither named after the public entry point nor an extension
     /// method: an extension called <c>MapSchedulerSweep</c> in this namespace is reached by
-    /// enclosing-namespace lookup from any assembly that sits under <c>Spinneret.Scheduler.Http</c>
+    /// enclosing-namespace lookup from any assembly that sits under <c>Spinneret.Scheduler.AspNetCore</c>
     /// and sees its internals — the test assembly does — where it wins over the public one and
     /// silently skips the guards that make an unswept or unguarded endpoint impossible to map.
     /// </summary>
@@ -34,7 +34,7 @@ internal static class SchedulerSweepEndpoint
         var ct = httpContext.RequestAborted;
         var sweep = httpContext.RequestServices.GetRequiredService<ISchedulerSweep>();
         var logger = httpContext.RequestServices.GetRequiredService<ILoggerFactory>()
-            .CreateLogger("Spinneret.Scheduler.Http.Sweep");
+            .CreateLogger("Spinneret.Scheduler.AspNetCore.Sweep");
 
         try
         {

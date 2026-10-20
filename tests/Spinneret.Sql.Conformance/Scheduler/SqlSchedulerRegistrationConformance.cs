@@ -98,7 +98,7 @@ public abstract class SqlSchedulerRegistrationConformance(SqlTestDialect dialect
     public async Task Scheduler_registers_the_sweep_engine_but_not_a_trigger()
     {
         // The engine is always available; what drives it is the host's choice — a timer via
-        // UseSweeper(), or the HTTP endpoint in Spinneret.Scheduler.Http.
+        // UseSweeper(), or the HTTP endpoint in Spinneret.Scheduler.AspNetCore.
         var configuration = Configuration();
         var services = ServicesWithQueue(configuration);
 

@@ -36,7 +36,7 @@ services.AddScheduler(s => s.UseMssql(configuration)   // or s.UsePostgres(confi
 | | |
 |---|---|
 | **The matching queue storage** | Not merely any queue — one stored in this database. Connection, schema name and schema creation are all inherited from the queue storage's section. Any other storage, or none, fails the host at startup with the reason. |
-| **A trigger** | `s.UseSweeper()` for a timer, or [`Spinneret.Scheduler.Http`](scheduler-http.md) for an endpoint. |
+| **A trigger** | `s.UseSweeper()` for a timer, or [`Spinneret.Scheduler.AspNetCore`](scheduler-aspnetcore.md) for an endpoint. |
 | **A delivery somewhere** | The sweep only enqueues; an in-host worker or Cloud Tasks delivers. |
 
 The dead-letter writer comes from the queue's storage; nothing extra is needed. A dead-letter store

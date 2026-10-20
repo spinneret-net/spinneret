@@ -11,7 +11,7 @@ namespace Spinneret.Scheduler;
 /// </summary>
 /// <remarks>
 /// Suits a host that is always running. A host that scales to zero has no thread to tick, so it
-/// wants the HTTP trigger in <c>Spinneret.Scheduler.Http</c> and an external cron instead — same
+/// wants the HTTP trigger in <c>Spinneret.Scheduler.AspNetCore</c> and an external cron instead — same
 /// sweep, different clock.
 /// </remarks>
 internal sealed class SchedulerSweeperService(

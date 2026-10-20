@@ -14,7 +14,7 @@ the jobs are stored, plus the timer that drives them.
 |---|---|
 | What the jobs are | this package — `IRecurringJob`, `AddRecurringJob` |
 | Where they live | a storage, chosen in `AddScheduler(s => s.UseMssql(...))`, `s.UsePostgres(...)` or `s.UseFirestore(...)` |
-| What decides when to sweep | `s.UseSweeper()` here, or [`Spinneret.Scheduler.Http`](scheduler-http.md) |
+| What decides when to sweep | `s.UseSweeper()` here, or [`Spinneret.Scheduler.AspNetCore`](scheduler-aspnetcore.md) |
 
 ```csharp
 services.AddScheduler(s => s.UseFirestore(configuration).UseSweeper());
@@ -135,7 +135,7 @@ can start a sweep while a tick is running.
 > A very low value costs more than wasted queries. It is read once at startup.
 
 For a host that scales to zero and has no thread to tick, use
-[`Spinneret.Scheduler.Http`](scheduler-http.md) and an external cron instead. Same sweep, different
+[`Spinneret.Scheduler.AspNetCore`](scheduler-aspnetcore.md) and an external cron instead. Same sweep, different
 clock.
 
 ## Tracing

@@ -1,4 +1,4 @@
-# Spinneret.Scheduler.Http
+# Spinneret.Scheduler.AspNetCore
 
 An authorized endpoint that runs one scheduler sweep per request.
 
@@ -11,7 +11,7 @@ It knows nothing about where jobs are stored. Pair it with either storage packag
 ## Install
 
 ```sh
-dotnet add package Spinneret.Scheduler.Http
+dotnet add package Spinneret.Scheduler.AspNetCore
 ```
 
 ```csharp

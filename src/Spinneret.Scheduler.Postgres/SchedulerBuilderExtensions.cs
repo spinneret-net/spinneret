@@ -22,7 +22,7 @@ public static class PostgresSchedulerBuilderExtensions
     /// </summary>
     /// <remarks>
     /// The sweep runs only when something drives it: <c>s.UseSweeper()</c> for a timer, or the
-    /// endpoint from <c>Spinneret.Scheduler.Http</c> for an external cron; sweeps race safely across
+    /// endpoint from <c>Spinneret.Scheduler.AspNetCore</c> for an external cron; sweeps race safely across
     /// hosts either way. Configuration is read from the <c>Scheduler:Postgres</c> section.
     /// </remarks>
     public static SchedulerBuilder UsePostgres(this SchedulerBuilder scheduler, IConfiguration configuration)

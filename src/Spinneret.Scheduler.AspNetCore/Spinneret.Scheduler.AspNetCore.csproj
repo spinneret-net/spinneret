@@ -20,7 +20,7 @@
     </ItemGroup>
 
     <ItemGroup>
-        <InternalsVisibleTo Include="Spinneret.Scheduler.Http.Tests" />
+        <InternalsVisibleTo Include="Spinneret.Scheduler.AspNetCore.Tests" />
     </ItemGroup>
 
     <PropertyGroup>

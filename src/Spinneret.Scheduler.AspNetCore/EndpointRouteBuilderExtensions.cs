@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using Spinneret.Scheduler;
-using Spinneret.Scheduler.Http;
+using Spinneret.Scheduler.AspNetCore;
 
 // ReSharper disable once CheckNamespace — deliberate: endpoint extensions live in the
 // builder namespace so Map* calls are discoverable without a using directive.

@@ -12,7 +12,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\Spinneret.Scheduler.Http\Spinneret.Scheduler.Http.csproj" />
+    <ProjectReference Include="..\..\src\Spinneret.Scheduler.AspNetCore\Spinneret.Scheduler.AspNetCore.csproj" />
   </ItemGroup>
 
 </Project>

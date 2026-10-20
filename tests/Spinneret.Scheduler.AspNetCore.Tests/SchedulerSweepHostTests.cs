@@ -8,7 +8,7 @@ using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 
-namespace Spinneret.Scheduler.Http.Tests;
+namespace Spinneret.Scheduler.AspNetCore.Tests;
 
 /// <summary>
 /// The sweep endpoint over a real ASP.NET pipeline rather than a fake route builder: that the route

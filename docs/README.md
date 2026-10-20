@@ -10,7 +10,7 @@ from two. The two calls can be written in either order.
 | **Queue delivery** — how messages reach handlers | `UseInHostDelivery()` ([in-host workers](queue-sql.md#in-host-delivery)) · [`Spinneret.Queue.CloudTasks`](queue-cloudtasks.md) · none, on a producer-only host |
 | **Dead letters** — where given-up work lands | the SQL storage's own table · [`Spinneret.Queue.Firestore`](queue-firestore.md) |
 | **Schedule storage** — where job definitions live | [`Spinneret.Scheduler.Mssql`](scheduler-mssql.md) · [`Spinneret.Scheduler.Postgres`](scheduler-postgres.md) — both via [`Spinneret.Scheduler.Sql`](scheduler-sql.md) · [`Spinneret.Scheduler.Firestore`](scheduler-firestore.md) |
-| **Sweep trigger** — what decides when to sweep | `UseSweeper()` from [`Spinneret.Scheduler`](scheduler.md) (timer) · [`Spinneret.Scheduler.Http`](scheduler-http.md) (endpoint + external cron) |
+| **Sweep trigger** — what decides when to sweep | `UseSweeper()` from [`Spinneret.Scheduler`](scheduler.md) (timer) · [`Spinneret.Scheduler.AspNetCore`](scheduler-aspnetcore.md) (endpoint + external cron) |
 
 What a SQL storage buys is atomicity: with one, every enqueue commits with the business write that
 caused it, and every delivery's writes, cascades and outcome commit together — whether in-host
@@ -48,7 +48,7 @@ app.MapSchedulerSweep(CloudTasksAuth.PolicyName);               // Cloud Schedul
 
 Read: [queue.md](queue.md) · [queue-cloudtasks.md](queue-cloudtasks.md) ·
 [queue-firestore.md](queue-firestore.md) · [scheduler.md](scheduler.md) ·
-[scheduler-firestore.md](scheduler-firestore.md) · [scheduler-http.md](scheduler-http.md)
+[scheduler-firestore.md](scheduler-firestore.md) · [scheduler-aspnetcore.md](scheduler-aspnetcore.md)
 
 **Cloud Run over SQL Server.** Cloud Tasks delivers, but the outbox and the schedules live in the
 application's database, so enqueues are transactional and deliveries atomic. The host is
@@ -74,7 +74,7 @@ Tasks as they commit; the relay endpoint picks up the ones committed in your own
 
 Read: [queue.md](queue.md) · [queue-sql.md](queue-sql.md) · [queue-mssql.md](queue-mssql.md) ·
 [queue-cloudtasks.md](queue-cloudtasks.md#over-a-sql-storage) · [scheduler-mssql.md](scheduler-mssql.md) ·
-[scheduler-http.md](scheduler-http.md)
+[scheduler-aspnetcore.md](scheduler-aspnetcore.md)
 
 **On PostgreSQL.** Any of the SQL Server recipes above, with the Postgres packages instead — the
 composition and the guarantees are the same. Sharing the application's own `NpgsqlDataSource` keeps
@@ -143,7 +143,7 @@ Read: [queue.md](queue.md) · [queue-sql.md](queue-sql.md) · [scheduler.md](sch
 | [scheduler-sql.md](scheduler-sql.md) | `Spinneret.Scheduler.Sql` — the SQL scheduler engine: the sweep, transactional one-shots, guarantees |
 | [scheduler-mssql.md](scheduler-mssql.md) | `Spinneret.Scheduler.Mssql` — schedules in SQL Server |
 | [scheduler-postgres.md](scheduler-postgres.md) | `Spinneret.Scheduler.Postgres` — schedules in PostgreSQL |
-| [scheduler-http.md](scheduler-http.md) | `Spinneret.Scheduler.Http` — sweep endpoint for externally-clocked hosts |
+| [scheduler-aspnetcore.md](scheduler-aspnetcore.md) | `Spinneret.Scheduler.AspNetCore` — sweep endpoint for externally-clocked hosts |
 
 Every page follows the same shape: what it is, install, what it requires, configuration,
 infrastructure, and gotchas. Read only the pages for the packages you picked.

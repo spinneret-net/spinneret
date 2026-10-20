@@ -71,7 +71,7 @@ public class CompositionTests
     [Test]
     public async Task The_scheduler_package_needs_no_web_stack()
     {
-        // The HTTP trigger moved to Spinneret.Scheduler.Http, so this package must not drag
+        // The HTTP trigger moved to Spinneret.Scheduler.AspNetCore, so this package must not drag
         // ASP.NET Core in behind a worker service that has no use for it.
         var referenced = typeof(FirestoreSchedulerOptions).Assembly
             .GetReferencedAssemblies()

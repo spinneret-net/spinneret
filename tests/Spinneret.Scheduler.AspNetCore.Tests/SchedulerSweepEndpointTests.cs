@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Http.Metadata;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace Spinneret.Scheduler.Http.Tests;
+namespace Spinneret.Scheduler.AspNetCore.Tests;
 
 /// <summary>
 /// The endpoint is a trigger and nothing else: it resolves whatever <see cref="ISchedulerSweep"/>

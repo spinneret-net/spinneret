@@ -29,28 +29,47 @@ Utility libraries tend to be junk drawers. Spinneret is the opposite: every pack
 - **A wait is not a failure.** Deferred work is re-enqueued without burning retry attempts. Dead letters are for the truly dead.
 - **Infrastructure is a seam.** Core packages are provider-agnostic; Cloud Tasks, SQL Server, PostgreSQL and Firestore adapters live in separate packages, composed one choice at a time. Changing infrastructure means swapping a package, not rewriting your app.
 
-## The silk
+## Packages
 
-| Package | In the web | What it spins |
-|---|---|---|
-| `Spinneret.Functional` | **The dragline** | `Result` / `Either` with `Match`/`Map`/`Bind` combinators and an awaitable `TaskResult` — the load-bearing thread every other package hangs from. |
-| `Spinneret.Mediator` | **The radials** | In-process request dispatch with declarative, tag-invalidated caching. A spider reads the world through vibrations in its radials; so does your app. |
-| `Spinneret.Parsing` | **The sticky spiral** | Parse-don't-validate boundaries: one pass, every invalid property caught and localized. Nothing gets through that shouldn't. |
-| `Spinneret.Queue` | **The egg sac** | A durable command queue where the application owns the retry policy — attempts, backoff, channels, dead-lettering — per command type. Safe until it hatches. |
-| `Spinneret.Queue.Sql` | | Queue storage in your own database: a transactional outbox, in-host delivery and dead letters, over ADO.NET. |
-| `Spinneret.Queue.Mssql` | | SQL Server storage for `Spinneret.Queue.Sql`. |
-| `Spinneret.Queue.Postgres` | | PostgreSQL storage for `Spinneret.Queue.Sql`. |
-| `Spinneret.Queue.CloudTasks` | | Google Cloud Tasks delivery with an OIDC-authenticated dispatch endpoint — directly, or relayed from a SQL outbox. |
-| `Spinneret.Queue.Firestore` | | Firestore-backed dead-letter store, usable with any queue. |
-| `Spinneret.Scheduler` | **The nightly respin** | Recurring jobs declared in code and installed idempotently at startup, swept on a timer. Orb-weavers rebuild their web every night; so do your jobs. |
-| `Spinneret.Scheduler.Firestore` | | Firestore-backed scheduling with transactional dispatch. |
-| `Spinneret.Scheduler.Sql` | | Relational scheduling over ADO.NET, dispatched onto the SQL outbox in the same transaction. |
-| `Spinneret.Scheduler.Mssql` | | SQL Server storage for `Spinneret.Scheduler.Sql`. |
-| `Spinneret.Scheduler.Postgres` | | PostgreSQL storage for `Spinneret.Scheduler.Sql`. |
-| `Spinneret.Scheduler.Http` | | An authorized endpoint that sweeps once per request, for hosts whose clock is an external cron. |
-| `Spinneret.ViewModel` | **The attachment discs** | MVVM for Blazor: bindable view models, two-way bindings with conversion and validation state, row collections, nested view models — the silk cement that fastens view to model. |
-| `Spinneret.View` | **The hub** | `ViewBase<T>` components that resolve their view model from DI, with lifecycle state and app-wide refresh coordination. Where the spider sits and feels everything. |
-| `Spinneret.View.Server` | | Blazor Server host support: the render context that reports whether the current render is a prerender. |
+Pick the core package for what you need, then add one package per piece of infrastructure.
+
+**Foundations**
+
+| Package | What it does |
+|---|---|
+| `Spinneret.Functional` | `Result` / `Either` with `Match`/`Map`/`Bind` and an awaitable `TaskResult`. Every other package builds on it. |
+| `Spinneret.Mediator` | In-process request dispatch, with declarative caching invalidated by tags. |
+| `Spinneret.Parsing` | Turns input into a typed model, or into the full list of localized property errors. |
+
+**Queue**
+
+| Package | What it does |
+|---|---|
+| `Spinneret.Queue` | A durable command queue. Each command type declares its own retry policy: attempts, backoff, channel and dead-lettering. |
+| `Spinneret.Queue.Sql` | Queue storage in your own database: a transactional outbox, in-host delivery and dead letters. Shared ADO.NET base; add a dialect package below. |
+| `Spinneret.Queue.Mssql` | SQL Server dialect for `Spinneret.Queue.Sql`. |
+| `Spinneret.Queue.Postgres` | PostgreSQL dialect for `Spinneret.Queue.Sql`. |
+| `Spinneret.Queue.CloudTasks` | Delivery through Google Cloud Tasks, with an OIDC-authenticated dispatch endpoint. Enqueues go straight to Cloud Tasks or are relayed from a SQL outbox. |
+| `Spinneret.Queue.Firestore` | Dead letters stored in Firestore. Works with any queue setup. |
+
+**Scheduler**
+
+| Package | What it does |
+|---|---|
+| `Spinneret.Scheduler` | Recurring jobs declared in code on cron schedules, installed at startup and swept on a timer. |
+| `Spinneret.Scheduler.Sql` | Job storage in your own database. Due jobs are dispatched onto the SQL outbox in the same transaction. Shared ADO.NET base; add a dialect package below. |
+| `Spinneret.Scheduler.Mssql` | SQL Server dialect for `Spinneret.Scheduler.Sql`. |
+| `Spinneret.Scheduler.Postgres` | PostgreSQL dialect for `Spinneret.Scheduler.Sql`. |
+| `Spinneret.Scheduler.Firestore` | Job storage in Firestore, dispatched transactionally. |
+| `Spinneret.Scheduler.AspNetCore` | An authorized endpoint that runs one sweep per request, for hosts woken by an external cron instead of a timer. |
+
+**Blazor**
+
+| Package | What it does |
+|---|---|
+| `Spinneret.ViewModel` | MVVM for Blazor: bindable view models, two-way bindings with conversion and validation state, row collections and nested view models. |
+| `Spinneret.View` | `ViewBase<T>` components that resolve their view model from DI, with lifecycle state and app-wide refresh. |
+| `Spinneret.View.Server` | Blazor Server support: tells a component whether the current render is a prerender. |
 
 ## Spinning up
 
@@ -272,7 +291,7 @@ services.AddScheduler(s => s
 
 A SQL storage is the outbox; in-host workers drain it, or a relay forwards it to Cloud Tasks. Without a storage, Cloud Tasks is called directly — it stores nothing you can query, so its dead letters live in Firestore. The `.Firestore` packages depend only on the provider-agnostic core, so they compose with any queue. A combination that cannot work — in-host delivery with no storage, two deliveries, two storages — fails at registration, naming the reason; a SQL scheduler beside a queue stored elsewhere fails as the host starts, since the two can be registered in either order.
 
-The trigger is likewise independent of where jobs are stored. `UseSweeper()` runs a timer inside the host; `Spinneret.Scheduler.Http` exposes an authorized endpoint instead, for a host that scales to zero and has no thread of its own to tick. Both drive the same `ISchedulerSweep`. See **[docs/](docs/README.md)** for the combinations and their guarantees.
+The trigger is likewise independent of where jobs are stored. `UseSweeper()` runs a timer inside the host; `Spinneret.Scheduler.AspNetCore` exposes an authorized endpoint instead, for a host that scales to zero and has no thread of its own to tick. Both drive the same `ISchedulerSweep`. See **[docs/](docs/README.md)** for the combinations and their guarantees.
 
 ```mermaid
 graph BT
@@ -290,7 +309,7 @@ graph BT
   SchedulerSql["Spinneret.Scheduler.Sql"] --> Scheduler & QueueSql
   SchedulerMssql["Spinneret.Scheduler.Mssql"] --> SchedulerSql & QueueMssql
   SchedulerPostgres["Spinneret.Scheduler.Postgres"] --> SchedulerSql & QueuePostgres
-  SchedulerHttp["Spinneret.Scheduler.Http"] --> Scheduler
+  SchedulerAspNetCore["Spinneret.Scheduler.AspNetCore"] --> Scheduler
   ViewModel["Spinneret.ViewModel"] --> Functional & Parsing
   View["Spinneret.View"] --> ViewModel
   ViewServer["Spinneret.View.Server"] --> View

@@ -31,7 +31,7 @@ public sealed class SchedulerBuilder
     /// Opt-in per host, because a host that declares or schedules jobs is not necessarily one that
     /// should dispatch them; sweeps race safely across hosts, so every instance may run one. A host
     /// that scales to zero has no thread to tick: map <c>MapSchedulerSweep</c> from
-    /// <c>Spinneret.Scheduler.Http</c> instead and drive it from an external cron. To bind the
+    /// <c>Spinneret.Scheduler.AspNetCore</c> instead and drive it from an external cron. To bind the
     /// interval from configuration, call <c>services.Configure&lt;SchedulerOptions&gt;(section)</c> —
     /// this package deliberately takes no dependency on the configuration binder.
     /// </remarks>

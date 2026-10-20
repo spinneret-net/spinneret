@@ -10,7 +10,7 @@
 
     <ItemGroup>
         <!-- No framework reference: this package is storage. The HTTP trigger that used to live
-             here is Spinneret.Scheduler.Http, so a worker with no web stack can consume this. -->
+             here is Spinneret.Scheduler.AspNetCore, so a worker with no web stack can consume this. -->
         <PackageReference Include="Google.Cloud.Firestore" Version="4.5.0" />
         <!-- Was arriving transitively through the AspNetCore framework reference this package no
              longer takes. Configuration.Binder is what ConfigurationBinder.Bind lives in, which is

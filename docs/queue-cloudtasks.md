@@ -124,7 +124,7 @@ both named `QueueOIDC` and exposed as `CloudTasksAuth.SchemeName` / `CloudTasksA
 dispatch endpoint guards itself with that policy.
 
 Use the constant to protect your own internal endpoints with the same Google-minted tokens — it is
-what [`Spinneret.Scheduler.Http`](scheduler-http.md) and `MapQueueRelay` expect you to pass:
+what [`Spinneret.Scheduler.AspNetCore`](scheduler-aspnetcore.md) and `MapQueueRelay` expect you to pass:
 
 ```csharp
 app.MapSchedulerSweep(CloudTasksAuth.PolicyName);

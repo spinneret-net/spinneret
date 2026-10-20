@@ -17,7 +17,7 @@ A *spinneret* is the organ a spider uses to spin its web — different silks for
 | `Spinneret.Queue.Firestore` | Firestore-backed dead-letter store for any queue |
 | `Spinneret.Scheduler` | Recurring jobs declared in code, installed idempotently at startup |
 | `Spinneret.Scheduler.Firestore` | Firestore-backed scheduling with transactional dispatch |
-| `Spinneret.Scheduler.Http` | HTTP trigger that sweeps due jobs once per request |
+| `Spinneret.Scheduler.AspNetCore` | HTTP trigger that sweeps due jobs once per request |
 | `Spinneret.Scheduler.Sql` | Relational scheduling, dispatched onto the SQL outbox in the same transaction |
 | `Spinneret.Scheduler.Mssql` | SQL Server storage for `Spinneret.Scheduler.Sql` |
 | `Spinneret.Scheduler.Postgres` | PostgreSQL storage for `Spinneret.Scheduler.Sql` |
