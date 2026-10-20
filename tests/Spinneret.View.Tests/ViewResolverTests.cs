@@ -7,7 +7,7 @@ public class ViewResolverTests
     // ViewResolver is internal; AddMvvm is the public way to get a configured one.
     private static IViewResolver CreateResolver() =>
         new ServiceCollection()
-            .AddMvvm<ClientRenderContext>(o => { o.AutoRegisterViewModels = false; o.Assemblies.Add(typeof(ViewResolverTests).Assembly); })
+            .AddMvvm(o => { o.AutoRegisterViewModels = false; o.Assemblies.Add(typeof(ViewResolverTests).Assembly); })
             .BuildServiceProvider()
             .GetRequiredService<IViewResolver>();
 

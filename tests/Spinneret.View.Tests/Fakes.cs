@@ -93,13 +93,6 @@ public sealed class FakeExceptionService : IViewModelExceptionService
     public bool Handle(IViewModel vm, Exception e) => false;
 }
 
-public sealed class FakeRenderContext : IRenderContext
-{
-    public bool IsClient { get; init; } = true;
-    public bool IsServer { get; init; }
-    public bool IsPrerendering { get; init; }
-}
-
 public sealed class FakeRefreshCoordinator : IViewRefreshCoordinator
 {
     private readonly object _gate = new();

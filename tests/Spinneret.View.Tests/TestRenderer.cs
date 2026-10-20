@@ -6,10 +6,16 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Spinneret.View.Tests;
 
-/// <summary>Headless renderer driving real Blazor component lifecycles.</summary>
-public sealed class TestRenderer(IServiceProvider services) : Renderer(services, NullLoggerFactory.Instance)
+/// <summary>Headless renderer driving real Blazor component lifecycles. Non-interactive with a render mode simulates a prerender; without one, a static SSR page.</summary>
+public sealed class TestRenderer(IServiceProvider services, bool interactive = true, IComponentRenderMode? renderMode = null)
+    : Renderer(services, NullLoggerFactory.Instance)
 {
     private readonly Dispatcher _dispatcher = Dispatcher.CreateDefault();
+    private readonly RendererInfo _rendererInfo = new(interactive ? "Test" : "Static", interactive);
+
+    protected override RendererInfo RendererInfo => _rendererInfo;
+
+    protected override IComponentRenderMode? GetComponentRenderMode(IComponent component) => renderMode;
     private readonly List<Exception> _handledExceptions = [];
     private int _renderBatchCount;
 

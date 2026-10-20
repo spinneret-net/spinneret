@@ -22,7 +22,6 @@ public abstract class ViewBase<T> : ComponentBase, IView<T>, IAsyncDisposable wh
 {
     [Inject] private IServiceProvider ServiceProvider { get; set; } = null!;
     [Inject] private ILogger<ViewBase<T>> Logger { get; set; } = null!;
-    [Inject] private IRenderContext RenderContext { get; set; } = null!;
     [Inject] private IViewRefreshCoordinator RefreshCoordinator { get; set; } = null!;
     public ViewState State { get; private set; } = ViewState.Uninitialized;
 
@@ -95,7 +94,8 @@ public abstract class ViewBase<T> : ComponentBase, IView<T>, IAsyncDisposable wh
 
     private async Task InitializeViewAsync()
     {
-        if (RenderContext.IsPrerendering)
+        // A prerender is a static render with interactivity to follow; a purely static page (null mode) initializes now, since nothing renders it again.
+        if (!RendererInfo.IsInteractive && AssignedRenderMode is not null)
         {
             State = ViewState.PreInitialized;
             return;

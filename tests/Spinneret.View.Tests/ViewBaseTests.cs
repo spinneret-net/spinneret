@@ -44,6 +44,18 @@ public class ViewBaseTests
     }
 
     [Test]
+    public async Task OnInitializedAsync_static_render_without_interactivity_to_follow_initializes_view_model()
+    {
+        var harness = new Harness(staticRender: true);
+
+        var (view, _) = await harness.RenderAsync<OwnedVmView>();
+
+        await Assert.That(view.State).IsEqualTo(ViewState.Initialized);
+        await Assert.That(harness.CreatedViewModels.Count).IsEqualTo(1);
+        await Assert.That(harness.CreatedViewModels[0].InitializeCallCount).IsEqualTo(1);
+    }
+
+    [Test]
     public async Task OnInitializedAsync_owned_view_model_subscribes_to_refresh_coordinator()
     {
         var harness = new Harness();
@@ -529,11 +541,10 @@ public class ViewBaseTests
         public Action<FakeViewModel>? OnViewModelCreated { get; set; }
         public TestRenderer Renderer { get; }
 
-        public Harness(bool prerendering = false, bool registerExceptionService = false)
+        public Harness(bool prerendering = false, bool staticRender = false, bool registerExceptionService = false)
         {
             var services = new ServiceCollection();
             services.AddSingleton(typeof(ILogger<>), typeof(NullLogger<>));
-            services.AddSingleton<IRenderContext>(new FakeRenderContext { IsPrerendering = prerendering });
             services.AddSingleton<IViewRefreshCoordinator>(Coordinator);
             services.AddTransient(_ =>
             {
@@ -554,7 +565,10 @@ public class ViewBaseTests
                 services.AddSingleton<IViewModelExceptionService>(ExceptionService);
             }
 
-            Renderer = new TestRenderer(services.BuildServiceProvider());
+            Renderer = new TestRenderer(
+                services.BuildServiceProvider(),
+                interactive: !prerendering && !staticRender,
+                renderMode: prerendering ? Microsoft.AspNetCore.Components.Web.RenderMode.InteractiveServer : null);
         }
 
         public async Task<(TView View, int ComponentId)> RenderAsync<TView>(FakeViewModel? parameterViewModel = null)

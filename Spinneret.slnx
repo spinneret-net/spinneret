@@ -16,7 +16,6 @@
     <Project Path="src\Spinneret.Scheduler.Mssql\Spinneret.Scheduler.Mssql.csproj" />
     <Project Path="src\Spinneret.Scheduler.Postgres\Spinneret.Scheduler.Postgres.csproj" />
     <Project Path="src\Spinneret.View\Spinneret.View.csproj" />
-    <Project Path="src\Spinneret.View.Server\Spinneret.View.Server.csproj" />
     <Project Path="src\Spinneret.ViewModel\Spinneret.ViewModel.csproj" />
   </Folder>
   <Folder Name="/tests/">
@@ -38,7 +37,6 @@
     <Project Path="tests\Spinneret.Scheduler.AspNetCore.Tests\Spinneret.Scheduler.AspNetCore.Tests.csproj" />
     <Project Path="tests\Spinneret.Scheduler.Mssql.Tests\Spinneret.Scheduler.Mssql.Tests.csproj" />
     <Project Path="tests\Spinneret.View.Tests\Spinneret.View.Tests.csproj" />
-    <Project Path="tests\Spinneret.View.Server.Tests\Spinneret.View.Server.Tests.csproj" />
     <Project Path="tests\Spinneret.ViewModel.Tests\Spinneret.ViewModel.Tests.csproj" />
   </Folder>
 </Solution>

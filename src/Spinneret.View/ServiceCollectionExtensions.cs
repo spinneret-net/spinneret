@@ -8,15 +8,13 @@ namespace Microsoft.Extensions.DependencyInjection;
 public static class MvvmServiceCollectionExtensions
 {
     /// <summary>Registers the MVVM services, scanning the entry assembly and auto-registering view models.</summary>
-    /// <typeparam name="TRenderContext"><see cref="ClientRenderContext"/> for WebAssembly, or <c>ServerRenderContext</c> (Spinneret.View.Server) for Blazor Server.</typeparam>
-    public static IServiceCollection AddMvvm<TRenderContext>(this IServiceCollection services)
-        where TRenderContext : class, IRenderContext
-        => services.AddMvvm<TRenderContext>(_ => { });
+    public static IServiceCollection AddMvvm(this IServiceCollection services)
+        => services.AddMvvm(_ => { });
 
     /// <summary>Registers the MVVM services with explicit configuration.</summary>
-    public static IServiceCollection AddMvvm<TRenderContext>(
+    public static IServiceCollection AddMvvm(
         this IServiceCollection services,
-        Action<MvvmOptions> configure) where TRenderContext : class, IRenderContext
+        Action<MvvmOptions> configure)
     {
         var options = new MvvmOptions();
         configure(options);
@@ -24,7 +22,7 @@ public static class MvvmServiceCollectionExtensions
         var assemblies = options.Assemblies.Count > 0
             ? options.Assemblies.ToArray()
             : [Assembly.GetEntryAssembly() ?? throw new InvalidOperationException(
-                "Entry assembly could not be determined. Specify assemblies explicitly: AddMvvm<T>(o => o.Assemblies.Add(typeof(Program).Assembly)).")];
+                "Entry assembly could not be determined. Specify assemblies explicitly: AddMvvm(o => o.Assemblies.Add(typeof(Program).Assembly)).")];
 
         var viewModelViewPairs = FindDerivedTypes(typeof(ViewBase<>), assemblies).ToList();
 
@@ -39,8 +37,7 @@ public static class MvvmServiceCollectionExtensions
         return services
             .AddScoped<IViewModelFactory, ViewModelFactory>()
             .AddScoped<IViewRefreshCoordinator, ViewRefreshCoordinator>()
-            .AddSingleton<IViewResolver>(new ViewResolver(viewModelViewPairs))
-            .AddSingleton<IRenderContext, TRenderContext>();
+            .AddSingleton<IViewResolver>(new ViewResolver(viewModelViewPairs));
     }
 
     private static IEnumerable<(Type GenericArgument, Type DerivedType)> FindDerivedTypes(Type genericBaseType, IEnumerable<Assembly> assemblies)

@@ -69,7 +69,6 @@ Pick the core package for what you need, then add one package per piece of infra
 |---|---|
 | `Spinneret.ViewModel` | MVVM for Blazor: bindable view models, two-way bindings with conversion and validation state, row collections and nested view models. |
 | `Spinneret.View` | `ViewBase<T>` components that resolve their view model from DI, with lifecycle state and app-wide refresh. |
-| `Spinneret.View.Server` | Blazor Server support: tells a component whether the current render is a prerender. |
 
 ## Spinning up
 
@@ -247,7 +246,7 @@ The scheduler itself is infrastructure-agnostic. `Spinneret.Scheduler.Firestore`
 Blazor components that receive a view model from DI instead of building their own state, with an explicit lifecycle and app-wide refresh coordination. Wire it up once:
 
 ```csharp
-services.AddMvvm<ClientRenderContext>(o =>          // Scans views, auto-registers view models
+services.AddMvvm(o =>  // Scans views, auto-registers view models
     o.Assemblies.Add(typeof(Program).Assembly));
 ```
 
@@ -312,7 +311,6 @@ graph BT
   SchedulerAspNetCore["Spinneret.Scheduler.AspNetCore"] --> Scheduler
   ViewModel["Spinneret.ViewModel"] --> Functional & Parsing
   View["Spinneret.View"] --> ViewModel
-  ViewServer["Spinneret.View.Server"] --> View
 ```
 
 ## Why "Spinneret"?
