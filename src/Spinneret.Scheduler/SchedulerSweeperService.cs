@@ -28,7 +28,7 @@ internal sealed class SchedulerSweeperService(
         if (scope.ServiceProvider.GetService<ISchedulerSweep>() is null)
             throw new InvalidOperationException(
                 "UseSweeper requires a scheduler storage to be registered "
-                + "(s.UseMssql, s.UseFirestore, or another): the sweeper is only a "
+                + "(s.UseMssql, s.UsePostgres, s.UseFirestore, or another): the sweeper is only a "
                 + "clock, and something has to tell it what is due.");
 
         return base.StartAsync(ct);

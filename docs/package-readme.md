@@ -12,6 +12,7 @@ A *spinneret* is the organ a spider uses to spin its web — different silks for
 | `Spinneret.Queue` | Durable command queue — the app owns the retry policy per command |
 | `Spinneret.Queue.Sql` | A transactional outbox in your own database, with in-host delivery and dead letters |
 | `Spinneret.Queue.Mssql` | SQL Server storage for `Spinneret.Queue.Sql` |
+| `Spinneret.Queue.Postgres` | PostgreSQL storage for `Spinneret.Queue.Sql` |
 | `Spinneret.Queue.CloudTasks` | Google Cloud Tasks delivery with OIDC-authenticated dispatch, direct or over a SQL outbox |
 | `Spinneret.Queue.Firestore` | Firestore-backed dead-letter store for any queue |
 | `Spinneret.Scheduler` | Recurring jobs declared in code, installed idempotently at startup |
@@ -19,6 +20,7 @@ A *spinneret* is the organ a spider uses to spin its web — different silks for
 | `Spinneret.Scheduler.Http` | HTTP trigger that sweeps due jobs once per request |
 | `Spinneret.Scheduler.Sql` | Relational scheduling, dispatched onto the SQL outbox in the same transaction |
 | `Spinneret.Scheduler.Mssql` | SQL Server storage for `Spinneret.Scheduler.Sql` |
+| `Spinneret.Scheduler.Postgres` | PostgreSQL storage for `Spinneret.Scheduler.Sql` |
 | `Spinneret.ViewModel` | MVVM for Blazor: typed two-way bindings with validation state |
 | `Spinneret.View` | Blazor views that resolve their view model from DI |
 | `Spinneret.View.Server` | Blazor Server host support for `Spinneret.View` |

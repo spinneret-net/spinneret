@@ -75,7 +75,7 @@ public sealed class MssqlQueueSchemaTests
         var creates = statements.Split("CREATE INDEX").Length - 1
             + statements.Split("CREATE UNIQUE INDEX").Length - 1;
 
-        await Assert.That(creates).IsEqualTo(4);
+        await Assert.That(creates).IsEqualTo(5);
         await Assert.That(guards).IsEqualTo(creates);
     }
 
@@ -124,15 +124,26 @@ public sealed class MssqlQueueSchemaTests
     [Arguments("semi;colon", false)]
     [Arguments("bracket]name", false)]
     [Arguments("quote'name", false)]
+    [Arguments("x123456789x123456789x123456789x123456789x123456789x123456789x123456789x123456789x123456789x123456789x123456789x123456789x1234567", true)]
+    [Arguments("x123456789x123456789x123456789x123456789x123456789x123456789x123456789x123456789x123456789x123456789x123456789x123456789x12345678", false)]
     public async Task Identifier_validation_accepts_plain_identifiers_only(string identifier, bool valid)
     {
-        await Assert.That(Identifier.IsValid(identifier)).IsEqualTo(valid);
+        await Assert.That(MssqlQueueDialect.Instance.IsValidIdentifier(identifier)).IsEqualTo(valid);
     }
 
     [Test]
     public async Task Identifier_quoting_escapes_closing_brackets()
     {
         // Defense in depth: validation rejects brackets, but quoting must still be correct.
-        await Assert.That(Identifier.Quote("a]b")).IsEqualTo("[a]]b]");
+        await Assert.That(MssqlQueueDialect.Instance.QuoteIdentifier("a]b")).IsEqualTo("[a]]b]");
+    }
+
+    [Test]
+    public async Task CreateScript_indexes_the_message_id_the_eager_forward_looks_rows_up_by()
+    {
+        var script = MssqlQueueSchema.CreateScript(new MssqlStorageOptions { QueueTableName = "Q" });
+
+        await Assert.That(script).Contains("[IX_Q_MessageId] ON [dbo].[Q] (MessageId)");
+        await Assert.That(script).Contains("name = N'IX_Q_MessageId'");
     }
 }

@@ -1,22 +1,17 @@
-using Spinneret.Functional;
-using System.Collections.Concurrent;
-using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.Extensions.Options;
+using Spinneret.Functional;
 using Spinneret.Mediator;
 using Spinneret.Queue;
-using Testcontainers.MsSql;
-using TUnit.Core.Interfaces;
 using Spinneret.Queue.Sql;
 
-namespace Spinneret.Queue.Mssql.Tests;
+namespace Spinneret.Sql.Conformance;
 
 // ---------------------------------------------------------------------------------------------
-// Test command types scanned by QueueTypeRegistry from this assembly, with mediator handlers
+// Test command types scanned by QueueTypeRegistry from the test assembly, with mediator handlers
 // recording deliveries into the DeliveryLog. All timing-relevant policies use millisecond
 // backoffs so retry scenarios complete in test time.
 // ---------------------------------------------------------------------------------------------
@@ -37,6 +32,15 @@ public sealed record DeferOnceCommand(string Key) : IRequest<Unit>;
 public sealed record WriteThenFailCommand(string Table) : IRequest<Unit>;
 
 public sealed record WriteCommand(string Table) : IRequest<Unit>;
+
+/// <summary>
+/// Writes a row to <paramref name="Table"/>, then runs a statement that fails — a NOT NULL
+/// violation — and catches the error itself before returning normally. On SQL Server the failed
+/// statement alone is undone; on Postgres the whole transaction is aborted. Either way the delivery
+/// must not be acknowledged with the handler's write silently gone.
+/// </summary>
+[QueuePolicy(MaxAttempts = 2, MinBackoff = "00:00:00.050", MaxBackoff = "00:00:00.100")]
+public sealed record SwallowSqlErrorCommand(string Table) : IRequest<Unit>;
 
 /// <summary>Enqueues a <see cref="PingCommand"/> and then fails permanently.</summary>
 public sealed record CascadeThenFailCommand(string Key) : IRequest<Unit>;
@@ -101,21 +105,44 @@ public sealed class DeferOnceHandler(DeliveryLog log) : IRequestHandler<DeferOnc
     }
 }
 
-public sealed class WriteThenFailHandler(ISqlTransactionProvider transactions)
+public sealed class WriteThenFailHandler(ISqlTransactionProvider transactions, SqlTestDialect dialect)
     : IRequestHandler<WriteThenFailCommand, Unit>
 {
     public async Task<Unit> Handle(WriteThenFailCommand request, CancellationToken cancellationToken)
     {
-        await SideEffects.Insert(transactions, request.Table, cancellationToken);
+        await dialect.InsertSideEffect(SideEffects.Ambient(transactions), request.Table, "written", cancellationToken);
         throw new QueueHandlerPermanentException("Failing after the side-effect write");
     }
 }
 
-public sealed class WriteHandler(ISqlTransactionProvider transactions) : IRequestHandler<WriteCommand, Unit>
+public sealed class WriteHandler(ISqlTransactionProvider transactions, SqlTestDialect dialect)
+    : IRequestHandler<WriteCommand, Unit>
 {
     public async Task<Unit> Handle(WriteCommand request, CancellationToken cancellationToken)
     {
-        await SideEffects.Insert(transactions, request.Table, cancellationToken);
+        await dialect.InsertSideEffect(SideEffects.Ambient(transactions), request.Table, "written", cancellationToken);
+        return Unit.Value;
+    }
+}
+
+public sealed class SwallowSqlErrorHandler(ISqlTransactionProvider transactions, SqlTestDialect dialect, DeliveryLog log)
+    : IRequestHandler<SwallowSqlErrorCommand, Unit>
+{
+    public async Task<Unit> Handle(SwallowSqlErrorCommand request, CancellationToken cancellationToken)
+    {
+        log.RecordAttempt(request.Table);
+        var transaction = SideEffects.Ambient(transactions);
+        await dialect.InsertSideEffect(transaction, request.Table, "written", cancellationToken);
+        try
+        {
+            await dialect.InsertSideEffect(transaction, request.Table, value: null, cancellationToken);
+        }
+        catch (System.Data.Common.DbException)
+        {
+            // Deliberately swallowed: the bug under test is a handler that does this.
+        }
+
+        log.RecordDelivery($"swallow:{request.Table}");
         return Unit.Value;
     }
 }
@@ -149,62 +176,67 @@ public sealed class BulkChannelHandler(DeliveryLog log) : IRequestHandler<BulkCh
 
 internal static class SideEffects
 {
-    public static async Task Insert(ISqlTransactionProvider transactions, string table, CancellationToken ct)
-    {
-        var transaction = transactions.Current
-            ?? throw new InvalidOperationException("Expected the delivery's ambient transaction.");
-        await using var command = transaction.Connection!.CreateCommand();
-        command.Transaction = transaction;
-        command.CommandText = $"INSERT INTO [{table}] (Value) VALUES ('written');";
-        await command.ExecuteNonQueryAsync(ct);
-    }
+    public static System.Data.Common.DbTransaction Ambient(ISqlTransactionProvider transactions) =>
+        transactions.Current ?? throw new InvalidOperationException("Expected the delivery's ambient transaction.");
 }
 
 // ---------------------------------------------------------------------------------------------
-// Docker fixture and host harness.
+// Host harness.
 // ---------------------------------------------------------------------------------------------
 
 /// <summary>
-/// A running queue host: DI container with the Mssql queue registered and all hosted services
-/// started, plus SQL helpers scoped to this test's unique tables.
+/// A running queue host: DI container with the dialect's SQL storage registered and all hosted
+/// services started, plus SQL helpers scoped to this test's unique tables.
 /// </summary>
 public sealed class QueueTestHost : IAsyncDisposable
 {
     private readonly ServiceProvider _provider;
     private readonly IHostedService[] _hostedServices;
 
-    public string Suffix { get; }
-    public MssqlStorageOptions Options { get; }
-    public DeliveryLog Log { get; }
-
-    private QueueTestHost(ServiceProvider provider, IHostedService[] hostedServices, string suffix)
+    private QueueTestHost(ServiceProvider provider, IHostedService[] hostedServices, SqlTestDialect dialect, string suffix)
     {
         _provider = provider;
         _hostedServices = hostedServices;
+        Dialect = dialect;
         Suffix = suffix;
-        Options = provider.GetRequiredService<IOptions<MssqlStorageOptions>>().Value;
+        Options = dialect.StorageOptions(provider);
         Log = provider.GetRequiredService<DeliveryLog>();
     }
+
+    public SqlTestDialect Dialect { get; }
+    public string Suffix { get; }
+    public SqlStorageOptions Options { get; }
+    public DeliveryLog Log { get; }
 
     public IServiceProvider Services => _provider;
     public IQueue Queue => _provider.GetRequiredService<IQueue>();
     public ISqlTransactionalQueue TransactionalQueue => _provider.GetRequiredService<ISqlTransactionalQueue>();
     public ISqlTransactionProvider Transactions => _provider.GetRequiredService<ISqlTransactionProvider>();
 
+    /// <summary>Config pinning a host to a given pair of tables, so several hosts can share them.</summary>
+    public static Dictionary<string, string?> Tables(SqlTestDialect dialect, string suffix) => new()
+    {
+        [$"{dialect.StorageSection}:QueueTableName"] = $"Q_{suffix}",
+        [$"{dialect.StorageSection}:DeadLetterTableName"] = $"DL_{suffix}",
+    };
+
+    public static string NewSuffix() => Guid.NewGuid().ToString("N")[..12];
+
     public static async Task<QueueTestHost> StartAsync(
-        string connectionString,
+        SqlTestDialect dialect,
         bool worker = true,
         Dictionary<string, string?>? extraConfig = null,
-        Action<IServiceCollection>? configure = null)
+        Action<IServiceCollection>? configure = null,
+        string? suffix = null)
     {
-        var suffix = Guid.NewGuid().ToString("N")[..12];
+        suffix ??= NewSuffix();
         var settings = new Dictionary<string, string?>
         {
-            ["Queue:Mssql:ConnectionString"] = connectionString,
-            ["Queue:Mssql:QueueTableName"] = $"Q_{suffix}",
-            ["Queue:Mssql:DeadLetterTableName"] = $"DL_{suffix}",
+            [$"{dialect.StorageSection}:ConnectionString"] = dialect.ConnectionString,
             ["Queue:InHost:PollInterval"] = "00:00:00.050",
         };
+        foreach (var (key, value) in Tables(dialect, suffix))
+            settings[key] = value;
         foreach (var (key, value) in extraConfig ?? [])
             settings[key] = value;
 
@@ -213,10 +245,11 @@ public sealed class QueueTestHost : IAsyncDisposable
         var services = new ServiceCollection();
         services.AddSingleton(typeof(ILogger<>), typeof(NullLogger<>));
         services.AddSingleton<DeliveryLog>();
+        services.AddSingleton(dialect);
         services.AddMediator([typeof(QueueTestHost).Assembly]);
         services.AddQueue(q =>
         {
-            q.AddRequestAssemblies(typeof(QueueTestHost).Assembly).UseMssqlStorage(configuration);
+            dialect.UseStorage(q.AddRequestAssemblies(typeof(QueueTestHost).Assembly), configuration);
             if (worker)
                 q.UseInHostDelivery(configuration);
         });
@@ -227,39 +260,23 @@ public sealed class QueueTestHost : IAsyncDisposable
         foreach (var hostedService in hostedServices)
             await hostedService.StartAsync(CancellationToken.None);
 
-        return new QueueTestHost(provider, hostedServices, suffix);
+        return new QueueTestHost(provider, hostedServices, dialect, suffix);
     }
 
     // ------------------------------------------------------------------------- SQL helpers ---
 
-    public async Task<SqlConnection> OpenConnectionAsync()
-    {
-        var connection = new SqlConnection(Options.ConnectionString);
-        await connection.OpenAsync();
-        return connection;
-    }
+    public string QueueTable => Options.QueueTableName;
+    public string DeadLetterTable => Options.DeadLetterTableName;
 
-    public async Task<T> ScalarAsync<T>(string sql)
-    {
-        await using var connection = await OpenConnectionAsync();
-        await using var command = connection.CreateCommand();
-        command.CommandText = sql;
-        return (T)(await command.ExecuteScalarAsync())!;
-    }
+    public Task<System.Data.Common.DbConnection> OpenConnectionAsync() => Dialect.OpenConnectionAsync();
 
-    public async Task ExecuteAsync(string sql)
-    {
-        await using var connection = await OpenConnectionAsync();
-        await using var command = connection.CreateCommand();
-        command.CommandText = sql;
-        await command.ExecuteNonQueryAsync();
-    }
+    public Task<T> ScalarAsync<T>(string sql) => Dialect.ScalarAsync<T>(sql);
 
-    public Task<int> QueueRowCount() =>
-        ScalarAsync<int>($"SELECT COUNT(*) FROM [{Options.QueueTableName}]");
+    public Task ExecuteAsync(string sql) => Dialect.ExecuteAsync(sql);
 
-    public Task<int> DeadLetterRowCount() =>
-        ScalarAsync<int>($"SELECT COUNT(*) FROM [{Options.DeadLetterTableName}]");
+    public Task<int> QueueRowCount() => Dialect.CountAsync(QueueTable);
+
+    public Task<int> DeadLetterRowCount() => Dialect.CountAsync(DeadLetterTable);
 
     public async ValueTask DisposeAsync()
     {

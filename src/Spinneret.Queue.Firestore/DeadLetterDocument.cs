@@ -34,7 +34,7 @@ internal static class DeadLetterDocument
     public static Dictionary<string, object?> From(DeadLetterEntry entry, DateTimeOffset deadLetteredAt) =>
         new()
         {
-            // The stored spelling matches the MSSQL writer's column value, so the same reader logic
+            // The stored spelling matches the SQL writer's column value, so the same reader logic
             // works whichever store a host uses. DeadLetterSource member names are a data contract.
             [Fields.Source] = DeadLetterStorage.FormatSource(entry.Source),
             [Fields.CommandTypeName] = entry.CommandTypeName,

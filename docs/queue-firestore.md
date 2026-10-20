@@ -59,7 +59,7 @@ retried write land on the document it already wrote instead of creating a second
 
 | Field | Type | Notes |
 |---|---|---|
-| `source` | string | `"Queue"` or `"Scheduler"`. Matches the MSSQL column value, so one reader serves either store. |
+| `source` | string | `"Queue"` or `"Scheduler"`. Matches the SQL column value, so one reader serves either store. |
 | `commandTypeName` | string | |
 | `description` | string \| null | Present but null when the enqueuer supplied none, so readers see a consistent shape. |
 | `payloadJson` | string | |
@@ -69,10 +69,10 @@ retried write land on the document it already wrote instead of creating a second
 
 **The first write wins.** A redelivered dead-letter write is ignored rather than overwriting, so
 `deadLetteredAt` records when the failure actually happened rather than when it was last retried.
-This mirrors the MSSQL writer, whose insert swallows a duplicate key.
+This mirrors the SQL writer, whose insert ignores a duplicate key.
 
 These field names are a data contract — the `IDeadLetterStore` in this package binds to them, and so
-does the MSSQL one to its columns, so treat a rename as a breaking change.
+does the SQL one to its columns, so treat a rename as a breaking change.
 
 ## Reading them back
 

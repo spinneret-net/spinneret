@@ -4,7 +4,6 @@
     <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="10.0.13" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.13" />
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.13" />
-    <PackageReference Include="Testcontainers.MsSql" Version="4.16.0" />
   </ItemGroup>
 
   <ItemGroup>
@@ -13,6 +12,15 @@
   <ItemGroup>
     <ProjectReference Include="..\Spinneret.Testing\Spinneret.Testing.csproj" />
     <Using Include="Spinneret.Testing" />
+  </ItemGroup>
+
+  <!-- The scheduler conformance suites, compiled into this assembly so their commands are scanned
+       from it and its InternalsVisibleTo grants cover them; SchedulerConformance.cs runs them on SQL
+       Server. -->
+  <ItemGroup>
+    <Compile Include="..\Spinneret.Sql.Conformance\SqlTestDialect.cs" LinkBase="Conformance" />
+    <Compile Include="..\Spinneret.Sql.Conformance\Dialects\MssqlTestDialect.cs" LinkBase="Conformance" />
+    <Compile Include="..\Spinneret.Sql.Conformance\Scheduler\**\*.cs" LinkBase="Conformance\Scheduler" />
   </ItemGroup>
 
 </Project>

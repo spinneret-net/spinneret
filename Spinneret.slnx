@@ -9,10 +9,12 @@
     <Project Path="src\Spinneret.Queue.Firestore\Spinneret.Queue.Firestore.csproj" />
     <Project Path="src\Spinneret.Queue.CloudTasks\Spinneret.Queue.CloudTasks.csproj" />
     <Project Path="src\Spinneret.Queue.Mssql\Spinneret.Queue.Mssql.csproj" />
+    <Project Path="src\Spinneret.Queue.Postgres\Spinneret.Queue.Postgres.csproj" />
     <Project Path="src\Spinneret.Scheduler\Spinneret.Scheduler.csproj" />
     <Project Path="src\Spinneret.Scheduler.Firestore\Spinneret.Scheduler.Firestore.csproj" />
     <Project Path="src\Spinneret.Scheduler.Http\Spinneret.Scheduler.Http.csproj" />
     <Project Path="src\Spinneret.Scheduler.Mssql\Spinneret.Scheduler.Mssql.csproj" />
+    <Project Path="src\Spinneret.Scheduler.Postgres\Spinneret.Scheduler.Postgres.csproj" />
     <Project Path="src\Spinneret.View\Spinneret.View.csproj" />
     <Project Path="src\Spinneret.View.Server\Spinneret.View.Server.csproj" />
     <Project Path="src\Spinneret.ViewModel\Spinneret.ViewModel.csproj" />
@@ -20,6 +22,10 @@
   <Folder Name="/tests/">
     <Project Path="tests/Spinneret.Composition.Tests/Spinneret.Composition.Tests.csproj" />
     <Project Path="tests/Spinneret.Testing/Spinneret.Testing.csproj" />
+    <Project Path="tests/Spinneret.Queue.Sql.Tests/Spinneret.Queue.Sql.Tests.csproj" />
+    <Project Path="tests/Spinneret.Queue.Postgres.Tests/Spinneret.Queue.Postgres.Tests.csproj" />
+    <Project Path="tests/Spinneret.Scheduler.Sql.Tests/Spinneret.Scheduler.Sql.Tests.csproj" />
+    <Project Path="tests/Spinneret.Scheduler.Postgres.Tests/Spinneret.Scheduler.Postgres.Tests.csproj" />
     <Project Path="tests\Spinneret.Functional.Tests\Spinneret.Functional.Tests.csproj" />
     <Project Path="tests\Spinneret.Mediator.Tests\Spinneret.Mediator.Tests.csproj" />
     <Project Path="tests\Spinneret.Parsing.Tests\Spinneret.Parsing.Tests.csproj" />

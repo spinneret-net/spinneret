@@ -13,9 +13,9 @@ internal sealed class SqlSchedulerStorage
         ArgumentNullException.ThrowIfNull(queue);
         ArgumentNullException.ThrowIfNull(dialect);
 
-        if (!string.Equals(dialect.QueueDialectName, queue.Dialect.Name, StringComparison.Ordinal))
+        if (!string.Equals(dialect.QueueDialect.Name, queue.Dialect.Name, StringComparison.Ordinal))
             throw new InvalidOperationException(
-                $"The scheduler's '{dialect.QueueDialectName}' storage cannot share a transaction with a "
+                $"The scheduler's '{dialect.QueueDialect.Name}' storage cannot share a transaction with a "
                 + $"'{queue.Dialect.Name}' queue: the scheduler and the queue must live in the same database.");
 
         Queue = queue;

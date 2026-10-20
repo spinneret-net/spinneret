@@ -1,5 +1,4 @@
 using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Options;
 using Spinneret.Scheduler;
 using Spinneret.Scheduler.Mssql;
 using Spinneret.Scheduler.Sql;
@@ -10,6 +9,9 @@ namespace Microsoft.Extensions.DependencyInjection;
 
 public static class MssqlSchedulerBuilderExtensions
 {
+    private static readonly SqlSchedulerDescriptor Descriptor = new(
+        nameof(UseMssql), MssqlSchedulerOptions.SectionName, MssqlSchedulerDialect.Instance);
+
     /// <summary>
     /// Stores scheduled jobs in SQL Server, next to the queue: provides
     /// <see cref="IRecurringJobScheduler"/>, <see cref="ISqlTransactionalScheduler"/>, the sweep engine
@@ -26,39 +28,17 @@ public static class MssqlSchedulerBuilderExtensions
     public static SchedulerBuilder UseMssql(this SchedulerBuilder scheduler, IConfiguration configuration)
     {
         ArgumentNullException.ThrowIfNull(configuration);
-        var section = configuration.GetSection(MssqlSchedulerOptions.SectionName);
-        return scheduler.UseMssqlCore(options => section.Bind(options));
+        return scheduler.UseSqlStorage<MssqlSchedulerOptions>(Descriptor, configuration, configure: null);
     }
 
     /// <summary>As <see cref="UseMssql(SchedulerBuilder, IConfiguration)"/>, configured in code.</summary>
     public static SchedulerBuilder UseMssql(this SchedulerBuilder scheduler, Action<MssqlSchedulerOptions> configure)
     {
         ArgumentNullException.ThrowIfNull(configure);
-        return scheduler.UseMssqlCore(configure);
+        return scheduler.UseSqlStorage(Descriptor, configuration: null, configure);
     }
 
     /// <summary>As <see cref="UseMssql(SchedulerBuilder, IConfiguration)"/>, with the defaults.</summary>
     public static SchedulerBuilder UseMssql(this SchedulerBuilder scheduler) =>
-        scheduler.UseMssqlCore(_ => { });
-
-    private static SchedulerBuilder UseMssqlCore(this SchedulerBuilder scheduler, Action<MssqlSchedulerOptions> configure)
-    {
-        ArgumentNullException.ThrowIfNull(scheduler);
-
-        return scheduler.UseStorage(new SchedulerStorageRole(nameof(UseMssql), services =>
-        {
-            // Fail as early as possible on broken configuration; the options-pipeline validation
-            // re-validates at host start to also cover later Configure/PostConfigure changes.
-            var eagerlyBound = new MssqlSchedulerOptions();
-            configure(eagerlyBound);
-            MssqlSchedulerOptionsValidator.ValidateOrThrow(eagerlyBound);
-
-            services.AddOptions<MssqlSchedulerOptions>().Configure(configure).ValidateOnStart();
-            services.AddSingleton<IValidateOptions<MssqlSchedulerOptions>, MssqlSchedulerOptionsValidator>();
-
-            services.AddSqlScheduler(
-                MssqlSchedulerDialect.Instance,
-                sp => sp.GetRequiredService<IOptions<MssqlSchedulerOptions>>().Value.TableName);
-        }));
-    }
+        scheduler.UseSqlStorage<MssqlSchedulerOptions>(Descriptor, configuration: null, configure: null);
 }

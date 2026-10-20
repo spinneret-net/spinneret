@@ -4,7 +4,7 @@ namespace Spinneret.Scheduler;
 
 /// <summary>
 /// Composes the scheduler a host runs, inside <c>services.AddScheduler(s => ...)</c>: where jobs are
-/// stored (a provider's <c>Use*</c> extension, e.g. <c>UseMssql</c> or <c>UseFirestore</c>) and,
+/// stored (a provider's <c>Use*</c> extension, e.g. <c>UseMssql</c>, <c>UsePostgres</c> or <c>UseFirestore</c>) and,
 /// optionally, a timer that dispatches them as they fall due (<see cref="UseSweeper"/>).
 /// </summary>
 /// <remarks>
@@ -61,7 +61,7 @@ public sealed class SchedulerBuilder
 
         if (Storage is null)
             throw new InvalidOperationException(
-                "The scheduler has nowhere to keep its jobs. Choose a storage, e.g. s.UseMssql(...) or s.UseFirestore(...).");
+                "The scheduler has nowhere to keep its jobs. Choose a storage, e.g. s.UseMssql(...), s.UsePostgres(...) or s.UseFirestore(...).");
 
         Services.AddSingleton<SchedulerRegistered>();
         Storage.Register(Services);

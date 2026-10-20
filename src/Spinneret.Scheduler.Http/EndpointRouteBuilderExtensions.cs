@@ -44,7 +44,7 @@ public static class SchedulerSweepEndpointRouteBuilderExtensions
         if (endpoints.ServiceProvider.GetService<ISchedulerSweep>() is null)
             throw new InvalidOperationException(
                 "MapSchedulerSweep requires a scheduler storage provider to be registered "
-                + "(AddScheduler with s.UseMssql, s.UseFirestore, or another): this package only exposes "
+                + "(AddScheduler with s.UseMssql, s.UsePostgres, s.UseFirestore, or another): this package only exposes "
                 + "the trigger, and something has to tell it what is due.");
 
         return SchedulerSweepEndpoint.Map(

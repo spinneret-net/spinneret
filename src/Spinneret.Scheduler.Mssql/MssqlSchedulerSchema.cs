@@ -5,7 +5,7 @@ namespace Spinneret.Scheduler.Mssql;
 
 /// <summary>
 /// DDL for the scheduled-jobs table. The startup initializer runs it when the queue storage's
-/// <see cref="MssqlStorageOptions.CreateSchema"/> is on; hosts that own their schema through
+/// <see cref="Spinneret.Queue.Sql.SqlStorageOptions.CreateSchema"/> is on; hosts that own their schema through
 /// migrations run it themselves and turn that off.
 /// </summary>
 /// <remarks>

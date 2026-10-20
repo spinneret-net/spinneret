@@ -3,7 +3,7 @@
 Scheduled jobs stored as Firestore documents, plus the sweep that dispatches them onto the queue.
 
 It depends only on the provider-agnostic core queue, so it composes with **any** queue — Firestore
-schedules dispatched onto a SQL Server outbox is a supported combination. It is a plain library with no
+schedules dispatched onto a SQL Server or PostgreSQL outbox is a supported combination. It is a plain library with no
 web dependency; the HTTP trigger lives in [`Spinneret.Scheduler.Http`](scheduler-http.md).
 
 Read [scheduler.md](scheduler.md) first for declaring jobs and schedules; this page is the Firestore
@@ -113,7 +113,7 @@ write has not happened yet when the method returns.
   stored document because Firestore requires every read in a transaction to precede every write,
   which would be impossible in a transaction the caller may already have written to.
 - **A sweep covers one query snapshot.** Anything falling due mid-pass waits for the next sweep, so the
-  trigger interval bounds how late a job can run. (The SQL Server sweep drains instead.)
+  trigger interval bounds how late a job can run. (The SQL sweep drains instead.)
 - **A crash mid-dispatch is not free, and it cuts differently per job kind.** Firestore and the queue
   are separate systems, so the lease always commits before the enqueue.
   - **One-shot jobs are at-least-once.** The lease hides the job for `OneShotLeaseWindow`; a crash
@@ -124,7 +124,7 @@ write has not happened yet when the method returns.
     time. Do not use a recurring job where every single occurrence must happen; use it for work that
     is periodic and self-correcting.
 
-  The SQL Server scheduler differs here: its claim and enqueue share one transaction, so an
+  The SQL schedulers differ here: its claim and enqueue share one transaction, so an
   occurrence can be neither lost nor double-enqueued. That is the trade for requiring the queue to
   live in the same database.
 - **A failed occurrence never stops the schedule.** It is dead-lettered and the next slot still runs —

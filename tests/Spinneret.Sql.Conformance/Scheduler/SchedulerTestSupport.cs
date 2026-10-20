@@ -1,19 +1,15 @@
-using Spinneret.Functional;
-using System.Collections.Concurrent;
-using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.Extensions.Options;
+using Spinneret.Functional;
 using Spinneret.Mediator;
-using Spinneret.Queue.Mssql;
-using Testcontainers.MsSql;
-using TUnit.Core.Interfaces;
+using Spinneret.Queue.Sql;
+using Spinneret.Scheduler;
 using Spinneret.Scheduler.Sql;
 
-namespace Spinneret.Scheduler.Mssql.Tests;
+namespace Spinneret.Sql.Conformance;
 
 // ---------------------------------------------------------------------------------------------
 // Test command types and handlers.
@@ -47,7 +43,7 @@ public sealed class ReportHandler(DeliveryLog log) : IRequestHandler<ReportComma
 }
 
 // ---------------------------------------------------------------------------------------------
-// Docker fixture and host harness.
+// Host harness.
 // ---------------------------------------------------------------------------------------------
 
 /// <summary>
@@ -59,20 +55,22 @@ public sealed class SchedulerTestHost : IAsyncDisposable
     private readonly ServiceProvider _provider;
     private readonly IHostedService[] _hostedServices;
 
-    public string Suffix { get; }
-    public MssqlStorageOptions QueueOptions { get; }
-    public MssqlSchedulerOptions SchedulerOptions { get; }
-    public DeliveryLog Log { get; }
-
-    private SchedulerTestHost(ServiceProvider provider, IHostedService[] hostedServices, string suffix)
+    private SchedulerTestHost(ServiceProvider provider, IHostedService[] hostedServices, SqlTestDialect dialect, string suffix)
     {
         _provider = provider;
         _hostedServices = hostedServices;
+        Dialect = dialect;
         Suffix = suffix;
-        QueueOptions = provider.GetRequiredService<IOptions<MssqlStorageOptions>>().Value;
-        SchedulerOptions = provider.GetRequiredService<IOptions<MssqlSchedulerOptions>>().Value;
+        QueueOptions = dialect.StorageOptions(provider);
+        SchedulerOptions = dialect.SchedulerOptions(provider);
         Log = provider.GetRequiredService<DeliveryLog>();
     }
+
+    public SqlTestDialect Dialect { get; }
+    public string Suffix { get; }
+    public SqlStorageOptions QueueOptions { get; }
+    public SqlSchedulerOptions SchedulerOptions { get; }
+    public DeliveryLog Log { get; }
 
     public IServiceProvider Services => _provider;
     public IRecurringJobScheduler Scheduler => _provider.GetRequiredService<IRecurringJobScheduler>();
@@ -80,7 +78,7 @@ public sealed class SchedulerTestHost : IAsyncDisposable
         _provider.GetRequiredService<ISqlTransactionalScheduler>();
 
     public static async Task<SchedulerTestHost> StartAsync(
-        string connectionString,
+        SqlTestDialect dialect,
         bool sweeper = true,
         Action<IServiceCollection>? configure = null,
         string? reuseSuffix = null)
@@ -88,24 +86,23 @@ public sealed class SchedulerTestHost : IAsyncDisposable
         var suffix = reuseSuffix ?? Guid.NewGuid().ToString("N")[..12];
         var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
         {
-            ["Queue:Mssql:ConnectionString"] = connectionString,
-            ["Queue:Mssql:QueueTableName"] = $"Q_{suffix}",
-            ["Queue:Mssql:DeadLetterTableName"] = $"DL_{suffix}",
+            [$"{dialect.StorageSection}:ConnectionString"] = dialect.ConnectionString,
+            [$"{dialect.StorageSection}:QueueTableName"] = $"Q_{suffix}",
+            [$"{dialect.StorageSection}:DeadLetterTableName"] = $"DL_{suffix}",
             ["Queue:InHost:PollInterval"] = "00:00:00.050",
-            ["Scheduler:Mssql:TableName"] = $"Jobs_{suffix}",
+            [$"{dialect.SchedulerSection}:TableName"] = $"Jobs_{suffix}",
         }).Build();
 
         var services = new ServiceCollection();
         services.AddSingleton(typeof(ILogger<>), typeof(NullLogger<>));
         services.AddSingleton<DeliveryLog>();
         services.AddMediator([typeof(SchedulerTestHost).Assembly]);
-        services.AddQueue(q => q
-            .AddRequestAssemblies(typeof(SchedulerTestHost).Assembly)
-            .UseMssqlStorage(configuration)
+        services.AddQueue(q => dialect
+            .UseStorage(q.AddRequestAssemblies(typeof(SchedulerTestHost).Assembly), configuration)
             .UseInHostDelivery(configuration));
         services.AddScheduler(s =>
         {
-            s.UseMssql(configuration);
+            dialect.UseScheduler(s, configuration);
             if (sweeper)
                 // Fast ticks so integration tests do not wait out the 15s default.
                 s.UseSweeper(o => o.SweepInterval = TimeSpan.FromMilliseconds(100));
@@ -117,49 +114,30 @@ public sealed class SchedulerTestHost : IAsyncDisposable
         foreach (var hostedService in hostedServices)
             await hostedService.StartAsync(CancellationToken.None);
 
-        return new SchedulerTestHost(provider, hostedServices, suffix);
+        return new SchedulerTestHost(provider, hostedServices, dialect, suffix);
     }
 
     // ------------------------------------------------------------------------- SQL helpers ---
 
     public string JobsTable => SchedulerOptions.TableName;
 
-    public async Task<SqlConnection> OpenConnectionAsync()
-    {
-        var connection = new SqlConnection(QueueOptions.ConnectionString);
-        await connection.OpenAsync();
-        return connection;
-    }
+    public Task<System.Data.Common.DbConnection> OpenConnectionAsync() => Dialect.OpenConnectionAsync();
 
-    public async Task<T> ScalarAsync<T>(string sql)
-    {
-        await using var connection = await OpenConnectionAsync();
-        await using var command = connection.CreateCommand();
-        command.CommandText = sql;
-        var value = await command.ExecuteScalarAsync();
-        return value is DBNull or null ? default! : (T)value;
-    }
+    public Task<T> ScalarAsync<T>(string sql) => Dialect.ScalarAsync<T>(sql);
 
-    public async Task ExecuteAsync(string sql)
-    {
-        await using var connection = await OpenConnectionAsync();
-        await using var command = connection.CreateCommand();
-        command.CommandText = sql;
-        await command.ExecuteNonQueryAsync();
-    }
+    public Task ExecuteAsync(string sql) => Dialect.ExecuteAsync(sql);
 
     /// <summary>
     /// Whether the job is still outstanding work. There is no status column — a job is deleted once
     /// it has run, been cancelled, or had its failure dead-lettered — so existence is the state.
     /// </summary>
     public async Task<bool> JobExists(string jobKey) =>
-        await ScalarAsync<int>($"SELECT COUNT(*) FROM [{JobsTable}] WHERE JobKey = N'{jobKey}'") == 1;
+        await Dialect.CountAsync(JobsTable, $"JobKey = '{jobKey}'") == 1;
 
     public Task<DateTime> JobNextExecuteAt(string jobKey) =>
-        ScalarAsync<DateTime>($"SELECT NextExecuteAt FROM [{JobsTable}] WHERE JobKey = N'{jobKey}'");
+        ScalarAsync<DateTime>($"SELECT NextExecuteAt FROM {Dialect.Quote(JobsTable)} WHERE JobKey = '{jobKey}'");
 
-    public Task<int> DeadLetterCount() =>
-        ScalarAsync<int>($"SELECT COUNT(*) FROM [{QueueOptions.DeadLetterTableName}]");
+    public Task<int> DeadLetterCount() => Dialect.CountAsync(QueueOptions.DeadLetterTableName);
 
     public async ValueTask DisposeAsync()
     {

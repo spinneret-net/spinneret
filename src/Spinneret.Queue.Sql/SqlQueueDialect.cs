@@ -33,11 +33,47 @@ internal abstract class SqlQueueDialect
     /// </summary>
     public abstract string CreateSchemaScript(SqlQueueNames names);
 
+    /// <summary>
+    /// Every index and constraint name the DDL derives from the configured table names. Validation
+    /// checks them against <see cref="MaxIdentifierLength"/> along with the configured names, since a
+    /// table name that fits can still derive one that does not — which SQL Server rejects at startup
+    /// and Postgres silently truncates, until two truncated names collide.
+    /// </summary>
+    public abstract IEnumerable<string> DerivedIdentifiers(SqlQueueNames names);
+
+    /// <summary>The longest identifier the database accepts, in characters (identifiers are ASCII).</summary>
+    public abstract int MaxIdentifierLength { get; }
+
+    /// <summary>Quotes and escapes a configured identifier: defense in depth behind startup validation.</summary>
+    public abstract string QuoteIdentifier(string identifier);
+
+    /// <summary>A schema-qualified, quoted table name.</summary>
+    public string Qualify(string schema, string table) => $"{QuoteIdentifier(schema)}.{QuoteIdentifier(table)}";
+
+    /// <summary>
+    /// Whether <paramref name="identifier"/> is a plain identifier — letters, digits and underscores,
+    /// not starting with a digit — short enough for the database. Configured names are spliced into
+    /// SQL, so nothing else is accepted, even though quoting would make more of it safe.
+    /// </summary>
+    public bool IsValidIdentifier(string identifier) =>
+        !string.IsNullOrWhiteSpace(identifier)
+        && identifier.Length <= MaxIdentifierLength
+        && (char.IsAsciiLetter(identifier[0]) || identifier[0] == '_')
+        && identifier.All(c => char.IsAsciiLetterOrDigit(c) || c == '_');
+
     /// <summary>Binds a UTC instant to a timestamp column of the dialect's DDL.</summary>
     public abstract void AddTimestamp(DbCommand command, string name, DateTimeOffset utc);
 
     /// <summary>Reads back a timestamp written through <see cref="AddTimestamp"/>.</summary>
     public abstract DateTimeOffset ReadTimestamp(DbDataReader reader, int ordinal);
+
+    /// <summary>
+    /// Whether a statement failed in <paramref name="transaction"/> in a way that left it refusing
+    /// all further work until a rollback. Checked after each handler, which may have caught such an
+    /// error itself. The default is false: on SQL Server a failed statement leaves the transaction
+    /// usable, and one the server has doomed fails its commit loudly anyway.
+    /// </summary>
+    public virtual Task<bool> IsAbortedAsync(DbTransaction transaction, CancellationToken ct) => Task.FromResult(false);
 
     /// <summary>Sets a savepoint on <paramref name="transaction"/>.</summary>
     public virtual Task SaveAsync(DbTransaction transaction, string savepoint, CancellationToken ct) =>

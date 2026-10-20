@@ -8,8 +8,8 @@ It composes two ways:
 - **On its own.** Each enqueue is a call to Cloud Tasks. Simple, but not atomic with anything the
   caller writes — and Cloud Tasks stores nothing you can query, so dead letters need a store of their
   own ([`Spinneret.Queue.Firestore`](queue-firestore.md)).
-- **Over a SQL storage** ([`Spinneret.Queue.Sql`](queue-sql.md) with a dialect such as
-  [`Spinneret.Queue.Mssql`](queue-mssql.md)). Every enqueue lands in the outbox table inside the
+- **Over a SQL storage** ([`Spinneret.Queue.Sql`](queue-sql.md) with a dialect:
+  [`Spinneret.Queue.Mssql`](queue-mssql.md) or [`Spinneret.Queue.Postgres`](queue-postgres.md)). Every enqueue lands in the outbox table inside the
   caller's transaction, a relay forwards it to Cloud Tasks, and each delivery runs in one SQL
   transaction committed before the endpoint answers. See [Over a SQL storage](#over-a-sql-storage).
 

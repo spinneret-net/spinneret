@@ -31,6 +31,18 @@ internal sealed class SavepointDispatchBoundary(
         try
         {
             await dispatch();
+
+            // A handler that caught a database error and returned normally can leave the transaction
+            // refusing all further work (Postgres aborts it on any error). Committing it would then
+            // silently roll back — the handler's writes and the acknowledge with it — while the
+            // delivery reported success. Treated as the failure it is, the savepoint below restores
+            // the transaction and the attempt is booked like any other.
+            if (await storage.Dialect.IsAbortedAsync(transaction, ct))
+                throw new InvalidOperationException(
+                    $"The handler for {context.Envelope.RequestTypeName} returned normally, but a database error "
+                    + "it caught aborted the delivery's transaction. Its writes were rolled back and the "
+                    + "attempt fails like any other; let the exception propagate, or roll back to a "
+                    + "savepoint of the handler's own around the statement that may fail.");
         }
         catch
         {

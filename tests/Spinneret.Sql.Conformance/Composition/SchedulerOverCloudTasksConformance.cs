@@ -1,28 +1,30 @@
-using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.DependencyInjection;
 using Spinneret.Scheduler;
 using Spinneret.Scheduler.Sql;
 
-namespace Spinneret.Composition.Tests;
+namespace Spinneret.Sql.Conformance;
 
 /// <summary>
 /// The SQL scheduler feeding Cloud Tasks: a due job's booking and its outbox insert commit together,
 /// and the relay takes it from there — the combination the SQL scheduler could not join before the
 /// queue had an outbox.
 /// </summary>
-[ClassDataSource<MssqlContainerFixture>(Shared = SharedType.PerTestSession)]
-public sealed class SchedulerCompositionTests(MssqlContainerFixture fixture)
+public abstract class SchedulerOverCloudTasksConformance(SqlTestDialect dialect)
 {
+    protected SqlTestDialect Dialect => dialect;
+
+    private string Q(string identifier) => dialect.Quote(identifier);
+
     [Test]
     public async Task A_due_sql_job_is_forwarded_once_through_the_outbox()
     {
         await using var host = await CloudTasksOverSqlHost.StartAsync(
-            fixture.ConnectionString,
-            configure: (services, configuration) => services.AddScheduler(s => s.UseMssql(configuration)));
+            Dialect,
+            configure: (services, configuration) => services.AddScheduler(s => dialect.UseScheduler(s, configuration)));
         await WaitForSchedulerTable(host);
 
         await using (var connection = await host.OpenConnectionAsync())
-        await using (var transaction = (SqlTransaction)await connection.BeginTransactionAsync())
+        await using (var transaction = await connection.BeginTransactionAsync())
         {
             await host.Services.GetRequiredService<ISqlTransactionalScheduler>()
                 .ScheduleJobAsync(transaction, new PingCommand("scheduled"), host.Clock.Now.AddMinutes(-1));
@@ -47,7 +49,5 @@ public sealed class SchedulerCompositionTests(MssqlContainerFixture fixture)
     /// with everything else; this only waits for it to be there.
     /// </summary>
     private static Task WaitForSchedulerTable(CloudTasksOverSqlHost host) =>
-        Wait.Until(async () => await host.ScalarAsync<int>(
-            $"SELECT COUNT(*) FROM sys.tables WHERE name = 'Jobs_{host.Suffix}'") == 1,
-            "the scheduler table to exist");
+        Wait.Until(() => host.Dialect.TableExists($"Jobs_{host.Suffix}"), "the scheduler table to exist");
 }

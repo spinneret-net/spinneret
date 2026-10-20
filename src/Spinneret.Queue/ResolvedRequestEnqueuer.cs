@@ -47,7 +47,7 @@ internal static class ResolvedRequestEnqueuer
         }
         catch (TargetInvocationException ex) when (ex.InnerException is not null)
         {
-            // A transport that throws synchronously rather than returning a faulted task — the MSSQL
+            // A transport that throws synchronously rather than returning a faulted task — the SQL
             // queue resolves the type before its first await — comes back wrapped in a
             // TargetInvocationException whose own message says nothing about what went wrong. The
             // sweepers put this message straight into the dead letter, so unwrap to the real one.

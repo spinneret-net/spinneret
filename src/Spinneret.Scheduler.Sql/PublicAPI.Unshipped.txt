@@ -2,3 +2,7 @@
 Spinneret.Scheduler.Sql.ISqlTransactionalScheduler
 Spinneret.Scheduler.Sql.ISqlTransactionalScheduler.CancelJobAsync(System.Data.Common.DbTransaction! transaction, string! handle, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
 Spinneret.Scheduler.Sql.ISqlTransactionalScheduler.ScheduleJobAsync<TResponse>(System.Data.Common.DbTransaction! transaction, Spinneret.Mediator.IRequest<TResponse>! request, System.DateTimeOffset executeAt, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<string!>!
+Spinneret.Scheduler.Sql.SqlSchedulerOptions
+Spinneret.Scheduler.Sql.SqlSchedulerOptions.SqlSchedulerOptions(string! tableName) -> void
+Spinneret.Scheduler.Sql.SqlSchedulerOptions.TableName.get -> string!
+Spinneret.Scheduler.Sql.SqlSchedulerOptions.TableName.set -> void

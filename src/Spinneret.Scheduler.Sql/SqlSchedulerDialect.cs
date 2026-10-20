@@ -1,3 +1,5 @@
+using Spinneret.Queue.Sql;
+
 namespace Spinneret.Scheduler.Sql;
 
 /// <summary>
@@ -9,10 +11,17 @@ namespace Spinneret.Scheduler.Sql;
 internal abstract class SqlSchedulerDialect
 {
     /// <summary>
-    /// The <c>SqlQueueDialect.Name</c> this dialect pairs with. A scheduler on one database feeding a
-    /// queue on another could not share its transaction, so a mismatch fails the host at startup.
+    /// The queue dialect this dialect pairs with, whose identifier rules it follows. A scheduler on
+    /// one database feeding a queue on another could not share its transaction, so a mismatch fails
+    /// the host at startup.
     /// </summary>
-    public abstract string QueueDialectName { get; }
+    public abstract SqlQueueDialect QueueDialect { get; }
+
+    /// <summary>
+    /// Every index and constraint name the DDL derives from the table name, checked against the
+    /// database's identifier limit along with the table name itself.
+    /// </summary>
+    public abstract IEnumerable<string> DerivedIdentifiers(string table);
 
     /// <summary>The statements for the configured names, built once at startup.</summary>
     public abstract SqlSchedulerStatements CreateStatements(SqlSchedulerNames names);

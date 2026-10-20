@@ -11,7 +11,7 @@ dotnet_diagnostic.RS0026.severity = warning
 
 # The IRequest<Unit> convenience overload sits next to the generic one, both carrying an optional
 # CancellationToken. The pair is the documented shape of these APIs, not an accident.
-[{IQueue.cs,SpinneretMediator.cs,MssqlQueue.cs}]
+[{IQueue.cs,SpinneretMediator.cs}]
 dotnet_diagnostic.RS0026.severity = none
 
 # [CallerMemberName] requires an optional parameter, and the explicit-name overloads exist precisely

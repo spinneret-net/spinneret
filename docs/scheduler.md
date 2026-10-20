@@ -5,7 +5,7 @@ they fall due. Adding a scheduled job is implementing an interface and registeri
 infrastructure change, because every job rides one sweep.
 
 You do not install this directly: a storage package ([Firestore](scheduler-firestore.md),
-[SQL Server](scheduler-mssql.md)) brings it in. This page covers what you write regardless of where
+[SQL Server](scheduler-mssql.md), [PostgreSQL](scheduler-postgres.md)) brings it in. This page covers what you write regardless of where
 the jobs are stored, plus the timer that drives them.
 
 ## Three separate decisions
@@ -13,7 +13,7 @@ the jobs are stored, plus the timer that drives them.
 | Decision | Where |
 |---|---|
 | What the jobs are | this package — `IRecurringJob`, `AddRecurringJob` |
-| Where they live | a storage, chosen in `AddScheduler(s => s.UseMssql(...))` or `s.UseFirestore(...)` |
+| Where they live | a storage, chosen in `AddScheduler(s => s.UseMssql(...))`, `s.UsePostgres(...)` or `s.UseFirestore(...)` |
 | What decides when to sweep | `s.UseSweeper()` here, or [`Spinneret.Scheduler.Http`](scheduler-http.md) |
 
 ```csharp
@@ -161,9 +161,10 @@ context, not a parent.
 
 ## What you must register
 
-- **A storage** — `s.UseFirestore(...)` or `s.UseMssql(...)`, in `AddScheduler`.
-- **A queue** (`AddQueue`), since the sweep dispatches onto it. `s.UseMssql` needs the queue's storage
-  in the same SQL Server database.
+- **A storage** — `s.UseFirestore(...)`, `s.UseMssql(...)` or `s.UsePostgres(...)`, in `AddScheduler`.
+- **A queue** (`AddQueue`), since the sweep dispatches onto it. A SQL scheduler needs the queue's
+  storage in the same database — `s.UseMssql` beside `q.UseMssqlStorage`, `s.UsePostgres` beside
+  `q.UsePostgresStorage` — and fails the host at startup otherwise.
 - **A trigger** — the sweeper above, or the HTTP endpoint.
 - **Your jobs**, and any retirements.
 - **A host that consumes the queue.** The sweep only *enqueues*; without a consumer, jobs pile up

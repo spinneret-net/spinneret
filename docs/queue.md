@@ -229,7 +229,7 @@ services.AddQueue(q => q
 
 | Choice | Options |
 |---|---|
-| **Storage** | `UseMssqlStorage` ([SQL](queue-sql.md)) — or none, with a push delivery. |
+| **Storage** | `UseMssqlStorage` or `UsePostgresStorage` ([SQL](queue-sql.md)) — or none, with a push delivery. |
 | **Delivery** | `UseInHostDelivery` (drains a SQL storage in this host), `UseCloudTasksDelivery` ([Cloud Tasks](queue-cloudtasks.md)) — or none, on a producer-only host with a storage. |
 | **Dead letters** | The storage's own table, `UseFirestoreDeadLetters` ([Firestore](queue-firestore.md)), or your own `IDeadLetterWriter`. |
 

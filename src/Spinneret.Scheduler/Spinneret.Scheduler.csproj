@@ -30,7 +30,6 @@
              sweeps must not drift apart on names or tags. -->
         <InternalsVisibleTo Include="Spinneret.Scheduler.Firestore" />
         <InternalsVisibleTo Include="Spinneret.Scheduler.Sql" />
-        <InternalsVisibleTo Include="Spinneret.Scheduler.Mssql" />
     </ItemGroup>
 
     <PropertyGroup>

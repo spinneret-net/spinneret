@@ -10,7 +10,7 @@ namespace Spinneret.Queue.Firestore;
 /// already landed cannot produce a second entry.
 /// </summary>
 /// <remarks>
-/// Unlike the MSSQL writer there is no ambient transaction to join — Firestore and the queue
+/// Unlike the SQL writer there is no ambient transaction to join — Firestore and the queue
 /// transport are separate systems — so a dead letter is never atomic with the delivery that
 /// produced it. The delivery processor accounts for that: a failed write is retried rather than
 /// acknowledged, which is why the write must stay idempotent.
@@ -28,7 +28,7 @@ internal sealed class FirestoreDeadLetterWriter(
 
         try
         {
-            // Create, not Set: the first write wins, exactly as the MSSQL writer's insert swallows a
+            // Create, not Set: the first write wins, exactly as the SQL writer's insert swallows a
             // duplicate key. A Set would overwrite the original entry on every redelivery, moving
             // deadLetteredAt forward and losing when the failure actually happened.
             await document.CreateAsync(fields, ct);

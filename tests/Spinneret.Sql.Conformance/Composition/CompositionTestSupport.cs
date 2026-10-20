@@ -7,7 +7,6 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.TestHost;
-using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -17,10 +16,9 @@ using Spinneret.Functional;
 using Spinneret.Mediator;
 using Spinneret.Queue;
 using Spinneret.Queue.CloudTasks;
-using Spinneret.Queue.Mssql;
 using Spinneret.Queue.Sql;
 
-namespace Spinneret.Composition.Tests;
+namespace Spinneret.Sql.Conformance;
 
 // ---------------------------------------------------------------------------------------------
 // Commands and handlers. Side effects are written on the delivery's ambient transaction, so whether
@@ -47,23 +45,23 @@ public sealed class PingHandler(DeliveryLog log) : IRequestHandler<PingCommand, 
     }
 }
 
-public sealed class WriteAndCascadeHandler(ISqlTransactionProvider transactions, IQueue queue)
+public sealed class WriteAndCascadeHandler(ISqlTransactionProvider transactions, IQueue queue, SqlTestDialect dialect)
     : IRequestHandler<WriteAndCascadeCommand, Unit>
 {
     public async Task<Unit> Handle(WriteAndCascadeCommand request, CancellationToken cancellationToken)
     {
-        await SideEffects.Insert(transactions, request.Table, cancellationToken);
+        await dialect.InsertSideEffect(SideEffects.Ambient(transactions), request.Table, "written", cancellationToken);
         await queue.Enqueue(new PingCommand(request.Name), ct: cancellationToken);
         return Unit.Value;
     }
 }
 
-public sealed class WriteThenFailHandler(ISqlTransactionProvider transactions)
+public sealed class WriteThenFailHandler(ISqlTransactionProvider transactions, SqlTestDialect dialect)
     : IRequestHandler<WriteThenFailCommand, Unit>
 {
     public async Task<Unit> Handle(WriteThenFailCommand request, CancellationToken cancellationToken)
     {
-        await SideEffects.Insert(transactions, request.Table, cancellationToken);
+        await dialect.InsertSideEffect(SideEffects.Ambient(transactions), request.Table, "written", cancellationToken);
         throw new QueueHandlerPermanentException("Failing after the side-effect write");
     }
 }
@@ -82,19 +80,12 @@ public sealed class FailOnceHandler(DeliveryLog log) : IRequestHandler<FailOnceC
 
 internal static class SideEffects
 {
-    public static async Task Insert(ISqlTransactionProvider transactions, string table, CancellationToken ct)
-    {
-        var transaction = transactions.Current
-            ?? throw new InvalidOperationException("Expected the delivery's ambient transaction.");
-        await using var command = transaction.Connection!.CreateCommand();
-        command.Transaction = transaction;
-        command.CommandText = $"INSERT INTO [{table}] (Value) VALUES ('written');";
-        await command.ExecuteNonQueryAsync(ct);
-    }
+    public static System.Data.Common.DbTransaction Ambient(ISqlTransactionProvider transactions) =>
+        transactions.Current ?? throw new InvalidOperationException("Expected the delivery's ambient transaction.");
 }
 
 // ---------------------------------------------------------------------------------------------
-// The host: Cloud Tasks delivery over SQL Server storage, with a fake Cloud Tasks and the dispatch
+// The host: Cloud Tasks delivery over the dialect's SQL storage, with a fake Cloud Tasks and the dispatch
 // endpoint served in memory. The relay never runs on its own here, so a test decides when a pass
 // happens; eager forwarding on commit still runs, as it would in production.
 // ---------------------------------------------------------------------------------------------
@@ -105,19 +96,22 @@ public sealed class CloudTasksOverSqlHost : IAsyncDisposable
 
     private readonly IHost _host;
 
-    private CloudTasksOverSqlHost(IHost host, string suffix, FakeCloudTasksClient tasks, FixedTimeProvider clock)
+    private CloudTasksOverSqlHost(
+        IHost host, SqlTestDialect dialect, string suffix, FakeCloudTasksClient tasks, FixedTimeProvider clock)
     {
         _host = host;
+        Dialect = dialect;
         Suffix = suffix;
         Tasks = tasks;
         Clock = clock;
-        Storage = host.Services.GetRequiredService<IOptions<MssqlStorageOptions>>().Value;
+        Storage = dialect.StorageOptions(host.Services);
     }
 
+    public SqlTestDialect Dialect { get; }
     public string Suffix { get; }
     public FakeCloudTasksClient Tasks { get; }
     public FixedTimeProvider Clock { get; }
-    public MssqlStorageOptions Storage { get; }
+    public SqlStorageOptions Storage { get; }
     public IServiceProvider Services => _host.Services;
     public IQueue Queue => Services.GetRequiredService<IQueue>();
     public IQueueRelay Relay => Services.GetRequiredService<IQueueRelay>();
@@ -126,23 +120,23 @@ public sealed class CloudTasksOverSqlHost : IAsyncDisposable
     public string DeadLetterTable => Storage.DeadLetterTableName;
 
     public static async Task<CloudTasksOverSqlHost> StartAsync(
-        string connectionString,
+        SqlTestDialect dialect,
         Action<IServiceCollection, IConfiguration>? configure = null,
         Dictionary<string, string?>? extraConfig = null)
     {
         var suffix = Guid.NewGuid().ToString("N")[..12];
         var settings = new Dictionary<string, string?>
         {
-            ["Queue:Mssql:ConnectionString"] = connectionString,
-            ["Queue:Mssql:QueueTableName"] = $"Q_{suffix}",
-            ["Queue:Mssql:DeadLetterTableName"] = $"DL_{suffix}",
+            [$"{dialect.StorageSection}:ConnectionString"] = dialect.ConnectionString,
+            [$"{dialect.StorageSection}:QueueTableName"] = $"Q_{suffix}",
+            [$"{dialect.StorageSection}:DeadLetterTableName"] = $"DL_{suffix}",
             ["Queue:CloudTasks:ProjectId"] = "test-project",
             ["Queue:CloudTasks:LocationId"] = "europe-north1",
             ["Queue:CloudTasks:Channels:default"] = "default-queue",
             ["Queue:CloudTasks:DispatcherUrl"] = DispatcherUrl,
             ["Queue:CloudTasks:ServiceAccountEmail"] = "tasks@test-project.iam.gserviceaccount.com",
             ["Queue:CloudTasks:Relay:RunInBackground"] = "false",
-            ["Scheduler:Mssql:TableName"] = $"Jobs_{suffix}",
+            [$"{dialect.SchedulerSection}:TableName"] = $"Jobs_{suffix}",
         };
         foreach (var (key, value) in extraConfig ?? [])
             settings[key] = value;
@@ -159,11 +153,11 @@ public sealed class CloudTasksOverSqlHost : IAsyncDisposable
                     services.AddLogging(logging => logging.ClearProviders());
                     services.AddRouting();
                     services.AddSingleton<DeliveryLog>();
+                    services.AddSingleton(dialect);
                     services.AddSingleton<TimeProvider>(clock);
                     services.AddMediator([typeof(CloudTasksOverSqlHost).Assembly]);
-                    services.AddQueue(q => q
-                        .AddRequestAssemblies(typeof(CloudTasksOverSqlHost).Assembly)
-                        .UseMssqlStorage(configuration)
+                    services.AddQueue(q => dialect
+                        .UseStorage(q.AddRequestAssemblies(typeof(CloudTasksOverSqlHost).Assembly), configuration)
                         .UseCloudTasksDelivery(configuration));
                     services.AddSingleton<CloudTasksClient>(tasks);
                     // The dispatch endpoint's OIDC validation is covered by the Cloud Tasks suite;
@@ -181,7 +175,7 @@ public sealed class CloudTasksOverSqlHost : IAsyncDisposable
                 }))
             .StartAsync();
 
-        return new CloudTasksOverSqlHost(host, suffix, tasks, clock);
+        return new CloudTasksOverSqlHost(host, dialect, suffix, tasks, clock);
     }
 
     /// <summary>Delivers a task the way Cloud Tasks would: POSTs its body with its name.</summary>
@@ -206,38 +200,21 @@ public sealed class CloudTasksOverSqlHost : IAsyncDisposable
 
     // ------------------------------------------------------------------------- SQL helpers ---
 
-    public async Task<SqlConnection> OpenConnectionAsync()
-    {
-        var connection = new SqlConnection(Storage.ConnectionString);
-        await connection.OpenAsync();
-        return connection;
-    }
+    public Task<System.Data.Common.DbConnection> OpenConnectionAsync() => Dialect.OpenConnectionAsync();
 
-    public async Task<T> ScalarAsync<T>(string sql)
-    {
-        await using var connection = await OpenConnectionAsync();
-        await using var command = connection.CreateCommand();
-        command.CommandText = sql;
-        return (T)(await command.ExecuteScalarAsync())!;
-    }
+    public Task<T> ScalarAsync<T>(string sql) => Dialect.ScalarAsync<T>(sql);
 
-    public async Task ExecuteAsync(string sql)
-    {
-        await using var connection = await OpenConnectionAsync();
-        await using var command = connection.CreateCommand();
-        command.CommandText = sql;
-        await command.ExecuteNonQueryAsync();
-    }
+    public Task ExecuteAsync(string sql) => Dialect.ExecuteAsync(sql);
 
-    public Task<int> OutboxCount() => ScalarAsync<int>($"SELECT COUNT(*) FROM [{QueueTable}]");
+    public Task<int> OutboxCount() => Dialect.CountAsync(QueueTable);
 
-    public Task<int> DeadLetterCount() => ScalarAsync<int>($"SELECT COUNT(*) FROM [{DeadLetterTable}]");
+    public Task<int> DeadLetterCount() => Dialect.CountAsync(DeadLetterTable);
 
     /// <summary>A side-effect table unique to the calling test.</summary>
     public async Task<string> CreateSideTable()
     {
         var table = $"Side_{Suffix}_{Guid.NewGuid().ToString("N")[..6]}";
-        await ExecuteAsync($"CREATE TABLE [{table}] (Value NVARCHAR(50) NOT NULL);");
+        await Dialect.CreateSideTable(table);
         return table;
     }
 

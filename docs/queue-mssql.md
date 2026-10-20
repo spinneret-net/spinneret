@@ -18,6 +18,10 @@ services.AddQueue(q => q
     .UseInHostDelivery(configuration));   // or .UseCloudTasksDelivery(configuration), or none
 ```
 
+A host that already builds its own SqlClient `DbDataSource` can hand that over instead of a
+connection string — `q.UseMssqlStorage(sp => myDataSource, configuration)` — and the storage leaves
+disposing it to the host.
+
 ## Requires
 
 | | |
@@ -30,7 +34,7 @@ services.AddQueue(q => q
 
 | Key | Type | Default | Notes |
 |---|---|---|---|
-| `ConnectionString` | `string` | — | **Mandatory**, unless supplied via `ConnectionStringName`. |
+| `ConnectionString` | `string` | — | **Mandatory**, unless supplied via `ConnectionStringName` or a data source is given. |
 | `ConnectionStringName` | `string?` | `null` | Name of an entry in the standard `ConnectionStrings` section. |
 | `SchemaName` | `string` | `"dbo"` | Must already exist — the DDL creates tables, not schemas. |
 | `QueueTableName` | `string` | `"SpinneretQueue"` | |
@@ -38,7 +42,10 @@ services.AddQueue(q => q
 | `CreateSchema` | `bool` | `true` | Create the tables idempotently at startup. |
 
 Identifiers must be plain SQL identifiers — ASCII letters, digits and underscore, starting with a
-letter or underscore, at most 116 characters. Anything else fails at startup rather than reaching a
+letter or underscore. SQL Server allows 128 characters, and the limit is checked not only for the
+configured names but for every index and constraint name derived from them
+(`IX_<table>_Channel_VisibleAt` and so on), so a table name long enough to push one over fails at
+startup, naming the key, rather than in the DDL. Anything else fails at startup rather than reaching a
 query.
 
 ```json
@@ -72,6 +79,7 @@ Two tables, using the defaults:
     LeaseToken   UNIQUEIDENTIFIER NULL
   + IX_SpinneretQueue_Channel_VisibleAt (Channel, VisibleAt)
   + IX_SpinneretQueue_VisibleAt (VisibleAt) INCLUDE (LeasedUntil)
+  + IX_SpinneretQueue_MessageId (MessageId)
   + UX_SpinneretQueue_DedupeKey (DedupeKey) WHERE DedupeKey IS NOT NULL
 
 [dbo].[SpinneretDeadLetters]
@@ -92,7 +100,8 @@ Two tables, using the defaults:
   given one when the column is added.
 - `LeasedUntil` / `LeaseToken` are how the relay to Cloud Tasks holds a row while it sends it. In-host
   delivery leaves them null.
-- `IX_SpinneretQueue_VisibleAt` serves the relay, which leases across every channel by due time.
+- `IX_SpinneretQueue_VisibleAt` serves the relay, which leases across every channel by due time, and
+  `IX_SpinneretQueue_MessageId` the eager forward of a message just committed.
 - `IX_SpinneretDeadLetters_DeadLetteredAt` serves the [dead-letter page's](queue.md#the-dead-letter-page)
   keyset paging.
 

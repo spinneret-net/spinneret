@@ -1,34 +1,43 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Spinneret.Queue;
 using Spinneret.Queue.Sql;
 
-namespace Spinneret.Queue.Mssql.Tests;
+namespace Spinneret.Sql.Conformance;
 
-public sealed class StartupExtensionsTests
+/// <summary>
+/// What a SQL storage registers and how it binds and validates its options — the same for every
+/// dialect, because the dialect packages register through the shared helper. No database needed.
+/// </summary>
+public abstract class SqlQueueRegistrationConformance(SqlTestDialect dialect)
 {
-    private static IConfiguration Configuration(Dictionary<string, string?>? overrides = null)
+    protected SqlTestDialect Dialect => dialect;
+
+    private string Section => dialect.StorageSection;
+
+    private IConfiguration Configuration(Dictionary<string, string?>? overrides = null, bool withConnectionString = true)
     {
-        var settings = new Dictionary<string, string?>
-        {
-            ["Queue:Mssql:ConnectionString"] = "Server=localhost;Database=q;Integrated Security=true;",
-        };
+        var settings = new Dictionary<string, string?>();
+        if (withConnectionString)
+            settings[$"{Section}:ConnectionString"] = dialect.SampleConnectionString;
         foreach (var (key, value) in overrides ?? [])
             settings[key] = value;
 
         return new ConfigurationBuilder().AddInMemoryCollection(settings).Build();
     }
 
-    private static IServiceCollection AddQueue(
+    private IServiceCollection AddQueue(
         IConfiguration configuration, IServiceCollection? services = null, bool inHost = false)
     {
         services ??= new ServiceCollection();
-        services.AddSingleton(typeof(Microsoft.Extensions.Logging.ILogger<>),
-            typeof(Microsoft.Extensions.Logging.Abstractions.NullLogger<>));
+        services.AddSingleton(typeof(ILogger<>), typeof(NullLogger<>));
         return services.AddQueue(q =>
         {
-            q.AddRequestAssemblies(typeof(StartupExtensionsTests).Assembly).UseMssqlStorage(configuration);
+            dialect.UseStorage(q.AddRequestAssemblies(typeof(SqlQueueRegistrationConformance).Assembly), configuration);
             if (inHost)
                 q.UseInHostDelivery(configuration);
         });
@@ -37,7 +46,7 @@ public sealed class StartupExtensionsTests
     // -------------------------------------------------------------------- registrations ---
 
     [Test]
-    public async Task UseMssqlStorage_exposes_producer_envelope_and_transactional_queue_as_one_instance()
+    public async Task Storage_exposes_producer_envelope_and_transactional_queue_as_one_instance()
     {
         var provider = AddQueue(Configuration()).BuildServiceProvider();
 
@@ -48,7 +57,15 @@ public sealed class StartupExtensionsTests
     }
 
     [Test]
-    public async Task UseMssqlStorage_registers_the_savepoint_dispatch_boundary()
+    public async Task Storage_reports_its_dialect()
+    {
+        var provider = AddQueue(Configuration()).BuildServiceProvider();
+
+        await Assert.That(provider.GetRequiredService<SqlQueueStorage>().Dialect.Name).IsEqualTo(dialect.Name);
+    }
+
+    [Test]
+    public async Task Storage_registers_the_savepoint_dispatch_boundary()
     {
         var services = AddQueue(Configuration());
 
@@ -59,7 +76,7 @@ public sealed class StartupExtensionsTests
     }
 
     [Test]
-    public async Task UseMssqlStorage_runs_units_of_work_in_a_sql_transaction()
+    public async Task Storage_runs_units_of_work_in_a_sql_transaction()
     {
         var provider = AddQueue(Configuration()).BuildServiceProvider();
 
@@ -67,7 +84,7 @@ public sealed class StartupExtensionsTests
     }
 
     [Test]
-    public async Task UseMssqlStorage_respects_a_custom_boundary_the_host_registered()
+    public async Task Storage_respects_a_custom_boundary_the_host_registered()
     {
         var services = new ServiceCollection();
         services.AddScoped<IQueueDispatchBoundary, CustomBoundary>();
@@ -79,7 +96,7 @@ public sealed class StartupExtensionsTests
     }
 
     [Test]
-    public async Task UseMssqlStorage_registers_the_table_backed_dead_letters()
+    public async Task Storage_registers_the_table_backed_dead_letters()
     {
         var provider = AddQueue(Configuration()).BuildServiceProvider();
 
@@ -88,7 +105,7 @@ public sealed class StartupExtensionsTests
     }
 
     [Test]
-    public async Task UseMssqlStorage_registers_the_ambient_transaction_provider()
+    public async Task Storage_registers_the_ambient_transaction_provider()
     {
         var provider = AddQueue(Configuration()).BuildServiceProvider();
 
@@ -107,7 +124,7 @@ public sealed class StartupExtensionsTests
     }
 
     [Test]
-    public async Task UseMssqlStorage_respects_host_registered_overrides()
+    public async Task Storage_respects_host_registered_overrides()
     {
         var services = new ServiceCollection();
         var serializer = new StubSerializer();
@@ -127,8 +144,7 @@ public sealed class StartupExtensionsTests
         var services = AddQueue(Configuration(), inHost: true);
 
         await Assert.That(services.Any(d =>
-                d.ServiceType == typeof(Microsoft.Extensions.Hosting.IHostedService)
-                && d.ImplementationType == typeof(SqlQueueWorker)))
+                d.ServiceType == typeof(IHostedService) && d.ImplementationType == typeof(SqlQueueWorker)))
             .IsTrue();
     }
 
@@ -142,15 +158,36 @@ public sealed class StartupExtensionsTests
     }
 
     [Test]
-    public async Task UseInHostDelivery_without_a_storage_fails_at_registration()
+    public async Task UseInHostDelivery_without_a_storage_fails_at_registration_naming_the_sql_storages()
     {
         var services = new ServiceCollection();
 
         var ex = Assert.Throws<InvalidOperationException>(() => services.AddQueue(q => q
-            .AddRequestAssemblies(typeof(StartupExtensionsTests).Assembly)
+            .AddRequestAssemblies(typeof(SqlQueueRegistrationConformance).Assembly)
             .UseInHostDelivery()));
 
         await Assert.That(ex.Message).Contains("nowhere to put messages");
+        await Assert.That(ex.Message).Contains(dialect.UseStorageName);
+    }
+
+    // ------------------------------------------------------------------ host data source ---
+
+    [Test]
+    public async Task A_host_data_source_is_used_without_a_connection_string()
+    {
+        // A host that already has a data source (shared with its own data access) hands it over.
+        // That it stays the host's to dispose is pinned by the storage's own unit tests.
+        await using var hostOwned = dialect.CreateDataSourceFor(dialect.SampleConnectionString);
+        var services = new ServiceCollection();
+        services.AddSingleton(typeof(ILogger<>), typeof(NullLogger<>));
+        services.AddQueue(q => dialect.UseStorage(
+            q.AddRequestAssemblies(typeof(SqlQueueRegistrationConformance).Assembly),
+            _ => hostOwned,
+            Configuration(withConnectionString: false)));
+
+        await using var provider = services.BuildServiceProvider();
+
+        await Assert.That(provider.GetRequiredService<SqlQueueStorage>().DataSource).IsSameReferenceAs(hostOwned);
     }
 
     // ------------------------------------------------------------------ options binding ---
@@ -160,11 +197,12 @@ public sealed class StartupExtensionsTests
     {
         var provider = AddQueue(Configuration()).BuildServiceProvider();
 
-        var options = provider.GetRequiredService<IOptions<MssqlStorageOptions>>().Value;
+        var options = dialect.StorageOptions(provider);
 
-        await Assert.That(options.SchemaName).IsEqualTo("dbo");
-        await Assert.That(options.QueueTableName).IsEqualTo("SpinneretQueue");
-        await Assert.That(options.DeadLetterTableName).IsEqualTo("SpinneretDeadLetters");
+        var (schema, queueTable, deadLetterTable) = dialect.DefaultStorageNames;
+        await Assert.That(options.SchemaName).IsEqualTo(schema);
+        await Assert.That(options.QueueTableName).IsEqualTo(queueTable);
+        await Assert.That(options.DeadLetterTableName).IsEqualTo(deadLetterTable);
         await Assert.That(options.CreateSchema).IsTrue();
     }
 
@@ -180,19 +218,21 @@ public sealed class StartupExtensionsTests
     }
 
     [Test]
-    public async Task Storage_options_bind_from_the_queue_mssql_section()
+    public async Task Storage_options_bind_from_the_dialects_section()
     {
         var configuration = Configuration(new()
         {
-            ["Queue:Mssql:SchemaName"] = "queues",
-            ["Queue:Mssql:QueueTableName"] = "MyQueue",
+            [$"{Section}:SchemaName"] = "queues",
+            [$"{Section}:QueueTableName"] = "MyQueue",
+            [$"{Section}:CreateSchema"] = "false",
         });
 
         var provider = AddQueue(configuration).BuildServiceProvider();
-        var options = provider.GetRequiredService<IOptions<MssqlStorageOptions>>().Value;
+        var options = dialect.StorageOptions(provider);
 
         await Assert.That(options.SchemaName).IsEqualTo("queues");
         await Assert.That(options.QueueTableName).IsEqualTo("MyQueue");
+        await Assert.That(options.CreateSchema).IsFalse();
     }
 
     [Test]
@@ -214,16 +254,16 @@ public sealed class StartupExtensionsTests
     [Test]
     public async Task Connection_string_resolves_through_the_standard_connection_strings_section()
     {
-        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        var configuration = Configuration(withConnectionString: false, overrides: new()
         {
-            ["ConnectionStrings:QueueConnection"] = "Server=elsewhere;Database=q;Integrated Security=true;",
-            ["Queue:Mssql:ConnectionStringName"] = "QueueConnection",
-        }).Build();
+            ["ConnectionStrings:QueueConnection"] = dialect.SampleConnectionString + ";Application Name=elsewhere",
+            [$"{Section}:ConnectionStringName"] = "QueueConnection",
+        });
 
         var provider = AddQueue(configuration).BuildServiceProvider();
-        var options = provider.GetRequiredService<IOptions<MssqlStorageOptions>>().Value;
+        var options = dialect.StorageOptions(provider);
 
-        await Assert.That(options.ConnectionString).Contains("Server=elsewhere");
+        await Assert.That(options.ConnectionString).Contains("elsewhere");
     }
 
     // ----------------------------------------------------------------- eager validation ---
@@ -231,37 +271,63 @@ public sealed class StartupExtensionsTests
     [Test]
     public async Task Missing_connection_string_fails_at_registration()
     {
-        var configuration = new ConfigurationBuilder().Build();
+        var ex = Assert.Throws<InvalidOperationException>(() => AddQueue(Configuration(withConnectionString: false)));
 
-        var ex = Assert.Throws<InvalidOperationException>(() => AddQueue(configuration));
-
-        await Assert.That(ex.Message).Contains("Queue:Mssql:ConnectionString");
+        await Assert.That(ex.Message).Contains($"{Section}:ConnectionString");
     }
 
     [Test]
     public async Task Unresolvable_connection_string_name_fails_at_registration()
     {
-        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        var configuration = Configuration(withConnectionString: false, overrides: new()
         {
-            ["Queue:Mssql:ConnectionStringName"] = "Nope",
-        }).Build();
+            [$"{Section}:ConnectionStringName"] = "Nope",
+        });
 
         var ex = Assert.Throws<InvalidOperationException>(() => AddQueue(configuration));
 
-        await Assert.That(ex.Message).Contains("Queue:Mssql:ConnectionString");
+        await Assert.That(ex.Message).Contains($"{Section}:ConnectionString");
     }
 
     [Test]
-    [Arguments("Queue:Mssql:SchemaName", "bad schema!")]
-    [Arguments("Queue:Mssql:QueueTableName", "Robert'); DROP TABLE Students;--")]
-    [Arguments("Queue:Mssql:DeadLetterTableName", "[Sneaky]")]
-    public async Task Invalid_identifiers_fail_at_registration_naming_the_key(string key, string value)
+    [Arguments("SchemaName", "bad schema!")]
+    [Arguments("QueueTableName", "Robert'); DROP TABLE Students;--")]
+    [Arguments("DeadLetterTableName", "[Sneaky]")]
+    [Arguments("QueueTableName", "\"Quoted\"")]
+    [Arguments("QueueTableName", "1StartsWithADigit")]
+    public async Task Invalid_identifiers_fail_at_registration_naming_the_key(string setting, string value)
     {
+        var key = $"{Section}:{setting}";
         var configuration = Configuration(new() { [key] = value });
 
         var ex = Assert.Throws<InvalidOperationException>(() => AddQueue(configuration));
 
         await Assert.That(ex.Message).Contains(key);
+    }
+
+    [Test]
+    public async Task A_table_name_longer_than_the_database_allows_fails_at_registration()
+    {
+        var key = $"{Section}:QueueTableName";
+        var configuration = Configuration(new() { [key] = new string('q', dialect.MaxIdentifierLength + 1) });
+
+        var ex = Assert.Throws<InvalidOperationException>(() => AddQueue(configuration));
+
+        await Assert.That(ex.Message).Contains(key);
+    }
+
+    [Test]
+    public async Task A_table_name_that_fits_but_derives_an_index_name_that_does_not_fails_at_registration()
+    {
+        // The table name alone is legal; the index names built from it are not. SQL Server would
+        // refuse the DDL at startup, Postgres would silently truncate it until two names collided.
+        var key = $"{Section}:QueueTableName";
+        var configuration = Configuration(new() { [key] = new string('q', dialect.MaxIdentifierLength - 2) });
+
+        var ex = Assert.Throws<InvalidOperationException>(() => AddQueue(configuration));
+
+        await Assert.That(ex.Message).Contains(key);
+        await Assert.That(ex.Message).Contains("Shorten the table name");
     }
 
     [Test]
@@ -301,21 +367,22 @@ public sealed class StartupExtensionsTests
         var configuration = Configuration(new() { ["Queue:InHost:ChannelParallelism:bulk"] = "2" });
 
         AddQueue(configuration, inHost: true);
+        await Task.CompletedTask;
     }
-}
 
-internal sealed class CustomBoundary : IQueueDispatchBoundary
-{
-    public Task ExecuteAsync(QueueDeliveryContext context, Func<Task> dispatch, CancellationToken ct) => dispatch();
-}
+    private sealed class CustomBoundary : IQueueDispatchBoundary
+    {
+        public Task ExecuteAsync(QueueDeliveryContext context, Func<Task> dispatch, CancellationToken ct) => dispatch();
+    }
 
-internal sealed class StubSerializer : IQueuePayloadSerializer
-{
-    public string Serialize(object request, Type requestType) => "{}";
-    public object? Deserialize(string json, Type requestType) => null;
-}
+    private sealed class StubSerializer : IQueuePayloadSerializer
+    {
+        public string Serialize(object request, Type requestType) => "{}";
+        public object? Deserialize(string json, Type requestType) => null;
+    }
 
-internal sealed class StubDeadLetterWriter : IDeadLetterWriter
-{
-    public Task WriteAsync(DeadLetterEntry entry, CancellationToken ct = default) => Task.CompletedTask;
+    private sealed class StubDeadLetterWriter : IDeadLetterWriter
+    {
+        public Task WriteAsync(DeadLetterEntry entry, CancellationToken ct = default) => Task.CompletedTask;
+    }
 }

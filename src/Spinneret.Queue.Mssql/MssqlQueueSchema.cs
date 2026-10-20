@@ -4,7 +4,7 @@ namespace Spinneret.Queue.Mssql;
 
 /// <summary>
 /// DDL for the queue tables. The startup initializer runs it when
-/// <see cref="MssqlStorageOptions.CreateSchema"/> is on; hosts that own their schema through
+/// <see cref="SqlStorageOptions.CreateSchema"/> is on; hosts that own their schema through
 /// migrations run it themselves and turn that off.
 /// </summary>
 public static class MssqlQueueSchema
@@ -17,9 +17,6 @@ public static class MssqlQueueSchema
     public static string CreateScript(MssqlStorageOptions options)
     {
         ArgumentNullException.ThrowIfNull(options);
-        return MssqlQueueDialect.Instance.CreateSchemaScript(NamesOf(options));
+        return MssqlQueueDialect.Instance.CreateSchemaScript(SqlQueueRegistration.NamesOf(options));
     }
-
-    internal static SqlQueueNames NamesOf(MssqlStorageOptions options) =>
-        new(options.SchemaName, options.QueueTableName, options.DeadLetterTableName);
 }

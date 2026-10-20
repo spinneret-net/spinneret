@@ -1,24 +1,24 @@
 using System.Data;
-using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.DependencyInjection;
 using Spinneret.Queue;
 
-namespace Spinneret.Queue.Mssql.Tests;
+namespace Spinneret.Sql.Conformance;
 
 /// <summary>
-/// The admin side against a real SQL Server: paging that stays correct while rows are deleted
+/// The admin side against a real database: paging that stays correct while rows are deleted
 /// underneath it, and a resend whose enqueue and delete land in one transaction.
 /// </summary>
-[ClassDataSource<MssqlContainerFixture>(Shared = SharedType.PerTestSession)]
-public sealed class MssqlDeadLetterStoreTests(MssqlContainerFixture fixture)
+public abstract class SqlDeadLetterStoreConformance(SqlTestDialect dialect)
 {
+    protected SqlTestDialect Dialect => dialect;
+
     private static readonly DateTimeOffset Base = new(2026, 8, 15, 10, 0, 0, TimeSpan.Zero);
 
     /// <summary>
     /// Inserts a dead letter with an exact timestamp — the writer's own clock cannot produce the
     /// ties and orderings these tests need.
     /// </summary>
-    private static async Task Seed(
+    private async Task Seed(
         QueueTestHost host,
         string key,
         DateTimeOffset deadLetteredAt,
@@ -30,18 +30,26 @@ public sealed class MssqlDeadLetterStoreTests(MssqlContainerFixture fixture)
         await using var connection = await host.OpenConnectionAsync();
         await using var command = connection.CreateCommand();
         command.CommandText = $"""
-            INSERT INTO [{host.Options.DeadLetterTableName}]
+            INSERT INTO {dialect.Quote(host.DeadLetterTable)}
                 (IdempotencyKey, Source, CommandTypeName, Description, PayloadJson, Error, Attempts, DeadLetteredAt)
             VALUES (@Key, @Source, @Type, @Description, @Payload, 'boom', 3, @At);
             """;
-        command.Parameters.AddWithValue("@Key", key);
-        command.Parameters.AddWithValue("@Source", source.ToString());
-        command.Parameters.AddWithValue("@Type", commandTypeName ?? typeof(PingCommand).FullName!);
-        command.Parameters.AddWithValue(
-            "@Description", withDescription ? $"seeded {key}" : DBNull.Value);
-        command.Parameters.AddWithValue("@Payload", payloadJson);
-        command.Parameters.Add(new SqlParameter("@At", SqlDbType.DateTime2) { Value = deadLetteredAt.UtcDateTime });
+        Add(command, "@Key", key);
+        Add(command, "@Source", source.ToString());
+        Add(command, "@Type", commandTypeName ?? typeof(PingCommand).FullName!);
+        Add(command, "@Description", withDescription ? $"seeded {key}" : null);
+        Add(command, "@Payload", payloadJson);
+        dialect.AddTimestamp(command, "@At", deadLetteredAt);
         await command.ExecuteNonQueryAsync();
+    }
+
+    private static void Add(System.Data.Common.DbCommand command, string name, string? value)
+    {
+        var parameter = command.CreateParameter();
+        parameter.ParameterName = name;
+        parameter.DbType = DbType.String;
+        parameter.Value = (object?)value ?? DBNull.Value;
+        command.Parameters.Add(parameter);
     }
 
     private static IDeadLetterStore Store(QueueTestHost host) =>
@@ -82,7 +90,7 @@ public sealed class MssqlDeadLetterStoreTests(MssqlContainerFixture fixture)
     [Test]
     public async Task Reads_back_every_field_that_was_stored()
     {
-        await using var host = await QueueTestHost.StartAsync(fixture.ConnectionString, worker: false);
+        await using var host = await QueueTestHost.StartAsync(Dialect, worker: false);
         await Seed(host, "task-1", Base, source: DeadLetterSource.Scheduler);
 
         var deadLetter = await Store(host).GetAsync("task-1");
@@ -102,7 +110,7 @@ public sealed class MssqlDeadLetterStoreTests(MssqlContainerFixture fixture)
     {
         // The seeding helper above writes its own SQL; this proves the writer and the store agree
         // without it in the middle.
-        await using var host = await QueueTestHost.StartAsync(fixture.ConnectionString, worker: false);
+        await using var host = await QueueTestHost.StartAsync(Dialect, worker: false);
         var writer = host.Services.GetRequiredService<IDeadLetterWriter>();
 
         await writer.WriteAsync(new DeadLetterEntry
@@ -132,7 +140,7 @@ public sealed class MssqlDeadLetterStoreTests(MssqlContainerFixture fixture)
     [Test]
     public async Task Reads_a_dead_letter_that_has_no_trace_id_back_as_null()
     {
-        await using var host = await QueueTestHost.StartAsync(fixture.ConnectionString, worker: false);
+        await using var host = await QueueTestHost.StartAsync(Dialect, worker: false);
         await Seed(host, "no-trace", Base);
 
         var deadLetter = await Store(host).GetAsync("no-trace");
@@ -143,7 +151,7 @@ public sealed class MssqlDeadLetterStoreTests(MssqlContainerFixture fixture)
     [Test]
     public async Task Reads_a_null_description_back_as_null()
     {
-        await using var host = await QueueTestHost.StartAsync(fixture.ConnectionString, worker: false);
+        await using var host = await QueueTestHost.StartAsync(Dialect, worker: false);
         await Seed(host, "no-desc", Base, withDescription: false);
 
         var deadLetter = await Store(host).GetAsync("no-desc");
@@ -154,7 +162,7 @@ public sealed class MssqlDeadLetterStoreTests(MssqlContainerFixture fixture)
     [Test]
     public async Task Returns_null_for_a_key_that_was_never_stored()
     {
-        await using var host = await QueueTestHost.StartAsync(fixture.ConnectionString, worker: false);
+        await using var host = await QueueTestHost.StartAsync(Dialect, worker: false);
 
         await Assert.That(await Store(host).GetAsync("absent")).IsNull();
     }
@@ -162,7 +170,7 @@ public sealed class MssqlDeadLetterStoreTests(MssqlContainerFixture fixture)
     [Test]
     public async Task Lists_newest_first()
     {
-        await using var host = await QueueTestHost.StartAsync(fixture.ConnectionString, worker: false);
+        await using var host = await QueueTestHost.StartAsync(Dialect, worker: false);
         await Seed(host, "oldest", Base);
         await Seed(host, "newest", Base.AddMinutes(2));
         await Seed(host, "middle", Base.AddMinutes(1));
@@ -176,7 +184,7 @@ public sealed class MssqlDeadLetterStoreTests(MssqlContainerFixture fixture)
     [Test]
     public async Task Reports_no_cursor_when_the_page_is_the_last_one()
     {
-        await using var host = await QueueTestHost.StartAsync(fixture.ConnectionString, worker: false);
+        await using var host = await QueueTestHost.StartAsync(Dialect, worker: false);
         await Seed(host, "a", Base);
         await Seed(host, "b", Base.AddMinutes(1));
 
@@ -191,7 +199,7 @@ public sealed class MssqlDeadLetterStoreTests(MssqlContainerFixture fixture)
     [Test]
     public async Task Reports_an_empty_page_with_no_cursor_when_nothing_is_stored()
     {
-        await using var host = await QueueTestHost.StartAsync(fixture.ConnectionString, worker: false);
+        await using var host = await QueueTestHost.StartAsync(Dialect, worker: false);
 
         var page = await Store(host).ListAsync(new DeadLetterQuery());
 
@@ -206,7 +214,7 @@ public sealed class MssqlDeadLetterStoreTests(MssqlContainerFixture fixture)
     [Arguments(7)]
     public async Task Pages_through_everything_exactly_once(int pageSize)
     {
-        await using var host = await QueueTestHost.StartAsync(fixture.ConnectionString, worker: false);
+        await using var host = await QueueTestHost.StartAsync(Dialect, worker: false);
         var expected = new List<string>();
         for (var i = 0; i < 7; i++)
         {
@@ -224,7 +232,7 @@ public sealed class MssqlDeadLetterStoreTests(MssqlContainerFixture fixture)
     {
         // The whole reason the key is in the sort: entries dead-lettered in the same millisecond are
         // ordered only by it, and without that a cursor landing inside the group skips or repeats.
-        await using var host = await QueueTestHost.StartAsync(fixture.ConnectionString, worker: false);
+        await using var host = await QueueTestHost.StartAsync(Dialect, worker: false);
         for (var i = 0; i < 5; i++)
             await Seed(host, $"tie-{i}", Base);
 
@@ -234,11 +242,27 @@ public sealed class MssqlDeadLetterStoreTests(MssqlContainerFixture fixture)
     }
 
     [Test]
+    public async Task Pages_through_entries_microseconds_apart()
+    {
+        // Instants finer than a dialect stores: SQL Server rounds them into ties, Postgres keeps
+        // them apart. Either way the cursor the store hands out must be one it can resume from
+        // exactly — a cursor carrying more precision than the column would skip or repeat rows.
+        await using var host = await QueueTestHost.StartAsync(Dialect, worker: false);
+        for (var i = 0; i < 6; i++)
+            await Seed(host, $"close-{i}", Base.AddTicks(i * 10));
+
+        var keys = await PageThrough(Store(host), pageSize: 2);
+
+        await Assert.That(keys).Count().IsEqualTo(6);
+        await Assert.That(keys.Distinct().Count()).IsEqualTo(6);
+    }
+
+    [Test]
     public async Task Keeps_its_place_when_rows_are_deleted_behind_the_cursor()
     {
         // The page exists so entries can be discarded from it, so the reader is always racing its
         // own deletions. Keyset paging holds its position; an offset would slide by one per delete.
-        await using var host = await QueueTestHost.StartAsync(fixture.ConnectionString, worker: false);
+        await using var host = await QueueTestHost.StartAsync(Dialect, worker: false);
         for (var i = 0; i < 6; i++)
             await Seed(host, $"task-{i}", Base.AddMinutes(i));
 
@@ -258,7 +282,7 @@ public sealed class MssqlDeadLetterStoreTests(MssqlContainerFixture fixture)
     [Test]
     public async Task Rejects_a_cursor_it_did_not_produce()
     {
-        await using var host = await QueueTestHost.StartAsync(fixture.ConnectionString, worker: false);
+        await using var host = await QueueTestHost.StartAsync(Dialect, worker: false);
 
         await Assert.That(async () =>
                 await Store(host).ListAsync(new DeadLetterQuery { Cursor = "nonsense" }))
@@ -270,7 +294,7 @@ public sealed class MssqlDeadLetterStoreTests(MssqlContainerFixture fixture)
     [Test]
     public async Task Deletes_an_entry_once()
     {
-        await using var host = await QueueTestHost.StartAsync(fixture.ConnectionString, worker: false);
+        await using var host = await QueueTestHost.StartAsync(Dialect, worker: false);
         await Seed(host, "task-1", Base);
 
         await Assert.That(await Store(host).DeleteAsync("task-1")).IsTrue();
@@ -283,7 +307,7 @@ public sealed class MssqlDeadLetterStoreTests(MssqlContainerFixture fixture)
     [Test]
     public async Task Resend_enqueues_the_command_and_removes_the_entry()
     {
-        await using var host = await QueueTestHost.StartAsync(fixture.ConnectionString);
+        await using var host = await QueueTestHost.StartAsync(Dialect);
         await Seed(host, "task-1", Base, payloadJson: """{"Name":"resent"}""");
 
         var result = await Resender(host).ResendAsync("task-1");
@@ -296,7 +320,7 @@ public sealed class MssqlDeadLetterStoreTests(MssqlContainerFixture fixture)
     [Test]
     public async Task Resend_uses_a_corrected_payload()
     {
-        await using var host = await QueueTestHost.StartAsync(fixture.ConnectionString);
+        await using var host = await QueueTestHost.StartAsync(Dialect);
         await Seed(host, "task-1", Base, payloadJson: """{"Name":"broken"}""");
 
         await Resender(host).ResendAsync("task-1", """{"Name":"fixed"}""");
@@ -310,11 +334,11 @@ public sealed class MssqlDeadLetterStoreTests(MssqlContainerFixture fixture)
         // Both operations enlist in the caller's ambient transaction, so rolling it back has to undo
         // the pair. That is the guarantee the transaction scope exists for, and the difference from
         // the ordered-but-separate behaviour a transport without a shared database can offer.
-        await using var host = await QueueTestHost.StartAsync(fixture.ConnectionString, worker: false);
+        await using var host = await QueueTestHost.StartAsync(Dialect, worker: false);
         await Seed(host, "task-1", Base);
 
         await using (var connection = await host.OpenConnectionAsync())
-        await using (var transaction = (SqlTransaction)await connection.BeginTransactionAsync())
+        await using (var transaction = await connection.BeginTransactionAsync())
         {
             host.Transactions.Use(transaction);
             try
@@ -337,7 +361,7 @@ public sealed class MssqlDeadLetterStoreTests(MssqlContainerFixture fixture)
     {
         // The scope opens and commits its own transaction; with the worker off, the enqueued row
         // stays put and can be counted.
-        await using var host = await QueueTestHost.StartAsync(fixture.ConnectionString, worker: false);
+        await using var host = await QueueTestHost.StartAsync(Dialect, worker: false);
         await Seed(host, "task-1", Base);
 
         await Resender(host).ResendAsync("task-1");
@@ -350,7 +374,7 @@ public sealed class MssqlDeadLetterStoreTests(MssqlContainerFixture fixture)
     [Test]
     public async Task Resend_of_an_unregistered_command_type_changes_nothing()
     {
-        await using var host = await QueueTestHost.StartAsync(fixture.ConnectionString, worker: false);
+        await using var host = await QueueTestHost.StartAsync(Dialect, worker: false);
         await Seed(host, "task-1", Base, commandTypeName: "Acme.RenamedCommand");
 
         var error = await ResendError(host, "task-1");
@@ -363,7 +387,7 @@ public sealed class MssqlDeadLetterStoreTests(MssqlContainerFixture fixture)
     [Test]
     public async Task Resend_of_a_broken_payload_changes_nothing()
     {
-        await using var host = await QueueTestHost.StartAsync(fixture.ConnectionString, worker: false);
+        await using var host = await QueueTestHost.StartAsync(Dialect, worker: false);
         await Seed(host, "task-1", Base);
 
         var error = await ResendError(host, "task-1", "{ not json");
@@ -380,7 +404,7 @@ public sealed class MssqlDeadLetterStoreTests(MssqlContainerFixture fixture)
     {
         // The whole loop the admin page exists for, with nothing seeded by hand: a command exhausts
         // its attempts, appears in the listing, and comes back to life on resend.
-        await using var host = await QueueTestHost.StartAsync(fixture.ConnectionString);
+        await using var host = await QueueTestHost.StartAsync(Dialect);
 
         await host.Queue.Enqueue(new AlwaysFailCommand("doomed"));
         await Wait.Until(async () => await host.DeadLetterRowCount() == 1, "the command to be dead-lettered");

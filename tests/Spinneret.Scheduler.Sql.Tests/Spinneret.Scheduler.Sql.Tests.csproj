@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The SQL scheduler's own logic, without a database: options validation and the startup check
+       that the scheduler and the queue share a database. -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Configuration" Version="10.0.13" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.13" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Spinneret.Scheduler.Sql\Spinneret.Scheduler.Sql.csproj" />
+  </ItemGroup>
+
+</Project>

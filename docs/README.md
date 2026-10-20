@@ -6,10 +6,10 @@ from two. The two calls can be written in either order.
 
 | Decision | Choices |
 |---|---|
-| **Queue storage** — where messages wait | [`Spinneret.Queue.Mssql`](queue-mssql.md) (SQL Server, via [`Spinneret.Queue.Sql`](queue-sql.md)) · none |
+| **Queue storage** — where messages wait | [`Spinneret.Queue.Mssql`](queue-mssql.md) (SQL Server) · [`Spinneret.Queue.Postgres`](queue-postgres.md) (PostgreSQL) — both via [`Spinneret.Queue.Sql`](queue-sql.md) · none |
 | **Queue delivery** — how messages reach handlers | `UseInHostDelivery()` ([in-host workers](queue-sql.md#in-host-delivery)) · [`Spinneret.Queue.CloudTasks`](queue-cloudtasks.md) · none, on a producer-only host |
 | **Dead letters** — where given-up work lands | the SQL storage's own table · [`Spinneret.Queue.Firestore`](queue-firestore.md) |
-| **Schedule storage** — where job definitions live | [`Spinneret.Scheduler.Mssql`](scheduler-mssql.md) · [`Spinneret.Scheduler.Firestore`](scheduler-firestore.md) |
+| **Schedule storage** — where job definitions live | [`Spinneret.Scheduler.Mssql`](scheduler-mssql.md) · [`Spinneret.Scheduler.Postgres`](scheduler-postgres.md) — both via [`Spinneret.Scheduler.Sql`](scheduler-sql.md) · [`Spinneret.Scheduler.Firestore`](scheduler-firestore.md) |
 | **Sweep trigger** — what decides when to sweep | `UseSweeper()` from [`Spinneret.Scheduler`](scheduler.md) (timer) · [`Spinneret.Scheduler.Http`](scheduler-http.md) (endpoint + external cron) |
 
 What a SQL storage buys is atomicity: with one, every enqueue commits with the business write that
@@ -17,13 +17,15 @@ caused it, and every delivery's writes, cascades and outcome commit together —
 workers or Cloud Tasks deliver it. Without one, Cloud Tasks is called directly and nothing spans the
 two systems. See [the guarantees](queue-sql.md#guarantees).
 
-The combinations that do not hold together fail at `AddQueue` or `AddScheduler`, with the reason:
+The combinations that do not hold together fail at `AddQueue` or `AddScheduler` — or, where the two
+calls must first both be in, as the host starts — with the reason:
 
 - **In-host delivery needs a SQL storage** — the workers drain its table.
 - **One storage, one delivery.** Choosing two of either fails, naming both.
-- **`Spinneret.Scheduler.Mssql` needs the queue's storage in the same SQL Server database**, because a
-  due job's booking and its enqueue commit in one transaction. `Spinneret.Scheduler.Firestore`
-  composes with any queue.
+- **A SQL scheduler needs the queue's storage in the same database** — `Scheduler.Mssql` beside
+  `Queue.Mssql`, `Scheduler.Postgres` beside `Queue.Postgres` — because a due job's booking and its
+  enqueue commit in one transaction. Since `AddQueue` and `AddScheduler` can come in either order,
+  this one is checked as the host starts. `Spinneret.Scheduler.Firestore` composes with any queue.
 
 ## Typical combinations
 
@@ -74,6 +76,23 @@ Read: [queue.md](queue.md) · [queue-sql.md](queue-sql.md) · [queue-mssql.md](q
 [queue-cloudtasks.md](queue-cloudtasks.md#over-a-sql-storage) · [scheduler-mssql.md](scheduler-mssql.md) ·
 [scheduler-http.md](scheduler-http.md)
 
+**On PostgreSQL.** Any of the SQL Server recipes above, with the Postgres packages instead — the
+composition and the guarantees are the same. Sharing the application's own `NpgsqlDataSource` keeps
+the queue on the same pool as the rest of your data access:
+
+```csharp
+services.AddNpgsqlDataSource(config.GetConnectionString("App")!);
+services.AddMediator([typeof(SomeCommand).Assembly]);
+services.AddQueue(q => q
+    .AddRequestAssemblies(typeof(SomeCommand).Assembly)
+    .UsePostgresStorage(sp => sp.GetRequiredService<NpgsqlDataSource>(), config)
+    .UseInHostDelivery(config));                                // or .UseCloudTasksDelivery(config)
+services.AddScheduler(s => s.UsePostgres(config).UseSweeper());
+```
+
+Read: [queue-sql.md](queue-sql.md) · [queue-postgres.md](queue-postgres.md) ·
+[scheduler-sql.md](scheduler-sql.md) · [scheduler-postgres.md](scheduler-postgres.md)
+
 **A single always-on service on SQL Server.** One database, one process, timers inside it.
 
 ```csharp
@@ -116,11 +135,14 @@ Read: [queue.md](queue.md) · [queue-sql.md](queue-sql.md) · [scheduler.md](sch
 | [queue.md](queue.md) | `Spinneret.Queue` — the model every queue shares: `IQueue`, `[QueuePolicy]`, dead-lettering, `AddQueue` |
 | [queue-sql.md](queue-sql.md) | `Spinneret.Queue.Sql` — the outbox, transactional enqueue, units of work, in-host delivery, guarantees |
 | [queue-mssql.md](queue-mssql.md) | `Spinneret.Queue.Mssql` — SQL Server storage: configuration, schema, permissions |
+| [queue-postgres.md](queue-postgres.md) | `Spinneret.Queue.Postgres` — PostgreSQL storage: configuration, schema, permissions, pooling |
 | [queue-cloudtasks.md](queue-cloudtasks.md) | `Spinneret.Queue.CloudTasks` — Cloud Tasks delivery, OIDC dispatch, the relay, IAM, emulator |
 | [queue-firestore.md](queue-firestore.md) | `Spinneret.Queue.Firestore` — Firestore dead-letter store |
 | [scheduler.md](scheduler.md) | `Spinneret.Scheduler` — declaring jobs, cron schedules, `AddScheduler`, the timer trigger |
 | [scheduler-firestore.md](scheduler-firestore.md) | `Spinneret.Scheduler.Firestore` — schedules in Firestore |
-| [scheduler-mssql.md](scheduler-mssql.md) | `Spinneret.Scheduler.Mssql` — schedules in SQL Server, via `Spinneret.Scheduler.Sql` |
+| [scheduler-sql.md](scheduler-sql.md) | `Spinneret.Scheduler.Sql` — the SQL scheduler engine: the sweep, transactional one-shots, guarantees |
+| [scheduler-mssql.md](scheduler-mssql.md) | `Spinneret.Scheduler.Mssql` — schedules in SQL Server |
+| [scheduler-postgres.md](scheduler-postgres.md) | `Spinneret.Scheduler.Postgres` — schedules in PostgreSQL |
 | [scheduler-http.md](scheduler-http.md) | `Spinneret.Scheduler.Http` — sweep endpoint for externally-clocked hosts |
 
 Every page follows the same shape: what it is, install, what it requires, configuration,

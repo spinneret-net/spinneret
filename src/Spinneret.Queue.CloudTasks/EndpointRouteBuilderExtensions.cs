@@ -63,8 +63,8 @@ public static class CloudTasksEndpointRouteBuilderExtensions
         // here rather than 500 on the first tick.
         if (endpoints.ServiceProvider.GetService<IQueueRelay>() is null)
             throw new InvalidOperationException(
-                "MapQueueRelay requires a queue whose storage feeds Cloud Tasks: "
-                + "AddQueue(q => q.UseMssqlStorage(...).UseCloudTasksDelivery(...)).");
+                "MapQueueRelay requires a queue whose SQL storage feeds Cloud Tasks: "
+                + "AddQueue(q => q.UseMssqlStorage(...).UseCloudTasksDelivery(...)), or UsePostgresStorage likewise.");
 
         return QueueRelayEndpoint.Map(endpoints, authorizationPolicy, pattern ?? QueueRelayEndpoint.DefaultRoutePattern);
     }

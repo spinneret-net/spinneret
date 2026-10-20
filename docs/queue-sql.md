@@ -11,6 +11,10 @@ dialect package, which supplies the SQL and the connection:
 | Dialect | Database |
 |---|---|
 | [`Spinneret.Queue.Mssql`](queue-mssql.md) | SQL Server |
+| [`Spinneret.Queue.Postgres`](queue-postgres.md) | PostgreSQL |
+
+Both behave the same — the same tests run against each — and differ only in spelling: the SQL, the
+DDL, the table-name defaults, and how a database error affects a transaction.
 
 The storage needs a **delivery** — something that moves messages from the table to their handlers:
 
@@ -29,7 +33,7 @@ Read [queue.md](queue.md) first for the retry model.
 ```csharp
 services.AddQueue(q => q
     .AddRequestAssemblies(typeof(SyncCustomer).Assembly)
-    .UseMssqlStorage(configuration)
+    .UseMssqlStorage(configuration)       // or .UsePostgresStorage(configuration)
     .UseInHostDelivery(configuration));   // only on hosts that should consume
 ```
 
@@ -75,7 +79,10 @@ as the ambient one so everything SQL-touching in the delivery joins it:
 
 The handler runs under a savepoint. A handler that fails has its partial writes — cascades included —
 rolled back to the savepoint, while the delivery transaction survives to book the retry or the dead
-letter. Then the whole delivery commits at once. A crash or a failed commit leaves nothing behind and
+letter. A handler that *catches* a database error and returns normally counts as failed when the
+error left the transaction unusable (as any error does on Postgres): committing would silently drop
+its writes, so they are rolled back to the savepoint and the attempt is booked like any other
+failure. Then the whole delivery commits at once. A crash or a failed commit leaves nothing behind and
 the message is redelivered as it was, without spending an attempt.
 
 The edge stays at-least-once: work outside the database — an HTTP call, an email — can happen and

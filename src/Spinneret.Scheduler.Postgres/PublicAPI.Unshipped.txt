@@ -1,0 +1,10 @@
+#nullable enable
+Microsoft.Extensions.DependencyInjection.PostgresSchedulerBuilderExtensions
+Spinneret.Scheduler.Postgres.PostgresSchedulerOptions
+Spinneret.Scheduler.Postgres.PostgresSchedulerOptions.PostgresSchedulerOptions() -> void
+Spinneret.Scheduler.Postgres.PostgresSchedulerSchema
+static Microsoft.Extensions.DependencyInjection.PostgresSchedulerBuilderExtensions.UsePostgres(this Spinneret.Scheduler.SchedulerBuilder! scheduler) -> Spinneret.Scheduler.SchedulerBuilder!
+static Microsoft.Extensions.DependencyInjection.PostgresSchedulerBuilderExtensions.UsePostgres(this Spinneret.Scheduler.SchedulerBuilder! scheduler, Microsoft.Extensions.Configuration.IConfiguration! configuration) -> Spinneret.Scheduler.SchedulerBuilder!
+static Microsoft.Extensions.DependencyInjection.PostgresSchedulerBuilderExtensions.UsePostgres(this Spinneret.Scheduler.SchedulerBuilder! scheduler, System.Action<Spinneret.Scheduler.Postgres.PostgresSchedulerOptions!>! configure) -> Spinneret.Scheduler.SchedulerBuilder!
+static Spinneret.Scheduler.Postgres.PostgresSchedulerSchema.CreateScript(Spinneret.Queue.Postgres.PostgresStorageOptions! storageOptions, Spinneret.Scheduler.Postgres.PostgresSchedulerOptions! schedulerOptions) -> string!
+static readonly Spinneret.Scheduler.Postgres.PostgresSchedulerOptions.SectionName -> string!

@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Spinneret.Queue;
 using Spinneret.Queue.CloudTasks;
+using Spinneret.Sql.Conformance;
 
 namespace Spinneret.Composition.Tests;
 
@@ -12,6 +13,7 @@ public sealed class CompositionRulesTests
     private static IConfiguration Configuration() => new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
     {
         ["Queue:Mssql:ConnectionString"] = "Server=localhost;Database=q;Integrated Security=true;",
+        ["Queue:Postgres:ConnectionString"] = "Host=localhost;Database=q;Username=app;Password=secret",
         ["Queue:CloudTasks:ProjectId"] = "p",
         ["Queue:CloudTasks:LocationId"] = "l",
         ["Queue:CloudTasks:Channels:default"] = "q",
@@ -111,5 +113,56 @@ public sealed class CompositionRulesTests
         public ICollection<Microsoft.AspNetCore.Routing.EndpointDataSource> DataSources { get; } = [];
         public Microsoft.AspNetCore.Builder.IApplicationBuilder CreateApplicationBuilder() =>
             new Microsoft.AspNetCore.Builder.ApplicationBuilder(ServiceProvider);
+    }
+
+    [Test]
+    public async Task Two_sql_storages_cannot_both_be_the_queues()
+    {
+        var ex = Assert.Throws<InvalidOperationException>(() => new ServiceCollection().AddQueue(q => q
+            .AddRequestAssemblies(typeof(CompositionRulesTests).Assembly)
+            .UseMssqlStorage(Configuration())
+            .UsePostgresStorage(Configuration())));
+
+        await Assert.That(ex.Message).Contains("UseMssqlStorage");
+        await Assert.That(ex.Message).Contains("UsePostgresStorage");
+    }
+
+    [Test]
+    public async Task A_scheduler_on_one_database_beside_a_queue_on_another_fails_when_the_host_starts()
+    {
+        // A due job's booking and its enqueue commit in one transaction, which no two databases can
+        // share. Registration order is free, so the check runs as the host starts — before any
+        // hosted service, so the schema initializer never creates a table in the wrong database.
+        using var host = new HostBuilder()
+            .ConfigureServices(services =>
+            {
+                services.AddQueue(q => q
+                    .AddRequestAssemblies(typeof(CompositionRulesTests).Assembly)
+                    .UseMssqlStorage(Configuration()));
+                services.AddScheduler(s => s.UsePostgres(Configuration()));
+            })
+            .Build();
+
+        var ex = await Assert.ThrowsAsync<Exception>(() => host.StartAsync());
+
+        await Assert.That(ex!.Message).Contains("'postgres' storage cannot share a transaction with a 'mssql' queue");
+    }
+
+    [Test]
+    public async Task A_sql_scheduler_beside_a_queue_without_sql_storage_fails_when_the_host_starts()
+    {
+        using var host = new HostBuilder()
+            .ConfigureServices(services =>
+            {
+                services.AddQueue(q => q
+                    .AddRequestAssemblies(typeof(CompositionRulesTests).Assembly)
+                    .UseCloudTasksDelivery(Configuration()));
+                services.AddScheduler(s => s.UseMssql(Configuration()));
+            })
+            .Build();
+
+        var ex = await Assert.ThrowsAsync<Exception>(() => host.StartAsync());
+
+        await Assert.That(ex!.Message).Contains("s.UseMssql(...) requires the queue's storage in the same database");
     }
 }

@@ -1,8 +1,6 @@
-using System.Data.Common;
-using Microsoft.Data.SqlClient;
 using Spinneret.Queue.Sql;
 
-namespace Spinneret.Queue.Mssql.Tests;
+namespace Spinneret.Queue.Sql.Tests;
 
 public sealed class AsyncLocalSqlTransactionProviderTests
 {
@@ -18,8 +16,7 @@ public sealed class AsyncLocalSqlTransactionProviderTests
     public async Task Use_publishes_to_the_current_async_flow()
     {
         var provider = new AsyncLocalSqlTransactionProvider();
-        await using var connection = new SqlConnection();
-        DbTransaction transaction = FakeTransaction.For(connection);
+        var transaction = new FakeTransaction();
 
         provider.Use(transaction);
 
@@ -32,9 +29,8 @@ public sealed class AsyncLocalSqlTransactionProviderTests
     public async Task Parallel_flows_see_their_own_transaction()
     {
         var provider = new AsyncLocalSqlTransactionProvider();
-        await using var connection = new SqlConnection();
-        var a = FakeTransaction.For(connection);
-        var b = FakeTransaction.For(connection);
+        var a = new FakeTransaction();
+        var b = new FakeTransaction();
 
         var flowA = Task.Run(async () =>
         {
@@ -54,19 +50,4 @@ public sealed class AsyncLocalSqlTransactionProviderTests
         // The outer flow never set one, and children cannot leak upward.
         await Assert.That(provider.Current).IsNull();
     }
-}
-
-/// <summary>Minimal DbTransaction stand-in; the provider only stores and returns references.</summary>
-internal sealed class FakeTransaction : DbTransaction
-{
-    private readonly DbConnection _connection;
-
-    private FakeTransaction(DbConnection connection) => _connection = connection;
-
-    public static FakeTransaction For(DbConnection connection) => new(connection);
-
-    public override System.Data.IsolationLevel IsolationLevel => System.Data.IsolationLevel.ReadCommitted;
-    protected override DbConnection? DbConnection => _connection;
-    public override void Commit() { }
-    public override void Rollback() { }
 }

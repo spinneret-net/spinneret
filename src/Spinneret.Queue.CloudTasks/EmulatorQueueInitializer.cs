@@ -12,7 +12,7 @@ using CloudTasksQueueResource = Google.Cloud.Tasks.V2.Queue;
 namespace Spinneret.Queue.CloudTasks;
 
 /// <summary>
-/// Creates the configured channels' queues on the Cloud Tasks emulator, the way the MSSQL transport
+/// Creates the configured channels' queues on the Cloud Tasks emulator, the way the SQL storage
 /// creates its tables. Production queues are owned by infrastructure-as-code and are never touched:
 /// this runs only when <see cref="CloudTasksOptions.EmulatorEndpoint"/> is set.
 /// </summary>

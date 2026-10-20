@@ -1,29 +1,31 @@
 using System.Net;
-using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.DependencyInjection;
 using Spinneret.Queue;
 using Spinneret.Queue.Sql;
 
-namespace Spinneret.Composition.Tests;
+namespace Spinneret.Sql.Conformance;
 
 /// <summary>
 /// Cloud Tasks over a SQL outbox: an enqueue commits with the business write that caused it, a relay
 /// forwards it to Cloud Tasks exactly once, and a delivery's writes, cascades, bookings and dead
 /// letter commit together before the endpoint answers.
 /// </summary>
-[ClassDataSource<MssqlContainerFixture>(Shared = SharedType.PerTestSession)]
-public sealed class CloudTasksOverSqlTests(MssqlContainerFixture fixture)
+public abstract class CloudTasksOverSqlConformance(SqlTestDialect dialect)
 {
+    protected SqlTestDialect Dialect => dialect;
+
+    private string Q(string identifier) => dialect.Quote(identifier);
+
     // ---------------------------------------------------------------------------- producer ---
 
     [Test]
     public async Task An_enqueue_in_a_rolled_back_transaction_is_never_forwarded()
     {
-        await using var host = await CloudTasksOverSqlHost.StartAsync(fixture.ConnectionString);
+        await using var host = await CloudTasksOverSqlHost.StartAsync(Dialect);
         var queue = host.Services.GetRequiredService<ISqlTransactionalQueue>();
 
         await using (var connection = await host.OpenConnectionAsync())
-        await using (var transaction = connection.BeginTransaction())
+        await using (var transaction = await connection.BeginTransactionAsync())
         {
             await queue.Enqueue(new PingCommand("never"), transaction);
             await transaction.RollbackAsync();
@@ -39,7 +41,7 @@ public sealed class CloudTasksOverSqlTests(MssqlContainerFixture fixture)
     [Test]
     public async Task An_enqueue_in_a_committed_transaction_is_forwarded_once_and_leaves_the_outbox()
     {
-        await using var host = await CloudTasksOverSqlHost.StartAsync(fixture.ConnectionString);
+        await using var host = await CloudTasksOverSqlHost.StartAsync(Dialect);
         await EnqueueCommitted(host, new PingCommand("committed"));
 
         var first = await host.Relay.RelayAsync(CancellationToken.None);
@@ -60,7 +62,7 @@ public sealed class CloudTasksOverSqlTests(MssqlContainerFixture fixture)
     public async Task An_enqueue_outside_a_transaction_is_forwarded_as_it_commits()
     {
         // No relay pass: a host that is CPU-throttled outside requests may not run one for a while.
-        await using var host = await CloudTasksOverSqlHost.StartAsync(fixture.ConnectionString);
+        await using var host = await CloudTasksOverSqlHost.StartAsync(Dialect);
 
         await host.Queue.Enqueue(new PingCommand("eager"));
 
@@ -73,7 +75,7 @@ public sealed class CloudTasksOverSqlTests(MssqlContainerFixture fixture)
     {
         // In the outbox the key only blocks a duplicate while the first is pending; once forwarded,
         // Cloud Tasks' memory of the name is what keeps the repeat from becoming a second task.
-        await using var host = await CloudTasksOverSqlHost.StartAsync(fixture.ConnectionString);
+        await using var host = await CloudTasksOverSqlHost.StartAsync(Dialect);
 
         await host.Queue.Enqueue(new PingCommand("a"), new QueueOptions { DedupeKey = "order-7" });
         await host.Queue.Enqueue(new PingCommand("b"), new QueueOptions { DedupeKey = "order-7" });
@@ -88,7 +90,7 @@ public sealed class CloudTasksOverSqlTests(MssqlContainerFixture fixture)
     [Test]
     public async Task A_send_that_fails_stays_in_the_outbox_and_is_retried_after_a_backoff()
     {
-        await using var host = await CloudTasksOverSqlHost.StartAsync(fixture.ConnectionString);
+        await using var host = await CloudTasksOverSqlHost.StartAsync(Dialect);
         await EnqueueCommitted(host, new PingCommand("retry"));
         host.Tasks.FailNextCreateTasks(1);
 
@@ -109,7 +111,7 @@ public sealed class CloudTasksOverSqlTests(MssqlContainerFixture fixture)
     {
         // The task was created but the relay never heard so: the row stays, the retry is refused as
         // a duplicate name, and the refusal is what lets the row go.
-        await using var host = await CloudTasksOverSqlHost.StartAsync(fixture.ConnectionString);
+        await using var host = await CloudTasksOverSqlHost.StartAsync(Dialect);
         await EnqueueCommitted(host, new PingCommand("lost"));
         host.Tasks.LoseNextCreateTaskResponses(1);
 
@@ -127,7 +129,7 @@ public sealed class CloudTasksOverSqlTests(MssqlContainerFixture fixture)
     [Test]
     public async Task Concurrent_relays_forward_each_message_once()
     {
-        await using var host = await CloudTasksOverSqlHost.StartAsync(fixture.ConnectionString);
+        await using var host = await CloudTasksOverSqlHost.StartAsync(Dialect);
         await EnqueueCommitted(host, Enumerable.Range(0, 30).Select(i => new PingCommand($"m{i}")).ToArray());
 
         var results = await Task.WhenAll(Enumerable.Range(0, 4)
@@ -142,7 +144,7 @@ public sealed class CloudTasksOverSqlTests(MssqlContainerFixture fixture)
     public async Task A_message_due_beyond_the_forwarding_horizon_waits_in_the_outbox()
     {
         // Cloud Tasks will not schedule a task more than 30 days out; the outbox holds it until then.
-        await using var host = await CloudTasksOverSqlHost.StartAsync(fixture.ConnectionString);
+        await using var host = await CloudTasksOverSqlHost.StartAsync(Dialect);
 
         await host.Queue.Enqueue(new PingCommand("later"), new QueueOptions { Delay = TimeSpan.FromDays(40) });
         var early = await host.Relay.RelayAsync(CancellationToken.None);
@@ -160,14 +162,14 @@ public sealed class CloudTasksOverSqlTests(MssqlContainerFixture fixture)
     [Test]
     public async Task A_delivery_commits_its_writes_and_forwards_its_cascade_before_answering()
     {
-        await using var host = await CloudTasksOverSqlHost.StartAsync(fixture.ConnectionString);
+        await using var host = await CloudTasksOverSqlHost.StartAsync(Dialect);
         var table = await host.CreateSideTable();
         await host.Queue.Enqueue(new WriteAndCascadeCommand(table, "child"));
 
         var status = await host.Deliver(host.Tasks.SingleRequest);
 
         await Assert.That(status).IsEqualTo(HttpStatusCode.OK);
-        await Assert.That(await host.ScalarAsync<int>($"SELECT COUNT(*) FROM [{table}]")).IsEqualTo(1);
+        await Assert.That(await host.ScalarAsync<int>($"SELECT COUNT(*) FROM {Q(table)}")).IsEqualTo(1);
         // The cascade was forwarded as the delivery committed, before the 200.
         await Assert.That(host.Tasks.Requests).Count().IsEqualTo(2);
         await Assert.That(await host.OutboxCount()).IsEqualTo(0);
@@ -179,7 +181,7 @@ public sealed class CloudTasksOverSqlTests(MssqlContainerFixture fixture)
     [Test]
     public async Task A_failing_delivery_rolls_back_its_writes_and_files_its_dead_letter_in_the_same_database()
     {
-        await using var host = await CloudTasksOverSqlHost.StartAsync(fixture.ConnectionString);
+        await using var host = await CloudTasksOverSqlHost.StartAsync(Dialect);
         var table = await host.CreateSideTable();
         await host.Queue.Enqueue(new WriteThenFailCommand(table));
         var task = host.Tasks.SingleRequest;
@@ -187,15 +189,15 @@ public sealed class CloudTasksOverSqlTests(MssqlContainerFixture fixture)
         var status = await host.Deliver(task);
 
         await Assert.That(status).IsEqualTo(HttpStatusCode.OK);
-        await Assert.That(await host.ScalarAsync<int>($"SELECT COUNT(*) FROM [{table}]")).IsEqualTo(0);
-        await Assert.That(await host.ScalarAsync<string>($"SELECT IdempotencyKey FROM [{host.DeadLetterTable}]"))
+        await Assert.That(await host.ScalarAsync<int>($"SELECT COUNT(*) FROM {Q(table)}")).IsEqualTo(0);
+        await Assert.That(await host.ScalarAsync<string>($"SELECT IdempotencyKey FROM {Q(host.DeadLetterTable)}"))
             .IsEqualTo(CloudTasksOverSqlHost.TaskIdOf(task));
     }
 
     [Test]
     public async Task A_failed_attempt_books_its_retry_through_the_outbox()
     {
-        await using var host = await CloudTasksOverSqlHost.StartAsync(fixture.ConnectionString);
+        await using var host = await CloudTasksOverSqlHost.StartAsync(Dialect);
         await host.Queue.Enqueue(new FailOnceCommand("k"));
 
         var first = await host.Deliver(host.Tasks.SingleRequest);
@@ -213,7 +215,7 @@ public sealed class CloudTasksOverSqlTests(MssqlContainerFixture fixture)
     {
         // Cloud Tasks redelivers when it never saw the 200; the dead letter is filed under the task's
         // name, so the second write lands on the first.
-        await using var host = await CloudTasksOverSqlHost.StartAsync(fixture.ConnectionString);
+        await using var host = await CloudTasksOverSqlHost.StartAsync(Dialect);
         var table = await host.CreateSideTable();
         await host.Queue.Enqueue(new WriteThenFailCommand(table));
 
@@ -228,7 +230,7 @@ public sealed class CloudTasksOverSqlTests(MssqlContainerFixture fixture)
     [Test]
     public async Task A_resend_enqueues_and_deletes_in_one_transaction_and_is_forwarded()
     {
-        await using var host = await CloudTasksOverSqlHost.StartAsync(fixture.ConnectionString);
+        await using var host = await CloudTasksOverSqlHost.StartAsync(Dialect);
         var table = await host.CreateSideTable();
         await host.Queue.Enqueue(new WriteThenFailCommand(table));
         await host.Deliver(host.Tasks.SingleRequest);
@@ -249,7 +251,7 @@ public sealed class CloudTasksOverSqlTests(MssqlContainerFixture fixture)
     {
         var queue = host.Services.GetRequiredService<ISqlTransactionalQueue>();
         await using var connection = await host.OpenConnectionAsync();
-        await using var transaction = (SqlTransaction)await connection.BeginTransactionAsync();
+        await using var transaction = await connection.BeginTransactionAsync();
         foreach (var command in commands)
             await queue.Enqueue(command, transaction);
         await transaction.CommitAsync();

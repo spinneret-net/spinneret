@@ -11,6 +11,7 @@
     <ItemGroup>
         <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.13" />
         <PackageReference Include="Microsoft.Extensions.Options" Version="10.0.13" />
+        <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="10.0.13" />
     </ItemGroup>
 
     <ItemGroup>
@@ -22,15 +23,18 @@
     </ItemGroup>
 
     <ItemGroup>
-        <InternalsVisibleTo Include="Spinneret.Scheduler.Sql.Tests" />
         <!-- SqlSchedulerDialect and the registration helper: a dialect package supplies the
              statements and registers the scheduler through them. -->
+        <InternalsVisibleTo Include="Spinneret.Scheduler.Sql.Tests" />
         <InternalsVisibleTo Include="Spinneret.Scheduler.Mssql" />
         <InternalsVisibleTo Include="Spinneret.Scheduler.Mssql.Tests" />
+        <InternalsVisibleTo Include="Spinneret.Scheduler.Postgres" />
+        <InternalsVisibleTo Include="Spinneret.Scheduler.Postgres.Tests" />
+        <InternalsVisibleTo Include="Spinneret.Composition.Tests" />
     </ItemGroup>
 
     <PropertyGroup>
-        <Description>Relational scheduler for Spinneret over ADO.NET: durable recurring jobs and transactional one-shot jobs in the application database, dispatched onto the SQL queue in the same transaction. Pair it with a dialect package such as Spinneret.Scheduler.Mssql.</Description>
+        <Description>Relational scheduler for Spinneret over ADO.NET: durable recurring jobs and transactional one-shot jobs in the application database, dispatched onto the SQL queue in the same transaction. Pair it with a dialect package: Spinneret.Scheduler.Mssql or Spinneret.Scheduler.Postgres.</Description>
         <PackageTags>$(PackageTags) scheduler sql recurring-jobs transactional</PackageTags>
     </PropertyGroup>
 

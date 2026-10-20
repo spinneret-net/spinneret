@@ -15,3 +15,17 @@ static readonly Spinneret.Queue.Sql.InHostDeliveryOptions.SectionName -> string!
 static Microsoft.Extensions.DependencyInjection.SqlQueueBuilderExtensions.UseInHostDelivery(this Spinneret.Queue.QueueBuilder! queue) -> Spinneret.Queue.QueueBuilder!
 static Microsoft.Extensions.DependencyInjection.SqlQueueBuilderExtensions.UseInHostDelivery(this Spinneret.Queue.QueueBuilder! queue, Microsoft.Extensions.Configuration.IConfiguration! configuration) -> Spinneret.Queue.QueueBuilder!
 static Microsoft.Extensions.DependencyInjection.SqlQueueBuilderExtensions.UseInHostDelivery(this Spinneret.Queue.QueueBuilder! queue, System.Action<Spinneret.Queue.Sql.InHostDeliveryOptions!>! configure) -> Spinneret.Queue.QueueBuilder!
+Spinneret.Queue.Sql.SqlStorageOptions
+Spinneret.Queue.Sql.SqlStorageOptions.ConnectionString.get -> string!
+Spinneret.Queue.Sql.SqlStorageOptions.ConnectionString.set -> void
+Spinneret.Queue.Sql.SqlStorageOptions.ConnectionStringName.get -> string?
+Spinneret.Queue.Sql.SqlStorageOptions.ConnectionStringName.set -> void
+Spinneret.Queue.Sql.SqlStorageOptions.CreateSchema.get -> bool
+Spinneret.Queue.Sql.SqlStorageOptions.CreateSchema.set -> void
+Spinneret.Queue.Sql.SqlStorageOptions.DeadLetterTableName.get -> string!
+Spinneret.Queue.Sql.SqlStorageOptions.DeadLetterTableName.set -> void
+Spinneret.Queue.Sql.SqlStorageOptions.QueueTableName.get -> string!
+Spinneret.Queue.Sql.SqlStorageOptions.QueueTableName.set -> void
+Spinneret.Queue.Sql.SqlStorageOptions.SchemaName.get -> string!
+Spinneret.Queue.Sql.SqlStorageOptions.SchemaName.set -> void
+Spinneret.Queue.Sql.SqlStorageOptions.SqlStorageOptions(string! schemaName, string! queueTableName, string! deadLetterTableName) -> void

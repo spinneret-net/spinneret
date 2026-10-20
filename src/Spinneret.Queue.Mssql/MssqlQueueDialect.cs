@@ -30,8 +30,8 @@ internal sealed class MssqlQueueDialect : SqlQueueDialect
 
     public override SqlQueueStatements CreateStatements(SqlQueueNames names)
     {
-        var queueTable = Identifier.Qualify(names.Schema, names.QueueTable);
-        var deadLetterTable = Identifier.Qualify(names.Schema, names.DeadLetterTable);
+        var queueTable = Qualify(names.Schema, names.QueueTable);
+        var deadLetterTable = Qualify(names.Schema, names.DeadLetterTable);
 
         return new SqlQueueStatements
         {
@@ -155,15 +155,23 @@ internal sealed class MssqlQueueDialect : SqlQueueDialect
         };
     }
 
+    /// <summary>
+    /// sysname is 128 characters. Configured names used to be capped at 116 — a temp-table limit
+    /// that never applied here — while the derived index names could still overflow; checking the
+    /// derived names against the real limit covers both.
+    /// </summary>
+    public override int MaxIdentifierLength => 128;
+
+    public override string QuoteIdentifier(string identifier) => $"[{identifier.Replace("]", "]]")}]";
+
+    public override IEnumerable<string> DerivedIdentifiers(SqlQueueNames names) => DerivedNames.Of(names).All;
+
     public override string CreateSchemaScript(SqlQueueNames names)
     {
-        var queueTable = Identifier.Qualify(names.Schema, names.QueueTable);
-        var deadLetterTable = Identifier.Qualify(names.Schema, names.DeadLetterTable);
-        var channelIndex = $"IX_{names.QueueTable}_Channel_VisibleAt";
-        var visibleIndex = $"IX_{names.QueueTable}_VisibleAt";
-        var messageIdDefault = $"DF_{names.QueueTable}_MessageId";
-        var dedupeIndex = $"UX_{names.QueueTable}_DedupeKey";
-        var deadLetterOrderIndex = $"IX_{names.DeadLetterTable}_DeadLetteredAt";
+        var queueTable = Qualify(names.Schema, names.QueueTable);
+        var deadLetterTable = Qualify(names.Schema, names.DeadLetterTable);
+        var (queuePrimaryKey, channelIndex, visibleIndex, messageIdDefault, messageIdIndex, dedupeIndex,
+            deadLetterPrimaryKey, deadLetterOrderIndex) = DerivedNames.Of(names);
 
         return $"""
             SET XACT_ABORT ON;
@@ -191,8 +199,8 @@ internal sealed class MssqlQueueDialect : SqlQueueDialect
             IF OBJECT_ID(N'{queueTable}', N'U') IS NULL
             BEGIN
                 CREATE TABLE {queueTable} (
-                    Id BIGINT IDENTITY NOT NULL CONSTRAINT {Identifier.Quote($"PK_{names.QueueTable}")} PRIMARY KEY,
-                    MessageId UNIQUEIDENTIFIER NOT NULL CONSTRAINT {Identifier.Quote(messageIdDefault)} DEFAULT NEWID(),
+                    Id BIGINT IDENTITY NOT NULL CONSTRAINT {QuoteIdentifier(queuePrimaryKey)} PRIMARY KEY,
+                    MessageId UNIQUEIDENTIFIER NOT NULL CONSTRAINT {QuoteIdentifier(messageIdDefault)} DEFAULT NEWID(),
                     Channel NVARCHAR(100) NOT NULL,
                     VisibleAt DATETIME2(3) NOT NULL,
                     DedupeKey NVARCHAR(200) NULL,
@@ -208,7 +216,7 @@ internal sealed class MssqlQueueDialect : SqlQueueDialect
             -- columns are how a relay to a push transport holds a row while it sends it.
             IF COL_LENGTH(N'{queueTable}', N'MessageId') IS NULL
             BEGIN
-                EXEC(N'ALTER TABLE {queueTable} ADD MessageId UNIQUEIDENTIFIER NOT NULL CONSTRAINT {Identifier.Quote(messageIdDefault)} DEFAULT NEWID() WITH VALUES;');
+                EXEC(N'ALTER TABLE {queueTable} ADD MessageId UNIQUEIDENTIFIER NOT NULL CONSTRAINT {QuoteIdentifier(messageIdDefault)} DEFAULT NEWID() WITH VALUES;');
             END;
 
             IF COL_LENGTH(N'{queueTable}', N'LeasedUntil') IS NULL
@@ -226,7 +234,7 @@ internal sealed class MssqlQueueDialect : SqlQueueDialect
                 WHERE object_id = OBJECT_ID(N'{queueTable}', N'U')
                   AND name = N'{channelIndex}')
             BEGIN
-                CREATE INDEX {Identifier.Quote(channelIndex)}
+                CREATE INDEX {QuoteIdentifier(channelIndex)}
                     ON {queueTable} (Channel, VisibleAt);
             END;
 
@@ -238,7 +246,17 @@ internal sealed class MssqlQueueDialect : SqlQueueDialect
                 WHERE object_id = OBJECT_ID(N'{queueTable}', N'U')
                   AND name = N'{visibleIndex}')
             BEGIN
-                EXEC(N'CREATE INDEX {Identifier.Quote(visibleIndex)} ON {queueTable} (VisibleAt) INCLUDE (LeasedUntil);');
+                EXEC(N'CREATE INDEX {QuoteIdentifier(visibleIndex)} ON {queueTable} (VisibleAt) INCLUDE (LeasedUntil);');
+            END;
+
+            -- Serves LeaseById, the eager forward of a message just committed, which finds its row by
+            -- MessageId; without it every eager forward scans the outbox.
+            IF NOT EXISTS (
+                SELECT 1 FROM sys.indexes
+                WHERE object_id = OBJECT_ID(N'{queueTable}', N'U')
+                  AND name = N'{messageIdIndex}')
+            BEGIN
+                EXEC(N'CREATE INDEX {QuoteIdentifier(messageIdIndex)} ON {queueTable} (MessageId);');
             END;
 
             -- Not merely an optimisation: Enqueue detects a duplicate dedupe key by catching this
@@ -249,7 +267,7 @@ internal sealed class MssqlQueueDialect : SqlQueueDialect
                 WHERE object_id = OBJECT_ID(N'{queueTable}', N'U')
                   AND name = N'{dedupeIndex}')
             BEGIN
-                CREATE UNIQUE INDEX {Identifier.Quote(dedupeIndex)}
+                CREATE UNIQUE INDEX {QuoteIdentifier(dedupeIndex)}
                     ON {queueTable} (DedupeKey)
                     WHERE DedupeKey IS NOT NULL;
             END;
@@ -257,7 +275,7 @@ internal sealed class MssqlQueueDialect : SqlQueueDialect
             IF OBJECT_ID(N'{deadLetterTable}', N'U') IS NULL
             BEGIN
                 CREATE TABLE {deadLetterTable} (
-                    IdempotencyKey NVARCHAR(200) NOT NULL CONSTRAINT {Identifier.Quote($"PK_{names.DeadLetterTable}")} PRIMARY KEY,
+                    IdempotencyKey NVARCHAR(200) NOT NULL CONSTRAINT {QuoteIdentifier(deadLetterPrimaryKey)} PRIMARY KEY,
                     Source NVARCHAR(20) NOT NULL,
                     CommandTypeName NVARCHAR(500) NOT NULL,
                     Description NVARCHAR(1000) NULL,
@@ -283,7 +301,7 @@ internal sealed class MssqlQueueDialect : SqlQueueDialect
                 WHERE object_id = OBJECT_ID(N'{deadLetterTable}', N'U')
                   AND name = N'{deadLetterOrderIndex}')
             BEGIN
-                CREATE INDEX {Identifier.Quote(deadLetterOrderIndex)}
+                CREATE INDEX {QuoteIdentifier(deadLetterOrderIndex)}
                     ON {deadLetterTable} (DeadLetteredAt DESC, IdempotencyKey DESC);
             END;
 
@@ -325,16 +343,33 @@ internal sealed class MssqlQueueDialect : SqlQueueDialect
     }
 }
 
-internal static class Identifier
+/// <summary>
+/// The index and constraint names the DDL derives from the configured table names — in one place,
+/// so the script and the length validation can never disagree on them.
+/// </summary>
+internal readonly record struct DerivedNames(
+    string QueuePrimaryKey,
+    string ChannelIndex,
+    string VisibleIndex,
+    string MessageIdDefault,
+    string MessageIdIndex,
+    string DedupeIndex,
+    string DeadLetterPrimaryKey,
+    string DeadLetterOrderIndex)
 {
-    /// <summary>Brackets and escapes a configured identifier: defense in depth behind startup validation.</summary>
-    public static string Quote(string identifier) => $"[{identifier.Replace("]", "]]")}]";
+    public static DerivedNames Of(SqlQueueNames names) => new(
+        QueuePrimaryKey: $"PK_{names.QueueTable}",
+        ChannelIndex: $"IX_{names.QueueTable}_Channel_VisibleAt",
+        VisibleIndex: $"IX_{names.QueueTable}_VisibleAt",
+        MessageIdDefault: $"DF_{names.QueueTable}_MessageId",
+        MessageIdIndex: $"IX_{names.QueueTable}_MessageId",
+        DedupeIndex: $"UX_{names.QueueTable}_DedupeKey",
+        DeadLetterPrimaryKey: $"PK_{names.DeadLetterTable}",
+        DeadLetterOrderIndex: $"IX_{names.DeadLetterTable}_DeadLetteredAt");
 
-    public static string Qualify(string schema, string table) => $"{Quote(schema)}.{Quote(table)}";
-
-    public static bool IsValid(string identifier) =>
-        !string.IsNullOrWhiteSpace(identifier)
-        && identifier.Length <= 116
-        && (char.IsAsciiLetter(identifier[0]) || identifier[0] == '_')
-        && identifier.All(c => char.IsAsciiLetterOrDigit(c) || c == '_');
+    public IEnumerable<string> All =>
+    [
+        QueuePrimaryKey, ChannelIndex, VisibleIndex, MessageIdDefault, MessageIdIndex, DedupeIndex,
+        DeadLetterPrimaryKey, DeadLetterOrderIndex,
+    ];
 }

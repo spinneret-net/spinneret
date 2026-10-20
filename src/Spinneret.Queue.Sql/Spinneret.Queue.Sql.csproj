@@ -21,18 +21,27 @@
     </ItemGroup>
 
     <ItemGroup>
+        <!-- SqlQueueDialect, SqlQueueStorage and the registration helper: a dialect package supplies
+             the statements and the data source, and registers the storage through the helper. The
+             SQL scheduler dispatches inside the same unit of work as the queue it feeds, so it
+             shares the storage, the unit of work and the command helpers, and a scheduler dialect
+             follows its queue dialect's identifier rules. -->
         <InternalsVisibleTo Include="Spinneret.Queue.Sql.Tests" />
-        <!-- SqlQueueDialect and SqlQueueStorage: a dialect package supplies the statements and the
-             data source, and registers the storage through the internal registration helper. -->
         <InternalsVisibleTo Include="Spinneret.Queue.Mssql" />
         <InternalsVisibleTo Include="Spinneret.Queue.Mssql.Tests" />
-        <!-- The SQL scheduler dispatches inside the same unit of work as the queue it feeds, so it
-             shares the storage, the unit of work and the command helpers. -->
+        <InternalsVisibleTo Include="Spinneret.Queue.Postgres" />
+        <InternalsVisibleTo Include="Spinneret.Queue.Postgres.Tests" />
         <InternalsVisibleTo Include="Spinneret.Scheduler.Sql" />
+        <InternalsVisibleTo Include="Spinneret.Scheduler.Sql.Tests" />
+        <InternalsVisibleTo Include="Spinneret.Scheduler.Mssql" />
+        <InternalsVisibleTo Include="Spinneret.Scheduler.Mssql.Tests" />
+        <InternalsVisibleTo Include="Spinneret.Scheduler.Postgres" />
+        <InternalsVisibleTo Include="Spinneret.Scheduler.Postgres.Tests" />
+        <InternalsVisibleTo Include="Spinneret.Composition.Tests" />
     </ItemGroup>
 
     <PropertyGroup>
-        <Description>Relational storage for Spinneret.Queue over ADO.NET: a transactional outbox in the application database, an in-host delivery worker, and dead letters. Pair it with a dialect package such as Spinneret.Queue.Mssql.</Description>
+        <Description>Relational storage for Spinneret.Queue over ADO.NET: a transactional outbox in the application database, an in-host delivery worker, and dead letters. Pair it with a dialect package: Spinneret.Queue.Mssql or Spinneret.Queue.Postgres.</Description>
         <PackageTags>$(PackageTags) queue sql outbox transactional background-jobs</PackageTags>
     </PropertyGroup>
 

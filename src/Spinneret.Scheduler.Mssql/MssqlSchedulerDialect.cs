@@ -1,4 +1,5 @@
 using Spinneret.Queue.Mssql;
+using Spinneret.Queue.Sql;
 using Spinneret.Scheduler.Sql;
 
 namespace Spinneret.Scheduler.Mssql;
@@ -15,11 +16,17 @@ internal sealed class MssqlSchedulerDialect : SqlSchedulerDialect
     {
     }
 
-    public override string QueueDialectName => "mssql";
+    public override SqlQueueDialect QueueDialect => MssqlQueueDialect.Instance;
+
+    public override IEnumerable<string> DerivedIdentifiers(string table) => [PrimaryKey(table), DueIndex(table)];
+
+    private static string PrimaryKey(string table) => $"PK_{table}";
+
+    private static string DueIndex(string table) => $"IX_{table}_NextExecuteAt";
 
     public override SqlSchedulerStatements CreateStatements(SqlSchedulerNames names)
     {
-        var table = Identifier.Qualify(names.Schema, names.Table);
+        var table = MssqlQueueDialect.Instance.Qualify(names.Schema, names.Table);
 
         return new SqlSchedulerStatements
         {
@@ -106,8 +113,8 @@ internal sealed class MssqlSchedulerDialect : SqlSchedulerDialect
 
     public override string CreateSchemaScript(SqlSchedulerNames names)
     {
-        var table = Identifier.Qualify(names.Schema, names.Table);
-        var dueIndex = $"IX_{names.Table}_NextExecuteAt";
+        var table = MssqlQueueDialect.Instance.Qualify(names.Schema, names.Table);
+        var dueIndex = DueIndex(names.Table);
 
         return $"""
             SET XACT_ABORT ON;
@@ -129,7 +136,7 @@ internal sealed class MssqlSchedulerDialect : SqlSchedulerDialect
             IF OBJECT_ID(N'{table}', N'U') IS NULL
             BEGIN
                 CREATE TABLE {table} (
-                    JobKey NVARCHAR(200) NOT NULL CONSTRAINT {Identifier.Quote($"PK_{names.Table}")} PRIMARY KEY,
+                    JobKey NVARCHAR(200) NOT NULL CONSTRAINT {MssqlQueueDialect.Instance.QuoteIdentifier(PrimaryKey(names.Table))} PRIMARY KEY,
                     RequestTypeName NVARCHAR(500) NOT NULL,
                     PayloadJson NVARCHAR(MAX) NOT NULL,
                     Schedule NVARCHAR(500) NULL,
@@ -146,7 +153,7 @@ internal sealed class MssqlSchedulerDialect : SqlSchedulerDialect
                 WHERE object_id = OBJECT_ID(N'{table}', N'U')
                   AND name = N'{dueIndex}')
             BEGIN
-                CREATE INDEX {Identifier.Quote(dueIndex)}
+                CREATE INDEX {MssqlQueueDialect.Instance.QuoteIdentifier(dueIndex)}
                     ON {table} (NextExecuteAt);
             END;
 

@@ -25,16 +25,15 @@
         <InternalsVisibleTo Include="Spinneret.Queue.CloudTasks.Tests" />
         <InternalsVisibleTo Include="Spinneret.Queue.Firestore.Tests" />
         <InternalsVisibleTo Include="Spinneret.Queue.Mssql.Tests" />
+        <InternalsVisibleTo Include="Spinneret.Queue.Postgres.Tests" />
         <InternalsVisibleTo Include="Spinneret.Scheduler.Firestore.Tests" />
         <!-- ResolvedRequestEnqueuer: the scheduler sweeps enqueue requests they read back from a
              store, so their response type is only known at runtime. -->
         <InternalsVisibleTo Include="Spinneret.Scheduler.Firestore" />
         <InternalsVisibleTo Include="Spinneret.Scheduler.Sql" />
         <!-- DeadLetterStorage and DeadLetterCursor: the source spelling and the cursor encoding are
-             one contract shared by every dead-letter store, not a per-provider decision.
-             IQueueTransactionScope additionally lets the MSSQL store make a resend atomic. -->
+             one contract shared by every dead-letter store, not a per-provider decision. -->
         <InternalsVisibleTo Include="Spinneret.Queue.Firestore" />
-        <InternalsVisibleTo Include="Spinneret.Queue.Mssql" />
         <!-- The unit-of-work seam, the delivery pipeline and the envelope factory: the SQL storage
              supplies the transaction a delivery runs in and builds envelopes the same way the
              transports do. -->

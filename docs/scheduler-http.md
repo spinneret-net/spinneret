@@ -37,7 +37,7 @@ app.MapSchedulerSweep(
 
 | | |
 |---|---|
-| **A scheduler storage** | `AddScheduler(s => s.UseFirestore(...))` or `s.UseMssql(...)`. Mapping without one throws — a sweep endpoint with nothing to sweep looks healthy while doing nothing. |
+| **A scheduler storage** | `AddScheduler(s => s.UseFirestore(...))`, `s.UseMssql(...)` or `s.UsePostgres(...)`. Mapping without one throws — a sweep endpoint with nothing to sweep looks healthy while doing nothing. |
 | **An authorization policy** | Required, not defaulted. Passing a blank one throws. |
 | **Auth middleware** | `UseAuthentication()` / `UseAuthorization()` before endpoints. |
 

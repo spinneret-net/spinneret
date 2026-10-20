@@ -2,20 +2,11 @@
 Microsoft.Extensions.DependencyInjection.MssqlQueueBuilderExtensions
 Spinneret.Queue.Mssql.MssqlQueueSchema
 Spinneret.Queue.Mssql.MssqlStorageOptions
-Spinneret.Queue.Mssql.MssqlStorageOptions.ConnectionString.get -> string!
-Spinneret.Queue.Mssql.MssqlStorageOptions.ConnectionString.set -> void
-Spinneret.Queue.Mssql.MssqlStorageOptions.ConnectionStringName.get -> string?
-Spinneret.Queue.Mssql.MssqlStorageOptions.ConnectionStringName.set -> void
-Spinneret.Queue.Mssql.MssqlStorageOptions.CreateSchema.get -> bool
-Spinneret.Queue.Mssql.MssqlStorageOptions.CreateSchema.set -> void
-Spinneret.Queue.Mssql.MssqlStorageOptions.DeadLetterTableName.get -> string!
-Spinneret.Queue.Mssql.MssqlStorageOptions.DeadLetterTableName.set -> void
 Spinneret.Queue.Mssql.MssqlStorageOptions.MssqlStorageOptions() -> void
-Spinneret.Queue.Mssql.MssqlStorageOptions.QueueTableName.get -> string!
-Spinneret.Queue.Mssql.MssqlStorageOptions.QueueTableName.set -> void
-Spinneret.Queue.Mssql.MssqlStorageOptions.SchemaName.get -> string!
-Spinneret.Queue.Mssql.MssqlStorageOptions.SchemaName.set -> void
-static Microsoft.Extensions.DependencyInjection.MssqlQueueBuilderExtensions.UseMssqlStorage(this Spinneret.Queue.QueueBuilder! queue, Microsoft.Extensions.Configuration.IConfiguration! configuration, System.Action<Spinneret.Queue.Mssql.MssqlStorageOptions!>? configure = null) -> Spinneret.Queue.QueueBuilder!
 static Microsoft.Extensions.DependencyInjection.MssqlQueueBuilderExtensions.UseMssqlStorage(this Spinneret.Queue.QueueBuilder! queue, System.Action<Spinneret.Queue.Mssql.MssqlStorageOptions!>! configure) -> Spinneret.Queue.QueueBuilder!
 static Spinneret.Queue.Mssql.MssqlQueueSchema.CreateScript(Spinneret.Queue.Mssql.MssqlStorageOptions! options) -> string!
 static readonly Spinneret.Queue.Mssql.MssqlStorageOptions.SectionName -> string!
+static Microsoft.Extensions.DependencyInjection.MssqlQueueBuilderExtensions.UseMssqlStorage(this Spinneret.Queue.QueueBuilder! queue, System.Func<System.IServiceProvider!, System.Data.Common.DbDataSource!>! dataSource, Microsoft.Extensions.Configuration.IConfiguration! configuration) -> Spinneret.Queue.QueueBuilder!
+static Microsoft.Extensions.DependencyInjection.MssqlQueueBuilderExtensions.UseMssqlStorage(this Spinneret.Queue.QueueBuilder! queue, System.Func<System.IServiceProvider!, System.Data.Common.DbDataSource!>! dataSource, System.Action<Spinneret.Queue.Mssql.MssqlStorageOptions!>! configure) -> Spinneret.Queue.QueueBuilder!
+static Microsoft.Extensions.DependencyInjection.MssqlQueueBuilderExtensions.UseMssqlStorage(this Spinneret.Queue.QueueBuilder! queue, Microsoft.Extensions.Configuration.IConfiguration! configuration) -> Spinneret.Queue.QueueBuilder!
+static Microsoft.Extensions.DependencyInjection.MssqlQueueBuilderExtensions.UseMssqlStorage(this Spinneret.Queue.QueueBuilder! queue, Microsoft.Extensions.Configuration.IConfiguration! configuration, System.Action<Spinneret.Queue.Mssql.MssqlStorageOptions!>! configure) -> Spinneret.Queue.QueueBuilder!

@@ -1,0 +1,12 @@
+#nullable enable
+Microsoft.Extensions.DependencyInjection.PostgresQueueBuilderExtensions
+Spinneret.Queue.Postgres.PostgresQueueSchema
+Spinneret.Queue.Postgres.PostgresStorageOptions
+Spinneret.Queue.Postgres.PostgresStorageOptions.PostgresStorageOptions() -> void
+static Microsoft.Extensions.DependencyInjection.PostgresQueueBuilderExtensions.UsePostgresStorage(this Spinneret.Queue.QueueBuilder! queue, Microsoft.Extensions.Configuration.IConfiguration! configuration) -> Spinneret.Queue.QueueBuilder!
+static Microsoft.Extensions.DependencyInjection.PostgresQueueBuilderExtensions.UsePostgresStorage(this Spinneret.Queue.QueueBuilder! queue, Microsoft.Extensions.Configuration.IConfiguration! configuration, System.Action<Spinneret.Queue.Postgres.PostgresStorageOptions!>! configure) -> Spinneret.Queue.QueueBuilder!
+static Microsoft.Extensions.DependencyInjection.PostgresQueueBuilderExtensions.UsePostgresStorage(this Spinneret.Queue.QueueBuilder! queue, System.Action<Spinneret.Queue.Postgres.PostgresStorageOptions!>! configure) -> Spinneret.Queue.QueueBuilder!
+static Microsoft.Extensions.DependencyInjection.PostgresQueueBuilderExtensions.UsePostgresStorage(this Spinneret.Queue.QueueBuilder! queue, System.Func<System.IServiceProvider!, Npgsql.NpgsqlDataSource!>! dataSource, Microsoft.Extensions.Configuration.IConfiguration! configuration) -> Spinneret.Queue.QueueBuilder!
+static Microsoft.Extensions.DependencyInjection.PostgresQueueBuilderExtensions.UsePostgresStorage(this Spinneret.Queue.QueueBuilder! queue, System.Func<System.IServiceProvider!, Npgsql.NpgsqlDataSource!>! dataSource, System.Action<Spinneret.Queue.Postgres.PostgresStorageOptions!>! configure) -> Spinneret.Queue.QueueBuilder!
+static Spinneret.Queue.Postgres.PostgresQueueSchema.CreateScript(Spinneret.Queue.Postgres.PostgresStorageOptions! options) -> string!
+static readonly Spinneret.Queue.Postgres.PostgresStorageOptions.SectionName -> string!

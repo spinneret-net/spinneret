@@ -9,7 +9,7 @@ namespace Spinneret.Queue;
 /// from up to three independent choices, each made by a provider package's <c>Use*</c> extension:
 /// <list type="bullet">
 /// <item><b>Storage</b> — where messages wait: a SQL outbox in the application database
-/// (<c>UseMssqlStorage</c>). With storage, every enqueue joins the caller's transaction.</item>
+/// (<c>UseMssqlStorage</c>, <c>UsePostgresStorage</c>). With storage, every enqueue joins the caller's transaction.</item>
 /// <item><b>Delivery</b> — how they reach a handler: the in-host worker draining that table
 /// (<c>UseInHostDelivery</c>), or a push transport (<c>UseCloudTasksDelivery</c>).</item>
 /// <item><b>Dead letters</b> — where exhausted work is kept, when not in the storage itself
@@ -110,13 +110,13 @@ public sealed class QueueBuilder
 
         if (Storage is null && Delivery is not { ProvidesTransport: true })
             throw new InvalidOperationException(
-                "The queue has nowhere to put messages. Choose a storage (e.g. q.UseMssqlStorage(...)), "
+                "The queue has nowhere to put messages. Choose a storage (e.g. q.UseMssqlStorage(...) or q.UsePostgresStorage(...)), "
                 + "a push transport (e.g. q.UseCloudTasksDelivery(...)), or both.");
 
         if (Delivery is { RequiresClaimableStorage: true } && Storage is not { Claimable: true })
             throw new InvalidOperationException(
                 $"{Delivery.Name} delivers messages from a storage table, so it needs a SQL storage "
-                + "such as q.UseMssqlStorage(...).");
+                + "such as q.UseMssqlStorage(...) or q.UsePostgresStorage(...).");
 
         if (Storage is not null && Delivery is { ProvidesTransport: true } && Storage.RegisterRelay is null)
             throw new InvalidOperationException(

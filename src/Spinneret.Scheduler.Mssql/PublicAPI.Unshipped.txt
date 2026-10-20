@@ -1,8 +1,6 @@
 #nullable enable
 Spinneret.Scheduler.Mssql.MssqlSchedulerOptions
 Spinneret.Scheduler.Mssql.MssqlSchedulerOptions.MssqlSchedulerOptions() -> void
-Spinneret.Scheduler.Mssql.MssqlSchedulerOptions.TableName.get -> string!
-Spinneret.Scheduler.Mssql.MssqlSchedulerOptions.TableName.set -> void
 Spinneret.Scheduler.Mssql.MssqlSchedulerSchema
 static readonly Spinneret.Scheduler.Mssql.MssqlSchedulerOptions.SectionName -> string!
 Microsoft.Extensions.DependencyInjection.MssqlSchedulerBuilderExtensions

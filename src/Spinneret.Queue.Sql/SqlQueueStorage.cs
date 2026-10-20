@@ -9,7 +9,12 @@ namespace Spinneret.Queue.Sql;
 /// </summary>
 internal sealed class SqlQueueStorage : IAsyncDisposable
 {
-    public SqlQueueStorage(DbDataSource dataSource, SqlQueueDialect dialect, SqlQueueNames names, bool createSchema)
+    private readonly bool _ownsDataSource;
+
+    // ownsDataSource: whether the storage created the data source and so disposes it. A data
+    // source the host supplied (and shares with its own data access) belongs to the host.
+    public SqlQueueStorage(
+        DbDataSource dataSource, SqlQueueDialect dialect, SqlQueueNames names, bool createSchema, bool ownsDataSource = true)
     {
         ArgumentNullException.ThrowIfNull(dataSource);
         ArgumentNullException.ThrowIfNull(dialect);
@@ -19,6 +24,7 @@ internal sealed class SqlQueueStorage : IAsyncDisposable
         Dialect = dialect;
         Names = names;
         CreateSchema = createSchema;
+        _ownsDataSource = ownsDataSource;
         Statements = dialect.CreateStatements(names);
     }
 
@@ -30,5 +36,5 @@ internal sealed class SqlQueueStorage : IAsyncDisposable
     /// <summary>Whether the startup initializer creates the tables; off when the host owns the schema.</summary>
     public bool CreateSchema { get; }
 
-    public ValueTask DisposeAsync() => DataSource.DisposeAsync();
+    public ValueTask DisposeAsync() => _ownsDataSource ? DataSource.DisposeAsync() : ValueTask.CompletedTask;
 }
