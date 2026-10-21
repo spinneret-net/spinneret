@@ -57,7 +57,7 @@ Mandatory. A missing one fails at `AddQueue` and again at host start:
 | `Channels:default` | Always required; the channel commands ride when they declare none. |
 | `Channels:<name>` | One per channel any `[QueuePolicy(Channel = …)]` declares. An unmapped channel fails at boot. |
 | `DispatcherUrl` | Absolute URL Cloud Tasks posts to. Must be `https` outside the emulator. |
-| `ServiceAccountEmail` | The account Cloud Tasks impersonates to mint the OIDC token. |
+| `ServiceAccountEmail` | The account Cloud Tasks impersonates to mint the OIDC token. The dispatch endpoint also accepts only tokens whose verified `email` is this account. |
 
 Optional:
 
@@ -122,6 +122,10 @@ envelope rather than the ambient activity so the two cannot disagree.
 `UseCloudTasksDelivery` also registers a JwtBearer authentication scheme and an authorization policy,
 both named `QueueOIDC` and exposed as `CloudTasksAuth.SchemeName` / `CloudTasksAuth.PolicyName`. The
 dispatch endpoint guards itself with that policy.
+
+A token passes only if its issuer and audience match **and** its `email` claim is `ServiceAccountEmail`
+with `email_verified` true. Google mints an ID token with any audience for any service account in any
+project, so issuer and audience alone would admit anyone able to create one.
 
 Use the constant to protect your own internal endpoints with the same Google-minted tokens — it is
 what [`Spinneret.Scheduler.AspNetCore`](scheduler-aspnetcore.md) and `MapQueueRelay` expect you to pass:
@@ -307,7 +311,7 @@ Four couplings decide whether this works:
 1. **`EmulatorEndpoint` is the master switch.** It points the client at the emulator over an insecure
    channel *and* relaxes the HTTPS-metadata requirement on the dispatch endpoint.
 2. **`OidcIssuer` must equal the emulator's `-openid-issuer`.** The emulator does **not** disable JWT
-   validation — issuer and audience are still checked in full; only the metadata transport is relaxed.
+   validation — issuer, audience and caller email are still checked in full; only the metadata transport is relaxed.
    Omitting the issuer means tokens are validated against `accounts.google.com` and every delivery
    401s, so this fails at startup rather than at run time.
 3. **`DispatcherUrl` must be reachable from inside the container** — `host.docker.internal`, not

@@ -91,14 +91,22 @@ public sealed class QueueDispatchHostTests
     private static string Token(
         string issuer = "https://accounts.google.com",
         string audience = TestSetup.DispatcherUrl,
-        DateTime? expires = null)
+        DateTime? expires = null,
+        string? email = TestSetup.ServiceAccountEmail,
+        bool? emailVerified = true)
     {
         // notBefore derives from the expiry, so an expired token still reaches lifetime validation.
         var expiresAt = expires ?? DateTime.UtcNow.AddMinutes(10);
+        List<Claim> claims = [new("sub", "1234567890")];
+        if (email is not null)
+            claims.Add(new Claim("email", email));
+        if (emailVerified is not null)
+            claims.Add(new Claim("email_verified", emailVerified.Value ? "true" : "false", ClaimValueTypes.Boolean));
+
         var token = new JwtSecurityToken(
             issuer: issuer,
             audience: audience,
-            claims: [new Claim(ClaimTypes.NameIdentifier, TestSetup.ServiceAccountEmail)],
+            claims: claims,
             notBefore: expiresAt.AddMinutes(-15),
             expires: expiresAt,
             signingCredentials: new SigningCredentials(SigningKey, SecurityAlgorithms.HmacSha256));
@@ -177,6 +185,60 @@ public sealed class QueueDispatchHostTests
 
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.Unauthorized);
         await Assert.That(processor.Calls).IsEqualTo(0);
+    }
+
+    [Test]
+    [Arguments("attacker@another-project.iam.gserviceaccount.com")]
+    [Arguments("someone@gmail.com")]
+    public async Task A_token_minted_for_another_service_account_is_refused(string email)
+    {
+        // Google mints a token with this audience for any service account in any project on request.
+        var processor = new FakeProcessor();
+        using var host = await StartHostAsync(processor, new FakeDeadLetterWriter());
+
+        var response = await host.GetTestClient().SendAsync(Post(EnvelopeJson(), Token(email: email)));
+
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.Unauthorized);
+        await Assert.That(processor.Calls).IsEqualTo(0);
+    }
+
+    [Test]
+    public async Task A_token_without_an_email_is_refused()
+    {
+        var processor = new FakeProcessor();
+        using var host = await StartHostAsync(processor, new FakeDeadLetterWriter());
+
+        var response = await host.GetTestClient().SendAsync(Post(EnvelopeJson(), Token(email: null)));
+
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.Unauthorized);
+        await Assert.That(processor.Calls).IsEqualTo(0);
+    }
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(null)]
+    public async Task A_token_whose_email_is_not_verified_is_refused(bool? emailVerified)
+    {
+        var processor = new FakeProcessor();
+        using var host = await StartHostAsync(processor, new FakeDeadLetterWriter());
+
+        var response = await host.GetTestClient()
+            .SendAsync(Post(EnvelopeJson(), Token(emailVerified: emailVerified)));
+
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.Unauthorized);
+        await Assert.That(processor.Calls).IsEqualTo(0);
+    }
+
+    [Test]
+    public async Task The_configured_service_account_is_matched_case_insensitively()
+    {
+        var processor = new FakeProcessor();
+        using var host = await StartHostAsync(processor, new FakeDeadLetterWriter());
+
+        var response = await host.GetTestClient()
+            .SendAsync(Post(EnvelopeJson(), Token(email: TestSetup.ServiceAccountEmail.ToUpperInvariant())));
+
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
     }
 
     [Test]
