@@ -50,7 +50,7 @@ internal sealed class DeadLetterResender(
         await unitOfWork.ExecuteAndCommitAsync(async token =>
         {
             // Enqueue before delete: if the delete fails the entry survives to be resent, never lost.
-            await ResolvedRequestEnqueuer.Enqueue(queue, request, registered.ResponseType, token);
+            await ResolvedRequestEnqueuer.Enqueue(queue, request, registered.ResponseType, options: null, token);
             await store.DeleteAsync(idempotencyKey, token);
         }, ct);
 

@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using Google.Cloud.Firestore;
 using Spinneret.Functional;
 using Spinneret.Mediator;
@@ -181,9 +182,153 @@ public sealed class FirestoreSchedulerDispatcherTests(FirestoreEmulatorFixture f
 
         await host.Sweep.SweepAsync(CancellationToken.None);
 
-        await Assert.That(host.DeadLetters.Entries).Count().IsEqualTo(2);
-        await Assert.That(await host.JobExists("first")).IsTrue();
-        await Assert.That(await host.JobExists("second")).IsTrue();
+        await Assert.That(await host.JobField<int>("first", ScheduledJob.Fields.DispatchFailures)).IsEqualTo(1);
+        await Assert.That(await host.JobField<int>("second", ScheduledJob.Fields.DispatchFailures)).IsEqualTo(1);
+    }
+
+    [Test]
+    public async Task A_recurring_job_whose_enqueue_fails_stays_due_instead_of_being_dead_lettered()
+    {
+        // A transport blip must neither page anyone nor cost a daily job its day.
+        await using var host = await SchedulerTestHost.StartAsync(fixture);
+        await host.Scheduler.RegisterAsync("flaky", new TestRequest("f"), Hourly);
+        await host.MakeDue("flaky");
+        host.Queue.FailWith = new InvalidOperationException("DeadlineExceeded");
+
+        await host.Sweep.SweepAsync(CancellationToken.None);
+
+        await Assert.That(host.DeadLetters.Entries).IsEmpty();
+        await Assert.That(await host.JobField<int>("flaky", ScheduledJob.Fields.DispatchFailures)).IsEqualTo(1);
+        await Assert.That(await host.JobNextExecuteAt("flaky") < DateTimeOffset.UtcNow.AddMinutes(1)).IsTrue();
+    }
+
+    [Test]
+    public async Task Consecutive_enqueue_failures_are_counted()
+    {
+        await using var host = await SchedulerTestHost.StartAsync(fixture);
+        await host.Scheduler.RegisterAsync("down", new TestRequest("dn"), Hourly);
+        host.Queue.FailWith = new InvalidOperationException("transport is down");
+
+        for (var i = 0; i < 3; i++)
+        {
+            await host.MakeDue("down");
+            await host.Sweep.SweepAsync(CancellationToken.None);
+        }
+
+        await Assert.That(await host.JobField<int>("down", ScheduledJob.Fields.DispatchFailures)).IsEqualTo(3);
+        await Assert.That(host.DeadLetters.Entries).IsEmpty();
+    }
+
+    [Test]
+    public async Task A_recurring_job_failing_past_the_retry_window_is_dead_lettered_and_resumes_its_schedule()
+    {
+        // A failure that never clears (a deleted queue) must surface, not retry unseen forever.
+        await using var host = await SchedulerTestHost.StartAsync(fixture);
+        await host.Scheduler.RegisterAsync("stuck", new TestRequest("st"), Hourly);
+        await host.MakeDue("stuck");
+        host.Queue.FailWith = new InvalidOperationException("Queue does not exist");
+        await host.Sweep.SweepAsync(CancellationToken.None);
+
+        await host.SetField("stuck", ScheduledJob.Fields.FirstFailedAt,
+            Timestamp.FromDateTimeOffset(DateTimeOffset.UtcNow - TimeSpan.FromHours(1)));
+        await host.MakeDue("stuck");
+        await host.Sweep.SweepAsync(CancellationToken.None);
+
+        var entry = host.DeadLetters.Entries.Single();
+        await Assert.That(entry.Attempts).IsEqualTo(2);
+        await Assert.That(entry.Error).Contains("Queue does not exist");
+        await Assert.That(await host.JobNextExecuteAt("stuck")).IsEqualTo(Hourly.NextRun(DateTimeOffset.UtcNow));
+        var snapshot = await host.Job("stuck").GetSnapshotAsync();
+        await Assert.That(snapshot.ContainsField(ScheduledJob.Fields.DispatchFailures)).IsFalse();
+        await Assert.That(snapshot.ContainsField(ScheduledJob.Fields.FirstFailedAt)).IsFalse();
+    }
+
+    [Test]
+    public async Task A_one_shot_failing_past_the_retry_window_is_dead_lettered_and_removed()
+    {
+        await using var host = await SchedulerTestHost.StartAsync(fixture);
+        var handle = await ScheduleOneShot(host, new TestRequest("given-up"), DateTimeOffset.UtcNow);
+        host.Queue.FailWith = new InvalidOperationException("transport is down");
+        await host.Sweep.SweepAsync(CancellationToken.None);
+
+        await host.SetField(handle, ScheduledJob.Fields.FirstFailedAt,
+            Timestamp.FromDateTimeOffset(DateTimeOffset.UtcNow - TimeSpan.FromHours(1)));
+        await host.MakeDue(handle);
+        await host.Sweep.SweepAsync(CancellationToken.None);
+
+        await Assert.That(host.DeadLetters.Entries.Single().Attempts).IsEqualTo(2);
+        await Assert.That(await host.JobExists(handle)).IsFalse();
+    }
+
+    [Test]
+    public async Task A_retried_recurring_job_runs_once_then_returns_to_its_schedule()
+    {
+        await using var host = await SchedulerTestHost.StartAsync(fixture);
+        await host.Scheduler.RegisterAsync("recovers", new TestRequest("rc"), Hourly);
+        await host.MakeDue("recovers");
+        host.Queue.FailWith = new InvalidOperationException("transport is down");
+        await host.Sweep.SweepAsync(CancellationToken.None);
+
+        host.Queue.FailWith = null;
+        await host.MakeDue("recovers");
+        await host.Sweep.SweepAsync(CancellationToken.None);
+
+        await Assert.That(Enqueued(host, "rc")).IsEqualTo(1);
+        await Assert.That(await host.JobNextExecuteAt("recovers")).IsEqualTo(Hourly.NextRun(DateTimeOffset.UtcNow));
+        var snapshot = await host.Job("recovers").GetSnapshotAsync();
+        await Assert.That(snapshot.ContainsField(ScheduledJob.Fields.DispatchFailures)).IsFalse();
+        await Assert.That(snapshot.ContainsField(ScheduledJob.Fields.PendingDedupeKey)).IsFalse();
+        await Assert.That(snapshot.ContainsField(ScheduledJob.Fields.FirstFailedAt)).IsFalse();
+    }
+
+    [Test]
+    public async Task A_retried_occurrence_reuses_its_dedupe_key()
+    {
+        // The failed enqueue may have landed (a timeout), and its retry must then be a duplicate.
+        await using var host = await SchedulerTestHost.StartAsync(fixture);
+        await host.Scheduler.RegisterAsync("timed-out", new TestRequest("to"), Hourly);
+        await host.MakeDue("timed-out");
+        host.Queue.FailWith = new InvalidOperationException("DeadlineExceeded");
+        await host.Sweep.SweepAsync(CancellationToken.None);
+
+        host.Queue.FailWith = null;
+        await host.MakeDue("timed-out");
+        await host.Sweep.SweepAsync(CancellationToken.None);
+
+        var keys = DedupeKeys(host, "to");
+        await Assert.That(keys).Count().IsEqualTo(2);
+        await Assert.That(keys.Distinct()).Count().IsEqualTo(1);
+    }
+
+    [Test]
+    public async Task Each_recurring_occurrence_has_its_own_dedupe_key()
+    {
+        await using var host = await SchedulerTestHost.StartAsync(fixture);
+        await host.Scheduler.RegisterAsync("distinct", new TestRequest("ds"), Hourly);
+
+        await host.MakeDue("distinct");
+        await host.Sweep.SweepAsync(CancellationToken.None);
+        await host.MakeDue("distinct", TimeSpan.FromSeconds(1));
+        await host.Sweep.SweepAsync(CancellationToken.None);
+
+        var keys = DedupeKeys(host, "ds");
+        await Assert.That(keys).Count().IsEqualTo(2);
+        await Assert.That(keys.Distinct()).Count().IsEqualTo(2);
+    }
+
+    [Test]
+    public async Task The_dedupe_key_suits_every_transport_whatever_the_job_key()
+    {
+        // Cloud Tasks takes [A-Za-z0-9_-] only; the SQL outboxes take 200 characters.
+        var jobKey = "billing:nightly run.v2 " + new string('x', 300);
+        await using var host = await SchedulerTestHost.StartAsync(fixture);
+        await host.Scheduler.RegisterAsync(jobKey, new TestRequest("odd"), Hourly);
+        await host.MakeDue(jobKey);
+
+        await host.Sweep.SweepAsync(CancellationToken.None);
+
+        var key = DedupeKeys(host, "odd").Single();
+        await Assert.That(Regex.IsMatch(key, "^[A-Za-z0-9_-]{1,200}$")).IsTrue();
     }
 
     [Test]
@@ -226,11 +371,31 @@ public sealed class FirestoreSchedulerDispatcherTests(FirestoreEmulatorFixture f
     }
 
     [Test]
-    public async Task Failed_one_shot_dispatch_is_removed_with_a_dead_letter()
+    public async Task A_one_shot_whose_enqueue_fails_is_kept_and_retried()
+    {
+        await using var host = await SchedulerTestHost.StartAsync(fixture);
+        var handle = await ScheduleOneShot(host, new TestRequest("persistent"), DateTimeOffset.UtcNow);
+        host.Queue.FailWith = new InvalidOperationException("transport is down");
+        await host.Sweep.SweepAsync(CancellationToken.None);
+
+        await Assert.That(host.DeadLetters.Entries).IsEmpty();
+        await Assert.That(await host.JobField<int>(handle, ScheduledJob.Fields.DispatchFailures)).IsEqualTo(1);
+
+        host.Queue.FailWith = null;
+        await host.MakeDue(handle);
+        await host.Sweep.SweepAsync(CancellationToken.None);
+
+        await Assert.That(Enqueued(host, "persistent")).IsEqualTo(1);
+        await Assert.That(await host.JobExists(handle)).IsFalse();
+        await Assert.That(DedupeKeys(host, "persistent").Distinct()).Count().IsEqualTo(1);
+    }
+
+    [Test]
+    public async Task A_one_shot_that_cannot_be_rebuilt_is_removed_with_a_dead_letter()
     {
         await using var host = await SchedulerTestHost.StartAsync(fixture);
         var handle = await ScheduleOneShot(host, new TestRequest("doomed"), DateTimeOffset.UtcNow);
-        host.Queue.FailWith = new InvalidOperationException("transport is down");
+        await host.SetField(handle, ScheduledJob.Fields.RequestTypeName, "No.Such.Type");
 
         await host.Sweep.SweepAsync(CancellationToken.None);
 
@@ -245,15 +410,17 @@ public sealed class FirestoreSchedulerDispatcherTests(FirestoreEmulatorFixture f
         // The document is the only copy left, so it must stay for the lapsed lease to retry.
         await using var host = await SchedulerTestHost.StartAsync(fixture);
         var handle = await ScheduleOneShot(host, new TestRequest("precious"), DateTimeOffset.UtcNow);
-        host.Queue.FailWith = new InvalidOperationException("transport is down");
-        host.DeadLetters.FailWith = new InvalidOperationException("dead-letter store is down too");
+        var typeName = await host.JobField<string>(handle, ScheduledJob.Fields.RequestTypeName);
+        await host.SetField(handle, ScheduledJob.Fields.RequestTypeName, "No.Such.Type");
+        host.DeadLetters.FailWith = new InvalidOperationException("dead-letter store is down");
 
         await host.Sweep.SweepAsync(CancellationToken.None);
 
         await Assert.That(host.DeadLetters.Entries).IsEmpty();
         await Assert.That(await host.JobExists(handle)).IsTrue();
 
-        host.Queue.FailWith = null;
+        // E.g. a later deploy registers the type again.
+        await host.SetField(handle, ScheduledJob.Fields.RequestTypeName, typeName);
         host.DeadLetters.FailWith = null;
         await host.MakeDue(handle);
         await host.Sweep.SweepAsync(CancellationToken.None);
@@ -261,6 +428,11 @@ public sealed class FirestoreSchedulerDispatcherTests(FirestoreEmulatorFixture f
         await Assert.That(Enqueued(host, "precious")).IsEqualTo(1);
         await Assert.That(await host.JobExists(handle)).IsFalse();
     }
+
+    private static string[] DedupeKeys(SchedulerTestHost host, string name) =>
+        [.. host.Queue.Attempts
+            .Where(a => a.Request is TestRequest r && r.Name == name)
+            .Select(a => a.Options?.DedupeKey ?? "")];
 
     private static async Task<string> ScheduleOneShot(
         SchedulerTestHost host, IRequest<Unit> request, DateTimeOffset executeAt)

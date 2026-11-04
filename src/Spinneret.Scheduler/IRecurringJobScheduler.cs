@@ -11,7 +11,7 @@ public interface IRecurringJobScheduler
     /// Registers or updates a recurring job by <paramref name="key"/>; idempotent and safe to call on every startup.
     /// </summary>
     /// <remarks>
-    /// The next run is rescheduled only when the schedule changed. A failed run is dead-lettered but never stops the schedule.
+    /// The next run is rescheduled only when the schedule changed. A run that cannot be dispatched never stops the schedule.
     /// </remarks>
     Task RegisterAsync<TResponse>(
         string key, IRequest<TResponse> request, Schedule schedule, CancellationToken ct = default);

@@ -19,6 +19,15 @@ public class FirestoreSchedulerOptionsTests
     }
 
     [Test]
+    public async Task Defaults_enqueue_retry_window_is_one_hour()
+    {
+        // Cloud Tasks remembers a task name for about an hour; past it a retry may deliver twice.
+        var options = new FirestoreSchedulerOptions();
+
+        await Assert.That(options.EnqueueRetryWindow).IsEqualTo(TimeSpan.FromHours(1));
+    }
+
+    [Test]
     public async Task SectionName_is_the_scheduler_gcp_configuration_path()
     {
         await Assert.That(FirestoreSchedulerOptions.SectionName).IsEqualTo("Scheduler:Firestore");

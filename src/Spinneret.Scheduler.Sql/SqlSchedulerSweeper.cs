@@ -172,7 +172,7 @@ internal sealed class SqlSchedulerSweeper(
         var request = serializer.Deserialize(job.PayloadJson, registered.RequestType)
             ?? throw new InvalidOperationException($"Deserialized null for '{job.RequestTypeName}'.");
 
-        await ResolvedRequestEnqueuer.Enqueue(queue, request, registered.ResponseType, ct);
+        await ResolvedRequestEnqueuer.Enqueue(queue, request, registered.ResponseType, options: null, ct);
     }
 
     // Guarded: if a competing sweep re-claimed the job, this is a no-op and nothing is

@@ -16,6 +16,7 @@ internal static class SchedulerJobOutcome
     internal const string Enqueued = "enqueued";
     internal const string Skipped = "skipped";
     internal const string Quarantined = "quarantined";
+    internal const string Retrying = "retrying";
 }
 
 internal static class SchedulerJobKind

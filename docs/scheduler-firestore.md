@@ -35,7 +35,7 @@ app.MapSchedulerSweep(CloudTasksAuth.PolicyName);                               
 |---|---|
 | **A queue** | Any composition. The sweep enqueues through `IQueue` and needs the type registry and payload serializer. |
 | **A host-registered `FirestoreDb`** | See [queue-firestore.md](queue-firestore.md#requires) for the builder snippet. |
-| **An `IDeadLetterWriter`** | A failed occurrence is dead-lettered. `q.UseFirestoreDeadLetters()` is the natural pairing; a SQL storage's table works too. |
+| **An `IDeadLetterWriter`** | A job whose request can no longer be rebuilt is dead-lettered. `q.UseFirestoreDeadLetters()` is the natural pairing; a SQL storage's table works too. |
 | **A trigger** | Nothing dispatches without one. |
 
 ## Configuration — `Scheduler:Firestore`
@@ -44,8 +44,12 @@ app.MapSchedulerSweep(CloudTasksAuth.PolicyName);                               
 |---|---|---|---|
 | `Collection` | `string` | `"scheduled_jobs"` | Collection holding job documents. |
 | `OneShotLeaseWindow` | `TimeSpan` | `00:05:00` | How long a one-shot job is hidden once a sweep leases it. |
+| `EnqueueRetryWindow` | `TimeSpan` | `01:00:00` | How long a job whose enqueue keeps failing is retried before it is dead-lettered. |
 
-Both must be set and positive respectively; validated at startup.
+`Collection` must be set and both windows positive; validated at startup.
+
+Keep `EnqueueRetryWindow` within the transport's dedupe window — about an hour on Cloud Tasks. Past it,
+a retry of an enqueue that landed unseen is delivered a second time.
 
 `OneShotLeaseWindow` is a crash-recovery window, not a timeout. If a dispatcher dies mid-dispatch the
 lease lapses and a later sweep retries the job, so a one-shot can never get permanently stuck. It must
@@ -67,11 +71,13 @@ One document per job, keyed by the job's `Key` (or an `oneshot-`-prefixed id for
 | `schedule` | Canonical `cron:<zone>:<expression>`. **Absent on one-shot jobs** — that absence is what distinguishes them. |
 | `nextExecuteAt` | When the job is next due. Doubles as the lease. |
 | `createdAt`, `lastRunAt` | `lastRunAt` is only meaningful on a recurring job; a one-shot is deleted by the run that would set it. |
+| `dispatchFailures`, `firstFailedAt` | Consecutive failed enqueues, and when the first failed. Present only while the job waits to retry one. |
+| `pendingDedupeKey` | Recurring only, beside `dispatchFailures`: the dedupe key the retry must reuse. |
 
 ### There is no status field
 
 A document exists only while it is still work to do. A one-shot is deleted the moment it is enqueued,
-or — if it failed — in the step after its payload reaches the dead-letter store; cancelling deletes it
+or — if it is dead-lettered — in the step after its payload reaches the dead-letter store; cancelling deletes it
 outright. So the collection stays proportional to what is scheduled rather than to everything ever
 scheduled, and needs no TTL policy or retention job.
 
@@ -79,7 +85,7 @@ Two consequences worth knowing:
 
 - **The record of a run lives in the logs and the queue, not here.** If you want to answer "did this
   job run", look at the `Scheduled job {JobId} enqueued` log line or the dead-letter collection.
-- **A failed dispatch whose dead-letter write also fails keeps its document**, deliberately: it is then
+- **A dead-lettered one-shot whose dead-letter write fails keeps its document**, deliberately: it is then
   the only copy of the payload. The lease lapses and a later sweep retries, which also recovers the
   job outright when the original failure was transient.
 
@@ -124,11 +130,24 @@ write has not happened yet when the method returns.
     time. Do not use a recurring job where every single occurrence must happen; use it for work that
     is periodic and self-correcting.
 
+  Every enqueue carries a `DedupeKey` naming its run — the one-shot's handle, or the recurring job's
+  key and slot — so an enqueue that landed but was not seen to (a crash, a timeout) is a duplicate
+  when it is sent again, within the transport's dedupe window.
+
   The SQL schedulers differ here: its claim and enqueue share one transaction, so an
   occurrence can be neither lost nor double-enqueued. That is the trade for requiring the queue to
   live in the same database.
-- **A failed occurrence never stops the schedule.** It is dead-lettered and the next slot still runs —
-  recurrence belongs to the job, not to any single run.
+- **A failed enqueue is retried for `EnqueueRetryWindow`, then dead-lettered.** The failure is usually
+  the transport's — a timeout, a queue briefly not found — so the job stays due: retried from 30
+  seconds, doubling to a 5-minute ceiling (and never faster than the sweep runs), logged as a warning
+  and as an error from the fifth consecutive failure on. A recurring job's slots missed meanwhile
+  coalesce into the one run that lands — every occurrence carries the same request. The retry reuses
+  the failed attempt's dedupe key, because a timed-out enqueue may have landed. A failure that outlasts
+  the window (a deleted queue, a payload the transport refuses) is dead-lettered: a one-shot's document
+  is then removed, and a recurring job resumes at its next slot and opens a new window.
+- **A request that cannot be rebuilt is dead-lettered at once** — its type no longer registered, or its
+  payload no longer deserializing. Retrying would never help. A recurring job is dead-lettered per
+  occurrence and keeps its schedule: recurrence belongs to the job, not to any single run.
 - **An unreadable schedule is quarantined, not dropped.** Pushed out five minutes and dead-lettered per
   occurrence, and kept so a host version that understands it can still pick it up. This is what a
   rollback past a schedule-format change looks like.

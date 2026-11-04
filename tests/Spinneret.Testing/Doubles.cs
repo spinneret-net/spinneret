@@ -23,6 +23,7 @@ public sealed class DeliveryLog
 public sealed class RecordingQueue : IQueue
 {
     private readonly ConcurrentQueue<object> _enqueued = new();
+    private readonly ConcurrentQueue<(object Request, QueueOptions? Options)> _attempts = new();
 
     /// <summary>Set to make every enqueue fail.</summary>
     public Exception? FailWith { get; set; }
@@ -30,8 +31,12 @@ public sealed class RecordingQueue : IQueue
     public IReadOnlyCollection<object> Enqueued => [.. _enqueued];
     public int CountOf<T>(Func<T, bool> predicate) => _enqueued.OfType<T>().Count(predicate);
 
+    /// <summary>Every enqueue call, failed ones included.</summary>
+    public IReadOnlyCollection<(object Request, QueueOptions? Options)> Attempts => [.. _attempts];
+
     public Task Enqueue<TResponse>(IRequest<TResponse> request, QueueOptions? options = null, CancellationToken ct = default)
     {
+        _attempts.Enqueue((request, options));
         if (FailWith is { } failure)
             return Task.FromException(failure);
 

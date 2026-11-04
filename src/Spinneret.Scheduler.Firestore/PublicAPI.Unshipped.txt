@@ -5,6 +5,8 @@ Spinneret.Scheduler.Firestore.FirestoreSchedulerOptions.Collection.set -> void
 Spinneret.Scheduler.Firestore.FirestoreSchedulerOptions.FirestoreSchedulerOptions() -> void
 Spinneret.Scheduler.Firestore.FirestoreSchedulerOptions.OneShotLeaseWindow.get -> System.TimeSpan
 Spinneret.Scheduler.Firestore.FirestoreSchedulerOptions.OneShotLeaseWindow.set -> void
+Spinneret.Scheduler.Firestore.FirestoreSchedulerOptions.EnqueueRetryWindow.get -> System.TimeSpan
+Spinneret.Scheduler.Firestore.FirestoreSchedulerOptions.EnqueueRetryWindow.set -> void
 Spinneret.Scheduler.Firestore.IFirestoreTransactionalScheduler
 Spinneret.Scheduler.Firestore.IFirestoreTransactionalScheduler.CancelJob(Google.Cloud.Firestore.Transaction! transaction, string! handle) -> void
 Spinneret.Scheduler.Firestore.IFirestoreTransactionalScheduler.ScheduleJob<TResponse>(Google.Cloud.Firestore.Transaction! transaction, Spinneret.Mediator.IRequest<TResponse>! request, System.DateTimeOffset executeAt) -> string!

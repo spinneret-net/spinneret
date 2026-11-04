@@ -144,7 +144,7 @@ Spans are emitted on the `Spinneret.Scheduler` source
 (`SchedulerDiagnostics.ActivitySourceName`): one `scheduler sweep` per pass, tagged
 `scheduler.jobs_dispatched`, and one `scheduler job` per *claimed* job — a pass that finds nothing
 due emits only the sweep span. Each job span carries `scheduler.job_id`, `scheduler.job_kind`
-(`recurring` or `oneshot`) and `scheduler.outcome` (`enqueued`, `skipped` or `quarantined`).
+(`recurring` or `oneshot`) and `scheduler.outcome` (`enqueued`, `retrying`, `skipped` or `quarantined`).
 
 **A job runs in the sweep's trace, never the one that scheduled it.** For a recurring job the
 "scheduling trace" is a host bootstrap that may have happened a year ago, and parenting every

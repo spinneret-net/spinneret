@@ -41,7 +41,7 @@ public static class FirestoreSchedulerBuilderExtensions
         {
             services.AddOptions<FirestoreSchedulerOptions>()
                 .Configure(configure)
-                .Validate(ValidateOptions, "Scheduler:Firestore options are invalid: Collection must be set and OneShotLeaseWindow positive.")
+                .Validate(ValidateOptions, "Scheduler:Firestore options are invalid: Collection must be set, and OneShotLeaseWindow and EnqueueRetryWindow positive.")
                 .ValidateOnStart();
 
             // Also registered by the queue; added so AddQueue/AddScheduler order doesn't matter.
@@ -54,5 +54,7 @@ public static class FirestoreSchedulerBuilderExtensions
     }
 
     private static bool ValidateOptions(FirestoreSchedulerOptions o) =>
-        !string.IsNullOrWhiteSpace(o.Collection) && o.OneShotLeaseWindow > TimeSpan.Zero;
+        !string.IsNullOrWhiteSpace(o.Collection)
+        && o.OneShotLeaseWindow > TimeSpan.Zero
+        && o.EnqueueRetryWindow > TimeSpan.Zero;
 }

@@ -21,5 +21,10 @@ internal static class ScheduledJob
         // Present only on recurring jobs; its absence marks a one-shot.
         public const string Schedule = "schedule";
         public const string LastRunAt = "lastRunAt";
+        // Present only while a job waits to retry an enqueue that failed.
+        public const string DispatchFailures = "dispatchFailures";
+        public const string FirstFailedAt = "firstFailedAt";
+        // Recurring only: the failed occurrence's dedupe key, which its slot no longer yields once retried.
+        public const string PendingDedupeKey = "pendingDedupeKey";
     }
 }

@@ -58,7 +58,7 @@ On Cloud Tasks, pass `CloudTasksAuth.PolicyName` to reuse the queue's OIDC schem
 | `401` / `403` | The caller did not satisfy the authorization policy — the first thing a misconfigured cron returns. |
 | `500` | The sweep threw. Deliberate: a non-success response is what makes an external scheduler retry the tick. |
 
-Per-job failures do not surface here — the sweep handles those internally, dead-lettering the
+Per-job failures do not surface here — the sweep handles those internally, retrying or dead-lettering the
 occurrence and continuing. A 500 means the pass itself could not run.
 
 ## Infrastructure

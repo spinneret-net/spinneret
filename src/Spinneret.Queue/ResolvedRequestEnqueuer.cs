@@ -12,11 +12,12 @@ internal static class ResolvedRequestEnqueuer
         typeof(IQueue).GetMethods()
             .Single(m => m is { Name: nameof(IQueue.Enqueue), IsGenericMethod: true });
 
-    public static Task Enqueue(IQueue queue, object request, Type responseType, CancellationToken ct)
+    public static Task Enqueue(
+        IQueue queue, object request, Type responseType, QueueOptions? options, CancellationToken ct)
     {
         try
         {
-            return (Task)EnqueueOpenGeneric.MakeGenericMethod(responseType).Invoke(queue, [request, null, ct])!;
+            return (Task)EnqueueOpenGeneric.MakeGenericMethod(responseType).Invoke(queue, [request, options, ct])!;
         }
         catch (TargetInvocationException ex) when (ex.InnerException is not null)
         {
