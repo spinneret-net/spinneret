@@ -1,7 +1,4 @@
 #nullable enable
-override Spinneret.Functional.Either<T1, T2>.Equals(object? obj) -> bool
-override Spinneret.Functional.Either<T1, T2>.GetHashCode() -> int
-override Spinneret.Functional.Either<T1, T2>.ToString() -> string!
 override Spinneret.Functional.Result<TError>.Equals(object? obj) -> bool
 override Spinneret.Functional.Result<TError>.GetHashCode() -> int
 override Spinneret.Functional.Result<TError>.ToString() -> string!
@@ -11,16 +8,6 @@ override Spinneret.Functional.Result<TOk, TError>.ToString() -> string!
 override Spinneret.Functional.TaskResult<TError>.GetHashCode() -> int
 override Spinneret.Functional.TaskResult<TOk, TError>.GetHashCode() -> int
 override Spinneret.Functional.Unit.GetHashCode() -> int
-Spinneret.Functional.Either<T1, T2>
-Spinneret.Functional.Either<T1, T2>.<Clone>$() -> Spinneret.Functional.Either<T1, T2>!
-Spinneret.Functional.Either<T1, T2>.Either(T1 value) -> void
-Spinneret.Functional.Either<T1, T2>.Either(T2 value) -> void
-Spinneret.Functional.Either<T1, T2>.Equals(Spinneret.Functional.Either<T1, T2>? other) -> bool
-Spinneret.Functional.Either<T1, T2>.Map<T3, T4>(System.Func<T1, T3>! f1, System.Func<T2, T4>! f2) -> Spinneret.Functional.Either<T3, T4>!
-Spinneret.Functional.Either<T1, T2>.Match<T>(System.Func<T1, T>! f1, System.Func<T2, T>! f2) -> T
-Spinneret.Functional.Either<T1, T2>.Reverse() -> Spinneret.Functional.Either<T2, T1>!
-Spinneret.Functional.Either<T1, T2>.Switch(System.Action<T1>! f1, System.Action<T2>! f2) -> void
-Spinneret.Functional.Either<T1, T2>.TraverseResult<T3, T4, TError>(System.Func<T1, Spinneret.Functional.Result<T3, TError>!>! f1, System.Func<T2, Spinneret.Functional.Result<T4, TError>!>! f2) -> Spinneret.Functional.Result<Spinneret.Functional.Either<T3, T4>!, TError>!
 Spinneret.Functional.LinqExtensions
 Spinneret.Functional.Result
 Spinneret.Functional.Result<TError>
@@ -104,10 +91,6 @@ Spinneret.Functional.TaskResultExtensions
 Spinneret.Functional.Unit
 Spinneret.Functional.Unit.Equals(Spinneret.Functional.Unit other) -> bool
 Spinneret.Functional.Unit.Unit() -> void
-static Spinneret.Functional.Either<T1, T2>.First(T1 value) -> Spinneret.Functional.Either<T1, T2>!
-static Spinneret.Functional.Either<T1, T2>.operator !=(Spinneret.Functional.Either<T1, T2>? left, Spinneret.Functional.Either<T1, T2>? right) -> bool
-static Spinneret.Functional.Either<T1, T2>.operator ==(Spinneret.Functional.Either<T1, T2>? left, Spinneret.Functional.Either<T1, T2>? right) -> bool
-static Spinneret.Functional.Either<T1, T2>.Second(T2 value) -> Spinneret.Functional.Either<T1, T2>!
 static Spinneret.Functional.LinqExtensions.Choose<T1, T2>(this System.Collections.Generic.IEnumerable<T1>! enumerable, System.Func<T1, T2?>! func) -> System.Collections.Generic.IEnumerable<T2!>!
 static Spinneret.Functional.LinqExtensions.Choose<T1, T2>(this System.Collections.Generic.IEnumerable<T1>! enumerable, System.Func<T1, T2?>! func) -> System.Collections.Generic.IEnumerable<T2>!
 static Spinneret.Functional.Result.Error<TError>(TError error) -> Spinneret.Functional.Result<TError>!
@@ -124,7 +107,6 @@ static Spinneret.Functional.Result<TOk, TError>.FromNullable(TOk? value, System.
 static Spinneret.Functional.Result<TOk, TError>.Ok(TOk value) -> Spinneret.Functional.Result<TOk, TError>!
 static Spinneret.Functional.Result<TOk, TError>.operator !=(Spinneret.Functional.Result<TOk, TError>? left, Spinneret.Functional.Result<TOk, TError>? right) -> bool
 static Spinneret.Functional.Result<TOk, TError>.operator ==(Spinneret.Functional.Result<TOk, TError>? left, Spinneret.Functional.Result<TOk, TError>? right) -> bool
-static Spinneret.Functional.ResultExtensions.Flatten<TOk, TError1, TError2>(this Spinneret.Functional.Result<Spinneret.Functional.Result<TOk, TError2>!, TError1>! res) -> Spinneret.Functional.Result<TOk, Spinneret.Functional.Either<TError1, TError2>!>!
 static Spinneret.Functional.ResultExtensions.Swap<TError1, TError2>(this Spinneret.Functional.Result<Spinneret.Functional.Result<TError2>!, TError1>! input) -> Spinneret.Functional.Result<Spinneret.Functional.Result<TError1>!, TError2>!
 static Spinneret.Functional.ResultExtensions.Swap<TOk, TError1, TError2>(this Spinneret.Functional.Result<Spinneret.Functional.Result<TOk, TError2>!, TError1>! input) -> Spinneret.Functional.Result<Spinneret.Functional.Result<TOk, TError1>!, TError2>!
 static Spinneret.Functional.TaskExtensions.Bind(this System.Threading.Tasks.Task! task, System.Func<System.Threading.Tasks.Task!>! continuation) -> System.Threading.Tasks.Task!

@@ -347,12 +347,4 @@ public static class ResultExtensions
             e => Result<Result<TError1>, TError2>.Ok(Result<TError1>.Error(e))
         );
     }
-
-    /// <summary>Merges a nested result's two error types into a single <see cref="Either{TError1, TError2}"/>.</summary>
-    public static Result<TOk, Either<TError1, TError2>> Flatten<TOk, TError1, TError2>(this Result<Result<TOk, TError2>, TError1> res)
-    {
-        return res
-            .MapError(Either<TError1, TError2>.First)
-            .Bind(x => x.MapError(Either<TError1, TError2>.Second));
-    }
 }

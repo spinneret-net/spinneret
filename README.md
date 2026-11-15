@@ -9,7 +9,7 @@
 
 <p align="center">
   <a href="https://www.nuget.org/packages?q=Spinneret"><img src="https://img.shields.io/nuget/v/Spinneret.Functional.svg?label=nuget&color=6366F1" alt="NuGet"></a>
-  <img src="https://img.shields.io/badge/.NET-10.0-6366F1" alt=".NET 10">
+  <img src="https://img.shields.io/badge/.NET-11.0-6366F1" alt=".NET 11">
   <img src="https://img.shields.io/badge/license-MIT-F59E0B" alt="MIT">
 </p>
 
@@ -37,7 +37,7 @@ Pick the core package for what you need, then add one package per piece of infra
 
 | Package | What it does |
 |---|---|
-| `Spinneret.Functional` | `Result` / `Either` with `Match`/`Map`/`Bind` and an awaitable `TaskResult`. Every other package builds on it. |
+| `Spinneret.Functional` | `Result` with `Match`/`Map`/`Bind` and an awaitable `TaskResult`. Every other package builds on it. |
 | `Spinneret.Mediator` | In-process request dispatch, with declarative caching invalidated by tags. |
 | `Spinneret.Parsing` | Turns input into a typed model, or into the full list of localized property errors. |
 

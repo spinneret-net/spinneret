@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <TargetFramework>net10.0</TargetFramework>
+        <TargetFramework>net11.0</TargetFramework>
         <Nullable>enable</Nullable>
         <ImplicitUsings>enable</ImplicitUsings>
         <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
@@ -9,8 +9,8 @@
     </PropertyGroup>
 
     <PropertyGroup>
-        <Description>Result and Either types with task and LINQ combinators. Railway-oriented error handling for .NET, and the dragline every other Spinneret package hangs from.</Description>
-        <PackageTags>$(PackageTags) result either functional railway-oriented errors</PackageTags>
+        <Description>Result types with task and LINQ combinators. Railway-oriented error handling for .NET, and the dragline every other Spinneret package hangs from.</Description>
+        <PackageTags>$(PackageTags) result functional railway-oriented errors</PackageTags>
     </PropertyGroup>
 
 </Project>

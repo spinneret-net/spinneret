@@ -111,3 +111,5 @@ internal readonly struct ChildStruct
 {
     public string StringProperty { get; init; }
 }
+
+internal union ChildOrNumber(ChildClass, int);

@@ -212,59 +212,58 @@ public class PropertyParserCoreTests
     }
 
     [Test]
-    public async Task Either_extension_parses_first_alternative_with_first_parser()
+    public async Task Union_model_parses_first_case_with_its_own_parser()
     {
-        var sut = new Either<ChildClass, int>(new ChildClass
+        ChildOrNumber sut = new ChildClass
         {
             StringProperty = "test"
-        });
+        };
 
-        var parseRes = ModelParser.Parse(sut, parser => parser.ParseEither(
-            (_, p) => new ChildClass { StringProperty = p.Require(x => x.StringProperty) },
-            (x, _) => x));
+        var parseRes = ModelParser.Parse(sut, ParseChildOrNumber);
 
         var res = Expect.Ok(parseRes);
 
-        var parsedChild = res.Match(
-            child => child,
-            _ => throw new InvalidOperationException("Expected first alternative."));
-
-        await Assert.That(parsedChild.StringProperty).IsEqualTo("test");
+        await Assert.That(res.Value).IsTypeOf<ChildClass>();
+        await Assert.That(((ChildClass)res.Value!).StringProperty).IsEqualTo("test");
     }
 
     [Test]
-    public async Task Either_extension_parses_second_alternative_with_second_parser()
+    public async Task Union_model_parses_second_case_with_its_own_parser()
     {
-        var sut = new Either<ChildClass, int>(41);
+        ChildOrNumber sut = 41;
 
-        var parseRes = ModelParser.Parse(sut, parser => parser.ParseEither(
-            (x, _) => x,
-            (x, _) => x + 1));
+        var parseRes = ModelParser.Parse(sut, ParseChildOrNumber);
 
         var res = Expect.Ok(parseRes);
 
-        var parsedValue = res.Match(
-            _ => throw new InvalidOperationException("Expected second alternative."),
-            value => value);
-
-        await Assert.That(parsedValue).IsEqualTo(42);
+        await Assert.That(res.Value).IsEqualTo(42);
     }
 
     [Test]
-    public async Task Either_extension_records_errors_from_the_selected_alternative()
+    public async Task Union_model_records_errors_from_the_selected_case()
     {
-        var sut = new Either<ChildClass, int>(new ChildClass
+        ChildOrNumber sut = new ChildClass
         {
             StringProperty = null!
-        });
+        };
 
-        var parseRes = ModelParser.Parse(sut, parser => parser.ParseEither(
-            (_, p) => new ChildClass { StringProperty = p.Require(x => x.StringProperty) },
-            (x, _) => x));
+        var parseRes = ModelParser.Parse(sut, ParseChildOrNumber);
 
         var error = Expect.SingleError(parseRes);
 
         await Assert.That(error.PropertyName).IsEqualTo("StringProperty");
         await Assert.That(error.Error).IsEqualTo("Required Property");
+    }
+
+    private static ChildOrNumber ParseChildOrNumber(PropertyParser<ChildOrNumber, string> parser)
+    {
+        return parser.Model switch
+        {
+            ChildClass child => new ChildClass
+            {
+                StringProperty = parser.WithModel(_ => child).Require(x => x.StringProperty)
+            },
+            int number => number + 1,
+        };
     }
 }

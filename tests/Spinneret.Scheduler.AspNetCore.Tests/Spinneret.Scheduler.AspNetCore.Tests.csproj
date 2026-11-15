@@ -6,7 +6,7 @@
 
   <ItemGroup>
     <!-- In-memory server, to test authorization through a real pipeline. -->
-    <PackageReference Include="Microsoft.AspNetCore.TestHost" Version="10.0.13" />
+    <PackageReference Include="Microsoft.AspNetCore.TestHost" Version="11.0.0" />
   </ItemGroup>
 
   <ItemGroup>

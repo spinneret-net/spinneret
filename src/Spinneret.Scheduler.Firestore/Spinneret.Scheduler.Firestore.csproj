@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <TargetFramework>net10.0</TargetFramework>
+        <TargetFramework>net11.0</TargetFramework>
         <Nullable>enable</Nullable>
         <ImplicitUsings>enable</ImplicitUsings>
         <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
@@ -10,10 +10,8 @@
 
     <ItemGroup>
         <!-- No ASP.NET Core framework reference, so a worker without a web stack can use this. -->
-        <PackageReference Include="Google.Cloud.Firestore" Version="4.5.0" />
-        <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="10.0.13" />
-        <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.13" />
-        <PackageReference Include="Microsoft.Extensions.Options" Version="10.0.13" />
+        <PackageReference Include="Google.Cloud.Firestore" Version="4.6.0" />
+        <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="11.0.0" />
     </ItemGroup>
 
     <ItemGroup>

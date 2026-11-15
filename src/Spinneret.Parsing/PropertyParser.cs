@@ -403,19 +403,3 @@ public sealed class PropertyParser<TModel, TError>
             });
     }
 }
-
-/// <summary>Combinators for parsing models that are an <see cref="Either{T1, T2}"/> of two shapes.</summary>
-public static class PropertyParserExtensions
-{
-    /// <summary>Parses whichever case the model holds with the matching parser.</summary>
-    public static Either<TParsed1, TParsed2> ParseEither<TModel1, TModel2, TParsed1, TParsed2, TError>(
-        this PropertyParser<Either<TModel1, TModel2>, TError> parser,
-        Func<TModel1, PropertyParser<TModel1, TError>, TParsed1> parser1,
-        Func<TModel2, PropertyParser<TModel2, TError>, TParsed2> parser2
-    )
-    {
-        return parser.Model.Map(
-            x => parser1(x, parser.ReplaceModel(x)),
-            x => parser2(x, parser.ReplaceModel(x)));
-    }
-}

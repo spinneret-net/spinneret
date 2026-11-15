@@ -38,10 +38,8 @@ Spinneret.Parsing.PropertyParser<TModel, TError>.Require<TMember, TParsed>(Syste
 Spinneret.Parsing.PropertyParser<TModel, TError>.Require<TMember>(System.Linq.Expressions.Expression<System.Func<TModel, TMember?>!>! expression) -> TMember
 Spinneret.Parsing.PropertyParser<TModel, TError>.Require<TMember>(System.Linq.Expressions.Expression<System.Func<TModel, TMember?>!>! expression) -> TMember!
 Spinneret.Parsing.PropertyParser<TModel, TError>.WithModel<TNewModel>(System.Func<TModel, TNewModel>! mapper) -> Spinneret.Parsing.PropertyParser<TNewModel, TError>!
-Spinneret.Parsing.PropertyParserExtensions
 static Microsoft.Extensions.DependencyInjection.ParsingServiceCollectionExtensions.AddModelParser<T>(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, T missingPropertyError) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
 static Spinneret.Parsing.ExpressionPropertyPath.GetDottedPath(System.Linq.Expressions.LambdaExpression! expression) -> string!
 static Spinneret.Parsing.ExpressionPropertyPath.TryGetDottedPath(System.Linq.Expressions.LambdaExpression! expression, out string? path) -> bool
 static Spinneret.Parsing.InvalidProperty<T>.operator !=(Spinneret.Parsing.InvalidProperty<T>? left, Spinneret.Parsing.InvalidProperty<T>? right) -> bool
 static Spinneret.Parsing.InvalidProperty<T>.operator ==(Spinneret.Parsing.InvalidProperty<T>? left, Spinneret.Parsing.InvalidProperty<T>? right) -> bool
-static Spinneret.Parsing.PropertyParserExtensions.ParseEither<TModel1, TModel2, TParsed1, TParsed2, TError>(this Spinneret.Parsing.PropertyParser<Spinneret.Functional.Either<TModel1, TModel2>!, TError>! parser, System.Func<TModel1, Spinneret.Parsing.PropertyParser<TModel1, TError>!, TParsed1>! parser1, System.Func<TModel2, Spinneret.Parsing.PropertyParser<TModel2, TError>!, TParsed2>! parser2) -> Spinneret.Functional.Either<TParsed1, TParsed2>!

@@ -639,36 +639,4 @@ public class ResultCombinatorTests
 
         await Assert.That(swapped).IsEqualTo(Result.Ok<Result<bool>, string>(Result.Error(true)));
     }
-
-    [Test]
-    public async Task Flatten_on_ok_of_ok_produces_flat_ok()
-    {
-        var nested = Result.Ok<Result<int, string>, bool>(Result.Ok<int, string>(42));
-
-        var flattened = nested.Flatten();
-
-        await Assert.That(flattened).IsEqualTo(Result.Ok<int, Either<bool, string>>(42));
-    }
-
-    [Test]
-    public async Task Flatten_on_outer_error_produces_first_either_branch()
-    {
-        var nested = Result.Error<Result<int, string>, bool>(true);
-
-        var flattened = nested.Flatten();
-
-        await Assert.That(flattened)
-            .IsEqualTo(Result.Error<int, Either<bool, string>>(new Either<bool, string>(true)));
-    }
-
-    [Test]
-    public async Task Flatten_on_inner_error_produces_second_either_branch()
-    {
-        var nested = Result.Ok<Result<int, string>, bool>(Result.Error<int, string>("inner"));
-
-        var flattened = nested.Flatten();
-
-        await Assert.That(flattened)
-            .IsEqualTo(Result.Error<int, Either<bool, string>>(new Either<bool, string>("inner")));
-    }
 }
